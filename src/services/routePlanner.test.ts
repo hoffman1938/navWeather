@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { BATUMI, FakeWeatherProvider, TBILISI, tbilisiBatumiPlaces, tbilisiBatumiRoute } from '../test/helpers';
+import {
+  BATUMI,
+  FakeRecognition,
+  FakeTTS,
+  FakeWeatherProvider,
+  TBILISI,
+  tbilisiBatumiPlaces,
+  tbilisiBatumiRoute,
+} from '../test/helpers';
 import { StyleUrlMapProvider } from './map/MapProvider';
 import type { Providers } from './providers';
 import { applyLatePlaces, parseCoordinateText, planRoute, resolvePlace } from './routePlanner';
@@ -8,7 +16,11 @@ import { WeatherService } from './weather/WeatherService';
 
 function providers(placesDelayMs: number, failPlaces = false): Providers {
   return {
-    routing: { name: 'r', calculateRoute: async () => tbilisiBatumiRoute() },
+    routing: {
+      name: 'r',
+      capabilities: { alternatives: false, avoid: [], laneGuidance: true, matrix: false, multiStop: true },
+      calculateRoutes: async () => [tbilisiBatumiRoute()],
+    },
     geocoding: { name: 'g', geocode: async (q) => (/tbilisi/i.test(q) ? TBILISI : null), reverse: async () => null },
     autocomplete: { name: 'a', suggest: async () => [] },
     reverseGeocoding: { name: 'rg', geocode: async () => null, reverse: async () => null },
@@ -20,6 +32,10 @@ function providers(placesDelayMs: number, failPlaces = false): Providers {
         ),
     },
     elevation: null,
+    poi: null,
+    speedLimits: null,
+    tts: new FakeTTS(),
+    speechRecognition: new FakeRecognition(),
     traffic: new NoTrafficProvider(),
     map: new StyleUrlMapProvider('t', 'l', 'd'),
     weather: new WeatherService(new FakeWeatherProvider(Date.now()), {

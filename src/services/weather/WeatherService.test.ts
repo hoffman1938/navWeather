@@ -71,6 +71,20 @@ describe('WeatherService', () => {
     expect(b.forecasts.size).toBe(4);
   });
 
+  it('does not adopt a request that its owner aborted (race)', async () => {
+    const { provider, service } = setup();
+    provider.delayMs = 20;
+    const ctrl = new AbortController();
+    const first = service.getForecasts(pts, { signal: ctrl.signal });
+    first.catch(() => undefined);
+    const second = service.getForecasts(pts); // joins the in-flight requests
+    ctrl.abort();
+    const r = await second;
+    expect(r.error).toBeUndefined();
+    expect(r.forecasts.size).toBe(4);
+    await expect(first).rejects.toThrow();
+  });
+
   it('falls back to stale cache when the provider fails', async () => {
     const { provider, service, advance } = setup();
     await service.getForecasts(pts);

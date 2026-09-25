@@ -1,20 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { setProviders, type Providers } from '../services/providers';
+import { setProviders } from '../services/providers';
 import type { RouteRequest } from '../services/routing/RoutingProvider';
-import { normalizeOsrmRoute } from '../services/routing/OSRMProvider';
-import { StyleUrlMapProvider } from '../services/map/MapProvider';
-import { NoTrafficProvider } from '../services/traffic/TrafficProvider';
-import { WeatherService } from '../services/weather/WeatherService';
-import {
-  BATUMI,
-  FakeWeatherProvider,
-  rawTbilisiBatumi,
-  TBILISI,
-  tbilisiBatumiPlaces,
-  tbilisiBatumiRoute,
-} from '../test/helpers';
+import { installFakeProviders } from '../test/harness';
+import type { FakeWeatherProvider } from '../test/helpers';
 import type { LngLat } from '../types/geo';
-import { haversineM } from '../utils/distance';
 import { formatLocalTime } from '../utils/timezone';
 import { selectScrub } from './scrub';
 import { __resetStoreRuntime, useAppStore } from './store';
@@ -33,66 +22,9 @@ let weatherProvider: FakeWeatherProvider;
 let routingCalls: RouteRequest[];
 
 function installProviders() {
-  weatherProvider = new FakeWeatherProvider(BASE);
-  routingCalls = [];
-  const providers: Providers = {
-    routing: {
-      name: 'fake-osrm',
-      async calculateRoute(req) {
-        routingCalls.push(req);
-        if (req.origin.id === TBILISI.id) return tbilisiBatumiRoute();
-        // Re-route: remainder of the fixture from the vertex closest to the origin.
-        const raw = rawTbilisiBatumi();
-        const coords = raw.geometry.coordinates;
-        let k = 0;
-        coords.forEach((c, i) => {
-          if (haversineM(c, req.origin.coordinate) < haversineM(coords[k], req.origin.coordinate)) k = i;
-        });
-        const leg = raw.legs[0];
-        const ann = leg.annotation!;
-        const durs = ann.duration!.slice(k);
-        const dists = ann.distance!.slice(k);
-        const sliced = {
-          distance: dists.reduce((a, b) => a + b, 0),
-          duration: durs.reduce((a, b) => a + b, 0),
-          geometry: { coordinates: [req.origin.coordinate, ...coords.slice(k + 1)] },
-          legs: [
-            {
-              ...leg,
-              distance: dists.reduce((a, b) => a + b, 0),
-              duration: durs.reduce((a, b) => a + b, 0),
-              steps: [],
-              annotation: { duration: durs, distance: dists },
-            },
-          ],
-        };
-        return normalizeOsrmRoute(sliced, req);
-      },
-    },
-    geocoding: {
-      name: 'fake-geo',
-      async geocode(q) {
-        return /batumi/i.test(q) ? BATUMI : /tbilisi/i.test(q) ? TBILISI : null;
-      },
-      async reverse() {
-        return null;
-      },
-    },
-    autocomplete: { name: 'fake-ac', suggest: async () => [] },
-    reverseGeocoding: { name: 'fake-rev', geocode: async () => null, reverse: async () => null },
-    places: { name: 'fake-places', getPlacesNearRoute: async () => tbilisiBatumiPlaces() },
-    elevation: null,
-    traffic: new NoTrafficProvider(),
-    map: new StyleUrlMapProvider('test', 'light', 'dark'),
-    weather: new WeatherService(weatherProvider, {
-      ttlMs: 20 * 60000,
-      batchSize: 50,
-      resolutionDeg: 0.02,
-      maxEntries: 500,
-      minForecastHours: 48,
-    }),
-  };
-  setProviders(providers);
+  const h = installFakeProviders(BASE);
+  weatherProvider = h.weather;
+  routingCalls = h.routingCalls;
 }
 
 async function planTbilisiBatumi() {

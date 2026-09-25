@@ -2,24 +2,41 @@ import { buildCurrentPoint, buildRouteWeatherPoints, reconcilePoints } from '../
 import { computeArrivals } from '../algorithms/routeTiming';
 import { buildTimelineItems, type TimelineItem } from '../algorithms/timeline';
 import {
-  detectWeatherEvents,
   groupWeather,
   selectDisplayPoints,
   summarizeRouteWeather,
   weatherRouteSegments,
 } from '../algorithms/weatherGrouping';
+import type { SpeedLimitProfile } from '../algorithms/speedLimits';
+import { isPrecipitating, matchForecastToTime } from '../algorithms/weatherMatching';
+import type { Messages } from '../i18n/en';
+import type { UnitPrefs } from '../i18n/format';
+import { buildRouteIntelligence, type RouteIntelligence } from '../intelligence/routeIntelligence';
+import type { RouteEvent } from '../intelligence/types';
+import type { WeatherAlertPrefs } from '../intelligence/weatherAlerts';
+import { buildManeuvers, type Maneuver } from '../navigation/maneuvers';
 import type { PlannedRoute } from '../services/routePlanner';
 import type { LngLat } from '../types/geo';
 import type { NavigationMode, RouteProgress } from '../types/navigation';
-import type { RouteSample } from '../types/route';
+import type { RouteSample, TimedRoute } from '../types/route';
 import type {
   LocationForecast,
   RouteWeatherPoint,
   RouteWeatherSummary,
-  WeatherEvent,
   WeatherGroup,
   WeatherRouteSegment,
 } from '../types/weather';
+
+export interface RouteOptionSummary {
+  index: number;
+  distanceM: number;
+  durationS: number;
+  /** Minutes of the drive expected in rain / heavy rain (at the ETAs). */
+  wetMinutes: number;
+  heavyMinutes: number;
+  hasWeather: boolean;
+  classes: string[];
+}
 
 export interface Derived {
   /** Every sample with its arrival-time weather (incl. passed ones). */
@@ -32,12 +49,16 @@ export interface Derived {
   currentPoint: RouteWeatherPoint | null;
   timelineItems: TimelineItem[];
   groups: WeatherGroup[];
-  events: WeatherEvent[];
   summary: RouteWeatherSummary | null;
   routeSegments: WeatherRouteSegment[];
+  maneuvers: Maneuver[];
+  intelligence: RouteIntelligence;
+  options: RouteOptionSummary[];
   departureMs: number;
   arrivalMs: number | null;
 }
+
+const emptyIntelligence: RouteIntelligence = { events: [], nextWeather: null, ahead: [] };
 
 export const emptyDerived: Derived = {
   points: [],
@@ -46,15 +67,19 @@ export const emptyDerived: Derived = {
   currentPoint: null,
   timelineItems: [],
   groups: [],
-  events: [],
   summary: null,
   routeSegments: [],
+  maneuvers: [],
+  intelligence: emptyIntelligence,
+  options: [],
   departureMs: 0,
   arrivalMs: null,
 };
 
 export interface DeriveInput {
   plan: PlannedRoute | null;
+  /** All route options (primary first) — for the weather comparison while planning. */
+  options: PlannedRoute[];
   forecastFor: (s: RouteSample) => LocationForecast | undefined;
   mode: NavigationMode;
   /** Planning: chosen departure. Navigating: when this route leg started. */
@@ -64,21 +89,44 @@ export interface DeriveInput {
   progress: RouteProgress | null;
   vehicleCoordinate: LngLat | null;
   fallbackTimeZone: string;
+  m: Messages;
+  units: UnitPrefs;
+  weatherPrefs: WeatherAlertPrefs;
+  speedLimits: SpeedLimitProfile | null;
+  fuelRangeKm: number | null;
+  vehicle?: 'fuel' | 'ev';
+  extraEvents: RouteEvent[];
   previous: Derived;
 }
 
+let maneuverMemo: { timed: TimedRoute; list: Maneuver[] } | null = null;
+function maneuversFor(timed: TimedRoute): Maneuver[] {
+  if (maneuverMemo?.timed !== timed) maneuverMemo = { timed, list: buildManeuvers(timed) };
+  return maneuverMemo.list;
+}
+
+/** Timezone for points without a forecast: nearest point that has one. */
+function nearestTimeZone(samples: RouteSample[], forecastFor: DeriveInput['forecastFor'], i: number, fallback: string) {
+  for (let d = 0; d < samples.length; d++) {
+    for (const j of [i - d, i + d]) {
+      const f = j >= 0 && j < samples.length ? forecastFor(samples[j]) : undefined;
+      if (f?.timezone) return f.timezone;
+    }
+  }
+  return fallback;
+}
+
 export function deriveRouteWeather(input: DeriveInput): Derived {
-  const { plan, mode, progress, previous } = input;
+  const { plan, mode, progress, previous, m, units } = input;
   if (!plan) return emptyDerived;
   const navigating = mode !== 'planning' && progress !== null;
   const samples = plan.samples;
+  const fallbackTz = nearestTimeZone(samples, input.forecastFor, 0, input.fallbackTimeZone);
 
-  const arrivals = computeArrivals(
-    samples,
-    navigating
-      ? { mode: 'navigating', nowMs: input.nowMs, modelTimeS: progress.modelTimeS, departureMs: input.departureMs }
-      : { mode: 'planning', departureMs: input.departureMs },
-  );
+  const clock = navigating
+    ? ({ mode: 'navigating', nowMs: input.nowMs, modelTimeS: progress.modelTimeS, departureMs: input.departureMs } as const)
+    : ({ mode: 'planning', departureMs: input.departureMs } as const);
+  const arrivals = computeArrivals(samples, clock);
   const rawPoints = buildRouteWeatherPoints({
     samples,
     arrivals,
@@ -86,7 +134,7 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     nowMs: input.nowMs,
     progressM: navigating ? progress.distanceAlongM : null,
     modelTimeS: navigating ? progress.modelTimeS : 0,
-    fallbackTimeZone: input.fallbackTimeZone,
+    fallbackTimeZone: fallbackTz,
   });
   const points = reconcilePoints(previous.points, rawPoints);
   const upcoming = navigating ? points.filter((p) => p.status !== 'passed') : points;
@@ -99,13 +147,33 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
       samples,
       forecastFor: input.forecastFor,
       nowMs: input.nowMs,
-      fallbackTimeZone: input.fallbackTimeZone,
+      fallbackTimeZone: fallbackTz,
     });
     currentPoint = c ? (reconcilePoints(previous.currentPoint ? [previous.currentPoint] : [], [c])[0] ?? c) : null;
   }
 
-  // Select cards over the whole route (stable while driving), then hide passed ones.
-  const selected = selectDisplayPoints(points, { includeFirst: true });
+  const maneuvers = maneuversFor(plan.timed);
+  const intelligence = buildRouteIntelligence({
+    timed: plan.timed,
+    maneuvers,
+    progressM: navigating ? progress.distanceAlongM : 0,
+    clock: navigating ? { mode: 'navigating', nowMs: input.nowMs, modelTimeS: progress.modelTimeS } : { mode: 'planning', departureMs: input.departureMs },
+    weatherPoints: points,
+    currentPoint,
+    weatherPrefs: input.weatherPrefs,
+    speedLimits: input.speedLimits,
+    fuelRangeKm: input.fuelRangeKm,
+    vehicle: input.vehicle,
+    extraEvents: input.extraEvents,
+    m,
+    units,
+  });
+
+  // Cards/markers: selected over the whole route (stable while driving), passed ones hidden.
+  const eventPointIds = new Set(
+    intelligence.events.filter((e) => e.category === 'weather').map((e) => e.id.split('@')[1]),
+  );
+  const selected = selectDisplayPoints(points, { includeFirst: true, eventPointIds });
   const displayPoints = stableArray(
     previous.displayPoints,
     navigating ? selected.filter((p) => p.status !== 'passed') : selected,
@@ -116,14 +184,16 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     previous.timelineItems,
     buildTimelineItems(currentPoint ? [currentPoint, ...displayPoints] : displayPoints),
   );
-  const groups = stableJson(previous.groups, groupWeather(ahead));
-  const events = stableJson(previous.events, detectWeatherEvents(ahead));
-  const summary = stableJson(previous.summary, summarizeRouteWeather(ahead));
+  const groups = stableJson(previous.groups, groupWeather(ahead, m));
+  const summary = stableJson(previous.summary, summarizeRouteWeather(ahead, m, units.temperature));
   const routeSegments = stableJson(previous.routeSegments, weatherRouteSegments(points, plan.timed.totalDistM));
 
-  const arrivalMs = navigating
-    ? progress.etaMs
-    : input.departureMs + plan.timed.totalTimeS * 1000;
+  const options =
+    !navigating && input.options.length > 1
+      ? stableJson(previous.options, input.options.map((o, i) => summarizeOption(o, i, input)))
+      : [];
+
+  const arrivalMs = navigating ? progress.etaMs : input.departureMs + plan.timed.totalTimeS * 1000;
 
   return {
     points,
@@ -132,11 +202,42 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     currentPoint,
     timelineItems,
     groups,
-    events,
     summary,
     routeSegments,
+    maneuvers,
+    intelligence: stableIntelligence(previous.intelligence, intelligence),
+    options,
     departureMs: input.departureMs,
     arrivalMs,
+  };
+}
+
+/** Weather exposure of a route option: minutes in rain / heavy rain at the ETAs. */
+function summarizeOption(o: PlannedRoute, index: number, input: DeriveInput): RouteOptionSummary {
+  let wet = 0;
+  let heavy = 0;
+  let has = false;
+  const s = o.samples;
+  for (let i = 0; i < s.length; i++) {
+    const f = input.forecastFor(s[i]);
+    const w = f ? matchForecastToTime(f, input.departureMs + s[i].travelTimeS * 1000) : null;
+    if (!w) continue;
+    has = true;
+    const next = s[i + 1]?.travelTimeS ?? s[i].travelTimeS;
+    const prev = s[i - 1]?.travelTimeS ?? s[i].travelTimeS;
+    const span = (next - prev) / 2 / 60;
+    if (isPrecipitating(w.condition)) wet += span;
+    if (w.condition === 'HEAVY_RAIN' || w.condition === 'THUNDERSTORM' || (w.precipitation ?? 0) >= 4) heavy += span;
+  }
+  const classes = [...new Set(o.timed.route.legs.flatMap((l) => l.steps.flatMap((st) => st.classes ?? [])))];
+  return {
+    index,
+    distanceM: o.timed.totalDistM,
+    durationS: o.timed.totalTimeS,
+    wetMinutes: Math.round(wet),
+    heavyMinutes: Math.round(heavy),
+    hasWeather: has,
+    classes,
   };
 }
 
@@ -157,6 +258,14 @@ function stableItems(prev: TimelineItem[], next: TimelineItem[]): TimelineItem[]
     return prev;
   }
   return next;
+}
+
+/** Re-use the previous intelligence object when nothing a user can see changed. */
+function stableIntelligence(prev: RouteIntelligence, next: RouteIntelligence): RouteIntelligence {
+  const sig = (i: RouteIntelligence) =>
+    i.ahead.map((e) => `${e.id}|${e.severity}|${e.estimatedMinutesFromCurrent}|${Math.round(e.distanceFromCurrentM / 100)}`).join(';') +
+    `#${i.events.length}#${i.nextWeather?.id ?? ''}`;
+  return sig(prev) === sig(next) ? { ...next, ahead: prev.ahead } : next;
 }
 
 function stableJson<T>(prev: T, next: T): T {

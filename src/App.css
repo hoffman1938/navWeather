@@ -8,3 +8,10 @@
   inset: 0;
   background: var(--bg);
 }
+.map-placeholder--error {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--text-3);
+  text-align: center;
+}

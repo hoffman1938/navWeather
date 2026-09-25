@@ -1,0 +1,50 @@
+.set-group {
+  margin: 0 0 16px;
+}
+.set-group .label {
+  margin: 0 0 2px;
+}
+.set-group > .set-row + .set-row {
+  border-top: 1px solid var(--border);
+}
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 6px 0;
+}
+.set-row > span {
+  display: flex;
+  flex-direction: column;
+}
+.set-row small {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.set-row select,
+.set-row input[type='number'] {
+  min-height: 40px;
+  max-width: 55%;
+  padding: 0 8px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  font-size: 16px;
+}
+.set-row input[type='number'] {
+  width: 110px;
+}
+.set-row--switch input {
+  width: 44px;
+  height: 26px;
+  accent-color: var(--accent-fill);
+}
+.set-note {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.set-done {
+  width: 100%;
+}

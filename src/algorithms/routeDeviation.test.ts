@@ -62,6 +62,15 @@ describe('route deviation detection', () => {
     expect(s.consecutiveOff).toBe(0);
   });
 
+  it('never flags off-route within the fix accuracy (city canyons)', () => {
+    const { s } = run([
+      { d: 120, acc: 140, t: 0 },
+      { d: 125, acc: 140, t: 5 },
+      { d: 130, acc: 140, t: 10 },
+    ]);
+    expect(s.status).toBe('on-route');
+  });
+
   it('tolerates poor-but-usable accuracy with a wider threshold', () => {
     const { s } = run([
       { d: 80, acc: 90, t: 0 },

@@ -1,4 +1,5 @@
 import type { GeoJSONSource, Map as MLMap } from 'maplibre-gl';
+import type * as maplibregl from 'maplibre-gl';
 import type { LngLat } from '../../types/geo';
 
 export const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -19,12 +20,13 @@ function cssVar(name: string, fallback: string): string {
 export function addRouteLayers(map: MLMap) {
   const route = cssVar('--route', '#0a6cff');
   const casing = cssVar('--route-casing', '#ffffff');
-  const traveled = cssVar('--route-traveled', '#9aa3ad');
   const danger = cssVar('--danger', '#c62828');
   const surface = cssVar('--surface', '#ffffff');
 
   const beforeId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
-  for (const id of ['route', 'route-weather', 'route-traveled', 'endpoints', 'focus']) {
+  // lineMetrics → line-progress, so the driven part is a gradient stop, not a re-uploaded line.
+  if (!map.getSource('route')) map.addSource('route', { type: 'geojson', data: EMPTY_FC, lineMetrics: true });
+  for (const id of ['route-weather', 'endpoints', 'focus', 'pois']) {
     if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: EMPTY_FC });
   }
   const lineLayout = { 'line-join': 'round', 'line-cap': 'round' } as const;
@@ -89,17 +91,11 @@ export function addRouteLayers(map: MLMap) {
       type: 'line',
       source: 'route',
       layout: lineLayout,
-      paint: { 'line-color': route, 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 3, 9, 5.5, 14, 10] },
-    },
-    beforeId,
-  );
-  map.addLayer(
-    {
-      id: 'route-traveled',
-      type: 'line',
-      source: 'route-traveled',
-      layout: lineLayout,
-      paint: { 'line-color': traveled, 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 3, 9, 5.5, 14, 10] },
+      paint: {
+        'line-color': route,
+        'line-gradient': routeGradient(0),
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 3, 9, 5.5, 14, 10],
+      },
     },
     beforeId,
   );
@@ -122,6 +118,17 @@ export function addRouteLayers(map: MLMap) {
       'circle-color': route,
       'circle-stroke-color': surface,
       'circle-stroke-width': 3,
+    },
+  });
+  map.addLayer({
+    id: 'pois',
+    type: 'circle',
+    source: 'pois',
+    paint: {
+      'circle-radius': 6,
+      'circle-color': route,
+      'circle-stroke-color': surface,
+      'circle-stroke-width': 2.5,
     },
   });
   map.addLayer({
@@ -148,4 +155,18 @@ export function lineFeature(coords: LngLat[], properties: Record<string, unknown
 
 export function pointFeature(c: LngLat, properties: Record<string, unknown> = {}): GeoJSON.Feature {
   return { type: 'Feature', properties, geometry: { type: 'Point', coordinates: c } };
+}
+
+/**
+ * Route colour with the driven part greyed out, as a gradient stop on
+ * line-progress (Mercator length fraction). Updating this paint property is
+ * cheap; re-uploading a growing polyline was not.
+ */
+export function routeGradient(fraction: number): maplibregl.ExpressionSpecification {
+  const route = cssVar('--route', '#0a6cff');
+  const traveled = cssVar('--route-traveled', '#9aa3ad');
+  const f = Math.max(0, Math.min(1, fraction));
+  if (f <= 0) return ['interpolate', ['linear'], ['line-progress'], 0, route, 1, route];
+  if (f >= 1) return ['interpolate', ['linear'], ['line-progress'], 0, traveled, 1, traveled];
+  return ['step', ['line-progress'], traveled, f, route];
 }

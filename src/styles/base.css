@@ -13,7 +13,7 @@ body,
 
 body {
   font-family: var(--font);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.35;
   color: var(--text);
   background: var(--bg);
@@ -22,6 +22,7 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 button,
@@ -63,7 +64,7 @@ button:disabled {
   border: 0;
 }
 
-/* Shared buttons */
+/* Buttons: one filled primary per context; everything else is quiet text. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -71,62 +72,60 @@ button:disabled {
   gap: 8px;
   min-height: var(--tap);
   padding: 0 18px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--r-control);
   font-weight: 600;
-  font-size: 15px;
-  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease), opacity var(--dur);
   white-space: nowrap;
-}
-.btn:active:not(:disabled) {
-  transform: scale(0.97);
+  transition: background var(--dur) var(--ease), opacity var(--dur);
 }
 .btn-primary {
-  background: var(--accent);
-  color: var(--accent-contrast);
-}
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 .btn-primary:disabled {
   opacity: 0.55;
 }
-.btn-secondary {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.btn-secondary:hover:not(:disabled) {
-  background: var(--surface-3);
-}
-.btn-ghost {
+.btn-quiet {
   color: var(--accent);
   padding: 0 12px;
+}
+.btn-danger {
+  background: var(--danger-fill);
+  color: #fff;
 }
 .icon-btn {
   display: inline-grid;
   place-items: center;
   width: var(--tap);
   height: var(--tap);
-  border-radius: var(--radius-pill);
+  border-radius: 50%;
   color: var(--text-2);
-  transition: background var(--dur) var(--ease);
 }
-.icon-btn:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-fill-hover);
+  }
+  .btn-quiet:hover,
+  .icon-btn:hover {
+    background: var(--surface-2);
+  }
 }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--tap);
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
+
+/* Section label: sentence case, small, no shouting uppercase. */
+.label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
 }
-.chip:hover {
-  background: var(--surface-3);
+
+/* Row list with hairline dividers — the default way to show many things. */
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rows > li + li {
+  border-top: 1px solid var(--border);
 }
 
 .spinner {
@@ -146,5 +145,10 @@ button:disabled {
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation-duration: 2.4s;
+  }
+}
+@media (forced-colors: active) {
+  .btn-primary {
+    border: 1px solid ButtonText;
   }
 }

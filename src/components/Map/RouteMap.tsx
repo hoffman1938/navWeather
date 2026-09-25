@@ -7,15 +7,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useEffectiveTheme } from '../../hooks/useEffectiveTheme';
 import { useReducedMotion } from '../../hooks/useMediaQuery';
+import { navigationZoom } from '../../navigation/instructions';
 import { getProviders } from '../../services/providers';
 import { useLayoutStore } from '../../state/layout';
 import { selectScrub } from '../../state/scrub';
+import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import type { LngLat } from '../../types/geo';
-import { sliceLine } from '../../utils/distance';
+import type { TimedRoute } from '../../types/route';
+import { lowerIndex, sliceLine } from '../../utils/distance';
 import { LocateIcon } from '../Icons/Icons';
 import { WeatherMarker } from '../WeatherMarker/WeatherMarker';
-import { addRouteLayers, EMPTY_FC, lineFeature, pointFeature, setData } from './mapLayers';
+import { addRouteLayers, EMPTY_FC, lineFeature, pointFeature, routeGradient, setData } from './mapLayers';
 import './Map.css';
 
 setWorkerUrl(maplibreWorkerUrl);
@@ -26,28 +29,50 @@ interface Host {
   marker: Marker;
 }
 
+/** Cumulative Web-Mercator length per vertex — what MapLibre's line-progress measures. */
+function mercatorProgress(timed: TimedRoute): (distanceM: number) => number {
+  const g = timed.route.geometry;
+  const merc = new Float64Array(g.length);
+  const y = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+  for (let i = 1; i < g.length; i++) {
+    const dx = ((g[i][0] - g[i - 1][0]) * Math.PI) / 180;
+    const dy = y(g[i][1]) - y(g[i - 1][1]);
+    merc[i] = merc[i - 1] + Math.hypot(dx, dy);
+  }
+  const total = merc[g.length - 1] || 1;
+  return (d) => {
+    const i = lowerIndex(timed.cumDistM, d);
+    if (i >= g.length - 1) return 1;
+    const span = timed.cumDistM[i + 1] - timed.cumDistM[i];
+    const t = span > 0 ? (d - timed.cumDistM[i]) / span : 0;
+    return (merc[i] + (merc[i + 1] - merc[i]) * t) / total;
+  };
+}
+
 /**
- * The map: route, subtle weather glow, weather markers (the SAME points as
- * the timeline cards), vehicle, and camera behaviour for selection/follow.
+ * The map: route (driven part greyed), subtle weather glow, weather markers
+ * (the same points as the strip), places, the vehicle, and a navigation
+ * camera (heading-up, auto-zoom around maneuvers, manual override + recenter).
  */
 export default function RouteMap() {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const hostsRef = useRef(new Map<string, Host>());
   const vehicleRef = useRef<Marker | null>(null);
-  /** True while a deliberate camera transition runs; follow mode waits for it. */
   const transitioning = useRef(false);
   const [styleVersion, setStyleVersion] = useState(0);
   const [hosts, setHosts] = useState<Host[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [userMoved, setUserMoved] = useState(false);
   const { theme } = useEffectiveTheme();
+  const m = useMessages();
   const dark = theme === 'dark';
   const initialDark = useRef(dark);
   const reduced = useReducedMotion();
+  const batterySaver = useSettings((s) => s.batterySaver);
   const insets = useLayoutStore((s) => s.insets);
 
-  const plan = useAppStore((s) => s.plan);
+  const timed = useAppStore((s) => s.plan?.timed ?? null);
   const displayPoints = useAppStore((s) => s.derived.displayPoints);
   const allPoints = useAppStore((s) => s.derived.points);
   const segments = useAppStore((s) => s.derived.routeSegments);
@@ -55,20 +80,17 @@ export default function RouteMap() {
   const selectionSource = useAppStore((s) => s.selectionSource);
   const highlightedId = useAppStore((s) => s.highlightedPointId);
   const scrub = useAppStore(selectScrub);
+  const poi = useAppStore((s) => s.poi);
   const mode = useAppStore((s) => s.mode);
   const follow = useAppStore((s) => s.followVehicle);
   const navigating = mode !== 'planning';
 
-  const padding = useMemo(
-    () => {
-      // Overlay insets, clamped so the visible map area never collapses.
-      const h = typeof window !== 'undefined' ? window.innerHeight : 800;
-      const top = insets.top + 8;
-      const bottom = Math.min(insets.bottom + 8, Math.max(0, h - top - 160));
-      return { top, bottom, left: 16, right: 16 };
-    },
-    [insets.top, insets.bottom],
-  );
+  const padding = useMemo(() => {
+    const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const top = insets.top + 8;
+    const bottom = Math.min(insets.bottom + 8, Math.max(0, h - top - 160));
+    return { top, bottom, left: insets.left + 16, right: 16 };
+  }, [insets.top, insets.bottom, insets.left]);
   const paddingRef = useRef(padding);
   paddingRef.current = padding;
 
@@ -82,27 +104,21 @@ export default function RouteMap() {
         style: getProviders().map.getStyleUrl(initialDark.current ? 'dark' : 'light'),
         center: [43.4, 42.0],
         zoom: 6.2,
-        // Attribution goes top-right so the bottom sheet never hides it.
-        attributionControl: false,
-        dragRotate: false,
+        attributionControl: false, // placed top-right so the sheet never hides it
         pitchWithRotate: false,
-        touchPitch: false,
         fadeDuration: 150,
       });
     } catch {
-      setMapError('Map unavailable on this device — the forecast below still works.');
+      setMapError(m.ui.mapUnavailable);
       return;
     }
     map.addControl(new AttributionControl({ compact: true }), 'top-right');
-    map.touchZoomRotate.disableRotation();
     map.on('style.load', () => {
       addRouteLayers(map);
       setStyleVersion((v) => v + 1);
     });
     map.on('error', (e) => {
-      if (!map.isStyleLoaded() && !map.loaded()) {
-        setMapError('Map tiles unavailable right now — the forecast below still works.');
-      }
+      if (!map.isStyleLoaded() && !map.loaded()) setMapError(m.ui.mapUnavailable);
       console.warn('[map]', e.error?.message ?? e);
     });
     const stopFollow = (e: { originalEvent?: unknown }) => {
@@ -113,6 +129,7 @@ export default function RouteMap() {
     };
     map.on('dragstart', stopFollow);
     map.on('zoomstart', stopFollow);
+    map.on('rotatestart', stopFollow);
     map.on('move', () => scheduleDeclutter());
     map.on('click', () => {
       const s = useAppStore.getState();
@@ -142,8 +159,6 @@ export default function RouteMap() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    // setPadding would cancel an in-flight camera animation (e.g. flying to a
-    // tapped card while the sheet grows) — apply it once the camera settles.
     if (map.isMoving()) {
       const apply = () => map.setPadding(paddingRef.current);
       map.once('moveend', apply);
@@ -160,21 +175,19 @@ export default function RouteMap() {
       const s = useAppStore.getState();
       if (!map || !s.plan) return;
       const [w, so, e, n] = s.plan.timed.route.bbox;
-      // fitBounds padding is *added* to the persistent overlay insets (setPadding),
-      // so only a small margin is needed here.
+      // fitBounds padding is added to the overlay insets (setPadding).
       map.fitBounds(
         [
           [w, so],
           [e, n],
         ],
-        { padding: 24, duration: animate && !reduced ? 700 : 0, maxZoom: 13 },
+        { padding: 24, bearing: 0, pitch: 0, duration: animate && !reduced ? 700 : 0, maxZoom: 13 },
       );
       setUserMoved(false);
     },
     [reduced],
   );
 
-  // Keep the whole route in view when the window/pane resizes (unless the user moved the map).
   const userMovedRef = useRef(userMoved);
   userMovedRef.current = userMoved;
   useEffect(() => {
@@ -194,27 +207,24 @@ export default function RouteMap() {
     };
   }, [fitRoute]);
 
-  // ---- Route geometry ---------------------------------------------------------
+  // ---- Route geometry: only when the ROUTE changes (not on every plan update) ----
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !styleVersion) return;
-    if (!plan) {
-      for (const id of ['route', 'route-weather', 'route-traveled', 'endpoints', 'focus']) setData(map, id, EMPTY_FC);
+    if (!timed) {
+      for (const id of ['route', 'route-weather', 'endpoints', 'focus', 'pois']) setData(map, id, EMPTY_FC);
       return;
     }
-    const { route } = plan.timed;
-    setData(map, 'route', lineFeature(route.geometry));
+    const g = timed.route.geometry;
+    setData(map, 'route', lineFeature(g));
     setData(map, 'endpoints', {
       type: 'FeatureCollection',
-      features: [
-        pointFeature(route.geometry[0], { role: 'origin' }),
-        pointFeature(route.geometry[route.geometry.length - 1], { role: 'destination' }),
-      ],
+      features: [pointFeature(g[0], { role: 'origin' }), pointFeature(g[g.length - 1], { role: 'destination' })],
     });
-  }, [plan, styleVersion]);
+    map.setPaintProperty('route-line', 'line-gradient', routeGradient(0));
+  }, [timed, styleVersion]);
 
-  // Fit the whole route when a new route arrives (not on every re-derive).
-  const routeId = plan?.timed.route.id;
+  const routeId = timed?.route.id;
   useEffect(() => {
     if (routeId && styleVersion && useAppStore.getState().mode === 'planning') fitRoute(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -223,23 +233,31 @@ export default function RouteMap() {
   // ---- Weather-coloured stretches -------------------------------------------
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleVersion || !plan) return;
-    const { route } = plan.timed;
+    if (!map || !styleVersion || !timed) return;
     setData(map, 'route-weather', {
       type: 'FeatureCollection',
       features: segments
-        .map((s) => lineFeature(sliceLine(route.geometry, plan.timed.cumDistM, s.startM, s.endM), { cls: s.groupClass }))
+        .map((s) => lineFeature(sliceLine(timed.route.geometry, timed.cumDistM, s.startM, s.endM), { cls: s.groupClass }))
         .filter((f) => (f.geometry as GeoJSON.LineString).coordinates.length > 1),
     });
-  }, [segments, plan, styleVersion]);
+  }, [segments, timed, styleVersion]);
 
-  // ---- Focus ring for selected / scroll-highlighted point --------------------
+  // ---- Places along the route ------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion) return;
+    setData(map, 'pois', {
+      type: 'FeatureCollection',
+      features: (poi?.results ?? []).map((r) => pointFeature(r.poi.coordinate, { id: r.poi.id })),
+    });
+  }, [poi, styleVersion]);
+
+  // ---- Focus ring (selected card > scrubbed time > scroll highlight) ---------
   const focusPoint = useMemo(() => {
     if (!selectedId && scrub) return { coord: scrub.coordinate, strong: true };
     const id = selectedId ?? highlightedId;
     if (!id) return null;
-    const p =
-      id === 'current' ? useAppStore.getState().derived.currentPoint : allPoints.find((x) => x.id === id);
+    const p = id === 'current' ? useAppStore.getState().derived.currentPoint : allPoints.find((x) => x.id === id);
     return p ? { coord: [p.longitude, p.latitude] as LngLat, strong: id === selectedId } : null;
   }, [selectedId, highlightedId, allPoints, scrub]);
 
@@ -249,15 +267,10 @@ export default function RouteMap() {
     setData(map, 'focus', focusPoint ? pointFeature(focusPoint.coord, { strong: focusPoint.strong }) : EMPTY_FC);
   }, [focusPoint, styleVersion]);
 
-  // Timeline → map: fly to the tapped card's route point.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !selectedId || selectionSource !== 'timeline' || !focusPoint) return;
-    map.easeTo({
-      center: focusPoint.coord,
-      zoom: Math.max(map.getZoom(), 9),
-      duration: reduced ? 0 : 650,
-    });
+    map.easeTo({ center: focusPoint.coord, zoom: Math.max(map.getZoom(), 9), duration: reduced ? 0 : 650 });
     setUserMoved(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, selectionSource]);
@@ -273,9 +286,7 @@ export default function RouteMap() {
       const list = s.derived.displayPoints;
       const priority = (id: string, i: number) =>
         id === s.selectedPointId ? 0 : id === s.highlightedPointId ? 1 : i === 0 || i === list.length - 1 ? 2 : 3;
-      const ordered = list
-        .map((p, i) => ({ p, pr: priority(p.id, i), i }))
-        .sort((a, b) => a.pr - b.pr || a.i - b.i);
+      const ordered = list.map((p, i) => ({ p, pr: priority(p.id, i), i })).sort((a, b) => a.pr - b.pr || a.i - b.i);
       const shown: { x: number; y: number; w: number }[] = [];
       for (const { p } of ordered) {
         const host = hostsRef.current.get(p.id);
@@ -294,26 +305,23 @@ export default function RouteMap() {
     const map = mapRef.current;
     if (!map) return;
     const want = new Set(displayPoints.map((p) => p.id));
+    let changed = false;
     for (const [id, h] of hostsRef.current) {
       if (!want.has(id)) {
         h.marker.remove();
         hostsRef.current.delete(id);
+        changed = true;
       }
     }
     for (const p of displayPoints) {
-      const existing = hostsRef.current.get(p.id);
-      if (existing) {
-        existing.marker.setLngLat([p.longitude, p.latitude]);
-        continue;
-      }
+      if (hostsRef.current.has(p.id)) continue;
       const el = document.createElement('div');
       el.className = 'wmarker-host';
-      const marker = new Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([p.longitude, p.latitude])
-        .addTo(map);
+      const marker = new Marker({ element: el, anchor: 'bottom' }).setLngLat([p.longitude, p.latitude]).addTo(map);
       hostsRef.current.set(p.id, { id: p.id, el, marker });
+      changed = true;
     }
-    setHosts(displayPoints.map((p) => hostsRef.current.get(p.id)!).filter(Boolean));
+    if (changed) setHosts(displayPoints.map((p) => hostsRef.current.get(p.id)!).filter(Boolean));
     scheduleDeclutter();
   }, [displayPoints, scheduleDeclutter]);
 
@@ -324,39 +332,64 @@ export default function RouteMap() {
     s.select(s.selectedPointId === id ? null : id, 'map');
   }, []);
 
-  // ---- Vehicle + traveled route (imperative: updates every frame) -----------
+  // ---- Vehicle, driven route and the navigation camera (imperative) ----------
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     let lastTraveled = 0;
+    let lastCamera = 0;
+    let progressFn: ((d: number) => number) | null = null;
+    let progressFor: TimedRoute | null = null;
+    let bearing = map.getBearing();
+    let zoom = map.getZoom();
+
     const update = () => {
       const s = useAppStore.getState();
       const v = s.vehicle;
-      if (!v || s.mode === 'planning') {
+      if (!v || s.mode === 'planning' || !s.plan) {
         vehicleRef.current?.remove();
         vehicleRef.current = null;
-        if (map.getSource('route-traveled')) setData(map, 'route-traveled', EMPTY_FC);
+        if (map.getLayer('route-line')) map.setPaintProperty('route-line', 'line-gradient', routeGradient(0));
         return;
       }
       if (!vehicleRef.current) {
         const el = document.createElement('div');
-        el.className = `vehicle${s.mode === 'simulating' ? ' vehicle--sim' : ''}`;
-        el.innerHTML = '<span class="vehicle__pulse"></span><span class="vehicle__dot"><span class="vehicle__arrow"></span></span>';
-        el.setAttribute('aria-label', 'Your position');
-        vehicleRef.current = new Marker({ element: el, rotationAlignment: 'map' }).setLngLat(v.coordinate).addTo(map);
+        el.className = 'vehicle';
+        el.innerHTML = '<span class="vehicle__dot"><span class="vehicle__arrow"></span></span>';
+        el.setAttribute('aria-hidden', 'true');
+        vehicleRef.current = new Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat(v.coordinate).addTo(map);
       }
       vehicleRef.current.setLngLat(v.coordinate);
       if (v.headingDeg !== undefined) vehicleRef.current.setRotation(v.headingDeg);
-      if (s.followVehicle && !transitioning.current) {
-        if (s.mode === 'simulating') map.jumpTo({ center: v.coordinate });
-        else map.easeTo({ center: v.coordinate, duration: reduced ? 0 : 800, easing: (t) => t });
-      }
+
       const now = performance.now();
-      if (s.plan && s.progress && now - lastTraveled > 200 && map.getSource('route-traveled')) {
+      const saver = useSettings.getState().batterySaver;
+
+      // Driven part of the route: one paint property, ≤5×/s.
+      if (s.progress && now - lastTraveled > (saver ? 1000 : 200) && map.getLayer('route-line')) {
         lastTraveled = now;
-        const { route } = s.plan.timed;
-        setData(map, 'route-traveled', lineFeature(sliceLine(route.geometry, s.plan.timed.cumDistM, 0, s.progress.distanceAlongM)));
+        if (progressFor !== s.plan.timed) {
+          progressFn = mercatorProgress(s.plan.timed);
+          progressFor = s.plan.timed;
+        }
+        map.setPaintProperty('route-line', 'line-gradient', routeGradient(progressFn!(s.progress.distanceAlongM)));
       }
+
+      // Navigation camera: heading-up, zoom out on open road, in near maneuvers.
+      if (!s.followVehicle || transitioning.current) return;
+      if (saver && now - lastCamera < 500) return;
+      lastCamera = now;
+      const g = s.guidance;
+      const targetZoom = navigationZoom(g?.next ? g.distanceToNextM : null, v.speedMps ?? 14);
+      const simFast = s.mode === 'simulating' && s.sim.speed > 10;
+      zoom += (targetZoom - (simFast ? 1.5 : 0) - zoom) * (reduced ? 1 : 0.08);
+      if (v.headingDeg !== undefined && Number.isFinite(v.headingDeg)) {
+        const d = ((v.headingDeg - bearing + 540) % 360) - 180;
+        bearing = (bearing + d * (reduced ? 1 : 0.15) + 360) % 360;
+      }
+      const pitch = saver || reduced ? 0 : 45;
+      if (s.mode === 'simulating') map.jumpTo({ center: v.coordinate, bearing, zoom, pitch });
+      else map.easeTo({ center: v.coordinate, bearing, zoom, pitch, duration: reduced ? 0 : 800, easing: (t) => t });
     };
     update();
     const unsub = useAppStore.subscribe((s) => s.vehicle, update);
@@ -365,7 +398,7 @@ export default function RouteMap() {
       unsub();
       unsubMode();
     };
-  }, [styleVersion, reduced]);
+  }, [styleVersion, reduced, batterySaver]);
 
   // Camera when navigation starts/stops.
   useEffect(() => {
@@ -380,7 +413,13 @@ export default function RouteMap() {
     if (v) {
       transitioning.current = true;
       map.once('moveend', () => (transitioning.current = false));
-      map.easeTo({ center: v.coordinate, zoom: mode === 'simulating' ? 10.5 : 14, duration: reduced ? 0 : 900 });
+      map.easeTo({
+        center: v.coordinate,
+        zoom: mode === 'simulating' ? 12 : 15,
+        bearing: v.headingDeg ?? 0,
+        pitch: reduced ? 0 : 45,
+        duration: reduced ? 0 : 900,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
@@ -393,7 +432,13 @@ export default function RouteMap() {
     if (v && map) {
       transitioning.current = true;
       map.once('moveend', () => (transitioning.current = false));
-      map.easeTo({ center: v.coordinate, zoom: Math.max(map.getZoom(), 10), duration: reduced ? 0 : 500 });
+      map.easeTo({
+        center: v.coordinate,
+        zoom: Math.max(map.getZoom(), 13),
+        bearing: v.headingDeg ?? map.getBearing(),
+        pitch: reduced ? 0 : 45,
+        duration: reduced ? 0 : 500,
+      });
     }
   };
 
@@ -401,7 +446,7 @@ export default function RouteMap() {
 
   return (
     <div className="map-wrap">
-      <div ref={container} className="map" aria-label="Map of your route" role="region" />
+      <div ref={container} className="map" aria-label={m.ui.overview} role="region" />
       {mapError ? <div className="map-error">{mapError}</div> : null}
       {hosts.map((h) => {
         const p = pointsById.get(h.id);
@@ -419,16 +464,16 @@ export default function RouteMap() {
             )
           : null;
       })}
-      <div className="map-controls" style={{ bottom: insets.bottom + 12 }}>
+      <div className="map-controls">
         {navigating && !follow ? (
-          <button className="map-fab" onClick={recenter} aria-label="Recenter on your position">
+          <button className="map-fab" onClick={recenter}>
             <LocateIcon size={20} />
-            <span>Recenter</span>
+            <span>{m.ui.recenter}</span>
           </button>
         ) : null}
-        {!navigating && plan && userMoved ? (
-          <button className="map-fab" onClick={() => fitRoute(true)} aria-label="Show whole route">
-            <span>Show whole route</span>
+        {!navigating && timed && userMoved ? (
+          <button className="map-fab" onClick={() => fitRoute(true)}>
+            <span>{m.ui.overview}</span>
           </button>
         ) : null}
       </div>

@@ -161,6 +161,26 @@ export function sampleRoute(input: SamplingInput): RouteSample[] {
     }
   }
 
+  // 3b. Distance fill is spaced in km; re-check every gap in TIME and add
+  //     time-based points until none exceeds the interval.
+  for (let i = 0; i < filled.length - 1; i++) {
+    const a = filled[i];
+    const b = filled[i + 1];
+    const ta = timeAtDistance(timed, a.distanceM);
+    const gapS = timeAtDistance(timed, b.distanceM) - ta;
+    if (gapS > maxIntervalS + 1) {
+      const k = Math.ceil(gapS / maxIntervalS) - 1;
+      const extra = Array.from({ length: k }, (_, j) => ({
+        distanceM: distanceAtTime(timed, ta + (gapS * (j + 1)) / (k + 1)),
+        reason: 'time' as SampleReason,
+        priority: PRIORITY.time,
+        reasons: new Set<SampleReason>(['time']),
+      }));
+      filled.splice(i + 1, 0, ...extra);
+      i += k;
+    }
+  }
+
   // 4. Cap at the budget maximum without breaking the time constraint.
   const pts = filled;
   while (pts.length > budget.max) {
@@ -180,7 +200,9 @@ export function sampleRoute(input: SamplingInput): RouteSample[] {
     pts.splice(removeAt, 1);
   }
 
-  return pts.map((p) => buildSample(timed, p.distanceM, [...p.reasons], p.place, elevation, p.elevationM));
+  // Tiny routes: collapse points that land on the same metre.
+  const unique = pts.filter((p, i) => i === 0 || Math.round(p.distanceM) !== Math.round(pts[i - 1].distanceM));
+  return unique.map((p) => buildSample(timed, p.distanceM, [...p.reasons], p.place, elevation, p.elevationM));
 }
 
 function buildSample(

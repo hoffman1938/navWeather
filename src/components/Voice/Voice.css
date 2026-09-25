@@ -1,0 +1,48 @@
+.voice {
+  position: absolute;
+  z-index: 13;
+  right: calc(var(--safe-right) + 12px);
+  bottom: calc(var(--inset-bottom, 200px) + 12px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.voice > * {
+  pointer-events: auto;
+}
+.voice__buttons {
+  display: flex;
+  gap: 8px;
+}
+.fab {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-float);
+}
+.fab--mic.is-listening {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 6px var(--accent-soft), var(--shadow-float);
+}
+.voice__caption {
+  max-width: min(320px, 70vw);
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--r-control);
+  background: var(--surface-inverse);
+  color: var(--on-inverse);
+  font-size: 15px;
+  box-shadow: var(--shadow-float);
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .voice {
+    bottom: calc(var(--safe-bottom) + 12px);
+  }
+}

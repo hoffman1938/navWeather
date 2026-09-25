@@ -14,18 +14,16 @@
   gap: 10px;
   max-width: 520px;
   min-height: 44px;
-  padding: 6px 6px 6px 16px;
-  border-radius: var(--radius-pill);
-  background: var(--text);
-  color: var(--surface);
-  box-shadow: var(--shadow-lg);
-  font-size: 14px;
-  font-weight: 500;
+  padding: 0 0 0 14px;
+  border-radius: var(--r-control);
+  background: var(--surface-inverse);
+  color: var(--on-inverse);
+  box-shadow: var(--shadow-float);
+  font-size: 15px;
   pointer-events: auto;
-  animation: notice-in var(--dur) var(--ease);
 }
 .notice--error {
-  background: var(--danger);
+  background: var(--danger-fill);
   color: #fff;
 }
 .notice__close {
@@ -33,50 +31,5 @@
   place-items: center;
   width: var(--tap);
   height: var(--tap);
-  margin: -6px -6px -6px 0;
-  border-radius: 50%;
-  opacity: 0.7;
-}
-.notice__close:hover {
-  opacity: 1;
-}
-@keyframes notice-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-}
-
-.prompt-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: end center;
-  background: rgba(10, 12, 16, 0.4);
-  padding: 12px;
-}
-@media (min-width: 600px) {
-  .prompt-backdrop {
-    place-items: center;
-  }
-}
-.prompt {
-  width: min(440px, 100%);
-  padding: 20px;
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: var(--shadow-lg);
-}
-.prompt h2 {
-  margin: 0 0 6px;
-  font-size: 19px;
-}
-.prompt p {
-  margin: 0 0 16px;
-  color: var(--text-2);
-}
-.prompt__actions {
-  display: grid;
-  gap: 8px;
+  opacity: 0.75;
 }

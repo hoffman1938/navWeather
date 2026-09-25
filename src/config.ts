@@ -37,6 +37,10 @@ export const config = {
     places: str('VITE_PLACES_PROVIDER', 'overpass'),
     elevation: str('VITE_ELEVATION_PROVIDER', 'open-meteo'),
     map: str('VITE_MAP_PROVIDER', 'openfreemap'),
+    poi: str('VITE_POI_PROVIDER', 'overpass'),
+    speedLimits: str('VITE_SPEED_LIMIT_PROVIDER', 'overpass'),
+    traffic: str('VITE_TRAFFIC_PROVIDER', 'none'),
+    speech: str('VITE_SPEECH_PROVIDER', 'browser'),
   },
   endpoints: {
     osrm: str('VITE_OSRM_BASE_URL', 'https://router.project-osrm.org'),
@@ -81,7 +85,7 @@ export const config = {
     offRoutePersistSeconds: num('VITE_OFF_ROUTE_PERSIST_SECONDS', 8),
     offRoutePersistReadings: num('VITE_OFF_ROUTE_PERSIST_READINGS', 3),
     /** GPS fixes worse than this are ignored for deviation decisions. */
-    maxUsableAccuracyM: num('VITE_MAX_USABLE_GPS_ACCURACY_M', 150),
+    maxUsableAccuracyM: num('VITE_MAX_USABLE_GPS_ACCURACY_M', 100),
     minRecalculationIntervalS: num('VITE_MIN_RECALC_INTERVAL_S', 20),
     /** Starting navigation farther than this from the route asks the user first. */
     farFromRouteM: num('VITE_FAR_FROM_ROUTE_M', 3000),

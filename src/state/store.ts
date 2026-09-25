@@ -1,18 +1,33 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { edgeSpeedMps, createProgressTracker } from '../algorithms/routeProgress';
 import { initialDeviationState, updateDeviation } from '../algorithms/routeDeviation';
+import { createProgressTracker, edgeSpeedMps, hasArrived } from '../algorithms/routeProgress';
 import { diffForecast } from '../algorithms/routeWeather';
 import { advanceSimulation, simProgress } from '../algorithms/simulation';
+import { matchSpeedLimits, speedLimitAt, updateSpeeding, type SpeedLimitProfile } from '../algorithms/speedLimits';
 import { config } from '../config';
+import { countOf, spokenDuration } from '../i18n/format';
+import {
+  acknowledge,
+  evaluateDriverAlerts,
+  initialDriverAlertState,
+  type DriverAlertState,
+  type VisualAlert,
+} from '../intelligence/driverAlerts';
+import { dueManeuverPrompt, markSpoken, spokenPrompt } from '../navigation/instructions';
+import { computeGuidance, type Guidance } from '../navigation/maneuvers';
 import { isAbortError, mapWithConcurrency } from '../services/http';
+import type { PoiCategory } from '../services/places/PoiProvider';
+import { searchAlongRoute, type PoiResult } from '../services/placesAlongRoute';
 import { getProviders } from '../services/providers';
 import {
   applyLatePlaces,
   describeError,
+  enrichRoute,
   fetchSampleForecasts,
   forecastLookupFn,
   planRoute,
+  planRouteOptions,
   refinePlanWithWeather,
   resolvePlace,
   type PlannedRoute,
@@ -24,12 +39,15 @@ import type { RouteSample } from '../types/route';
 import type { LocationForecast } from '../types/weather';
 import { haversineM } from '../utils/distance';
 import { deviceTimeZone } from '../utils/timezone';
+import { VoiceQueue } from '../voice/queue';
 import { deriveRouteWeather, emptyDerived, type Derived } from './derive';
+import { currentMessages, settingsSnapshot, useSettings } from './settings';
 
 export type RouteStatus = 'idle' | PlanStage | 'ready' | 'error';
 export type WeatherStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type SheetState = 'compact' | 'default' | 'expanded';
 export type Departure = { mode: 'now' } | { mode: 'at'; utcMs: number };
+export type RefreshReason = 'initial' | 'auto' | 'model-update' | 'manual' | 'recalculation' | 'refinement';
 
 export interface PlaceField {
   text: string;
@@ -40,7 +58,6 @@ export interface Notice {
   id: number;
   kind: 'info' | 'warning' | 'error' | 'success';
   text: string;
-  /** Persistent notices stay until replaced/cleared. */
   persistent?: boolean;
 }
 
@@ -60,19 +77,35 @@ export interface NavPrompt {
   headingDeg?: number;
 }
 
+export interface PoiSearchState {
+  category: PoiCategory;
+  status: 'loading' | 'ready' | 'error';
+  results: PoiResult[];
+}
+
+export interface AssistantState {
+  activity: 'idle' | 'listening' | 'thinking';
+  transcript: string;
+  reply: { text: string; at: number } | null;
+}
+
 export interface AppState {
   origin: PlaceField;
   destination: PlaceField;
+  waypoints: PlaceField[];
   departure: Departure;
 
   routeStatus: RouteStatus;
   routeError: string | null;
   plan: PlannedRoute | null;
+  /** Primary + alternatives (planning). `plan` is the selected one. */
+  routeOptions: PlannedRoute[];
+  selectedOption: number;
+  speedLimits: SpeedLimitProfile | null;
 
   forecasts: Map<string, LocationForecast>;
   weatherStatus: WeatherStatus;
   weatherError: string | null;
-  /** Oldest fetch time among forecasts in use ("Updated 12:42"). */
   weatherUpdatedAt: number | null;
   weatherStale: boolean;
   lastRefresh: { atMs: number; changedIds: string[]; reason: RefreshReason } | null;
@@ -80,24 +113,32 @@ export interface AppState {
   mode: NavigationMode;
   vehicle: VehicleState | null;
   progress: RouteProgress | null;
+  guidance: Guidance | null;
   deviation: DeviationState;
   navStartedMs: number | null;
   recalculating: boolean;
   navPrompt: NavPrompt | null;
+  locationPrimer: boolean;
   sim: SimulationState;
+  speeding: { speeding: boolean; since: number | null };
 
-  /** Real clock for "leave now" planning (ticks every 30 s). */
+  alertState: DriverAlertState;
+  activeAlert: VisualAlert | null;
+  poi: PoiSearchState | null;
+  assistant: AssistantState;
+  online: boolean;
+
   clockMs: number;
   derived: Derived;
   notice: Notice | null;
 
   selectedPointId: string | null;
   selectionSource: 'timeline' | 'map' | null;
-  /** Time picked in "Where will I be at…" (UTC ms), or null. */
   scrubMs: number | null;
   highlightedPointId: string | null;
   sheet: SheetState;
   followVehicle: boolean;
+  settingsOpen: boolean;
 
   // --- actions ---
   setOriginText(text: string): void;
@@ -105,12 +146,16 @@ export interface AppState {
   setOriginPlace(place: Place | null): void;
   setDestinationPlace(place: Place | null): void;
   swapPlaces(): void;
+  addWaypoint(): void;
+  setWaypointText(i: number, text: string): void;
+  setWaypointPlace(i: number, place: Place | null): void;
+  removeWaypoint(i: number): void;
   setDeparture(d: Departure): void;
   calculateRoute(): Promise<void>;
+  selectRouteOption(i: number): Promise<void>;
   clearRoute(): void;
   loadWeather(opts?: { force?: boolean; reason?: RefreshReason }): Promise<void>;
-  refreshIfStale(): void;
-  /** Reverse-geocode the few visible points that have no settlement name. */
+  refreshIfStale(): Promise<void>;
   nameDisplayPoints(): Promise<void>;
   tickClock(): void;
   select(id: string | null, source: 'timeline' | 'map'): void;
@@ -118,9 +163,15 @@ export interface AppState {
   setScrub(ms: number | null): void;
   setSheet(s: SheetState): void;
   setFollow(f: boolean): void;
+  setSettingsOpen(open: boolean): void;
   showNotice(kind: Notice['kind'], text: string, persistent?: boolean): void;
   dismissNotice(): void;
+  dismissAlert(): void;
+  setOnline(online: boolean): void;
+  rederive(): void;
 
+  requestNavigation(): Promise<void>;
+  confirmLocationPrimer(allow: boolean): void;
   startNavigation(): void;
   handlePosition(pos: { coordinate: LngLat; accuracyM?: number; headingDeg?: number; speedMps?: number; timestampMs: number }): void;
   handleGeolocationError(message: string): void;
@@ -133,19 +184,45 @@ export interface AppState {
   setSimulationSpeed(speed: number): void;
   advanceSimulationBy(realDtMs: number): void;
   exitSimulation(): void;
+
+  searchPoi(category: PoiCategory, opts?: { aroundM?: number; signal?: AbortSignal }): Promise<PoiResult[]>;
+  clearPoi(): void;
+  addStop(place: Place): Promise<void>;
+
+  setAssistant(patch: Partial<AssistantState>): void;
+  say(text: string, priority?: number): void;
 }
 
-export type RefreshReason = 'initial' | 'auto' | 'model-update' | 'manual' | 'recalculation' | 'refinement';
+// ---------------------------------------------------------------------------
+// Runtime (non-serializable) helpers kept outside state.
 
-// Non-serializable runtime helpers kept outside state.
 let routeAbort: AbortController | null = null;
 let weatherAbort: AbortController | null = null;
+/** Background work tied to the current route (late places, speed limits, naming). */
+let planTasks: AbortController | null = null;
 let tracker: ReturnType<typeof createProgressTracker> | null = null;
 let lastDeriveAt = 0;
 let lastDeriveSimMs = 0;
 let lastRecalcAt = 0;
 let noticeSeq = 0;
 const namingAttempted = new Set<string>();
+const spokenManeuvers = new Set<string>();
+let voiceQueue: VoiceQueue | null = null;
+
+function newPlanTasks(): AbortSignal {
+  planTasks?.abort();
+  planTasks = new AbortController();
+  return planTasks.signal;
+}
+
+/** The app's single voice channel (created lazily from the speech provider). */
+export function getVoiceQueue(): VoiceQueue {
+  if (!voiceQueue) {
+    voiceQueue = new VoiceQueue(getProviders().tts, () => currentMessages().speechLang);
+    voiceQueue.setMuted(!useSettings.getState().voice);
+  }
+  return voiceQueue;
+}
 
 function departureMsOf(s: Pick<AppState, 'departure' | 'clockMs'>): number {
   return s.departure.mode === 'now' ? s.clockMs : s.departure.utcMs;
@@ -155,22 +232,33 @@ function lookupFor(forecasts: Map<string, LocationForecast>) {
   return forecastLookupFn(getProviders(), forecasts);
 }
 
+function clockNow(s: Pick<AppState, 'mode' | 'sim' | 'clockMs'>): number {
+  return s.mode === 'simulating' ? s.sim.nowMs : s.mode === 'navigating' ? Date.now() : s.clockMs;
+}
+
 /** Recompute everything the UI shows from the current inputs. */
-function derive(s: AppState, overrides: Partial<AppState> = {}): Derived {
-  const st = { ...s, ...overrides };
-  const navigating = st.mode !== 'planning' && st.progress !== null;
-  const nowMs = st.mode === 'simulating' ? st.sim.nowMs : st.mode === 'navigating' ? Date.now() : st.clockMs;
+function derive(s: AppState): Derived {
+  const navigating = s.mode !== 'planning' && s.progress !== null;
+  const settings = settingsSnapshot();
   lastDeriveAt = performance.now();
-  lastDeriveSimMs = st.sim.nowMs;
+  lastDeriveSimMs = s.sim.nowMs;
   return deriveRouteWeather({
-    plan: st.plan,
-    forecastFor: lookupFor(st.forecasts),
-    mode: st.mode,
-    departureMs: navigating && st.navStartedMs !== null ? st.navStartedMs : departureMsOf(st),
-    nowMs,
-    progress: navigating ? st.progress : null,
-    vehicleCoordinate: st.vehicle?.coordinate ?? null,
+    plan: s.plan,
+    options: s.mode === 'planning' ? s.routeOptions : [],
+    forecastFor: lookupFor(s.forecasts),
+    mode: s.mode,
+    departureMs: navigating && s.navStartedMs !== null ? s.navStartedMs : departureMsOf(s),
+    nowMs: clockNow(s),
+    progress: navigating ? s.progress : null,
+    vehicleCoordinate: s.vehicle?.coordinate ?? null,
     fallbackTimeZone: deviceTimeZone(),
+    m: currentMessages(),
+    units: settings.units,
+    weatherPrefs: settings.weatherAlerts,
+    speedLimits: s.speedLimits,
+    fuelRangeKm: settings.fuelRangeKm,
+    vehicle: settings.vehicle,
+    extraEvents: [],
     previous: s.derived,
   });
 }
@@ -194,14 +282,20 @@ const initialSim: SimulationState = {
   arrived: false,
 };
 
+const initialAssistant: AssistantState = { activity: 'idle', transcript: '', reply: null };
+
 export const useAppStore = create<AppState>()(
   subscribeWithSelector((set, get) => ({
     origin: { text: '', place: null },
     destination: { text: '', place: null },
+    waypoints: [],
     departure: { mode: 'now' },
     routeStatus: 'idle',
     routeError: null,
     plan: null,
+    routeOptions: [],
+    selectedOption: 0,
+    speedLimits: null,
     forecasts: new Map(),
     weatherStatus: 'idle',
     weatherError: null,
@@ -211,11 +305,19 @@ export const useAppStore = create<AppState>()(
     mode: 'planning',
     vehicle: null,
     progress: null,
+    guidance: null,
     deviation: initialDeviationState,
     navStartedMs: null,
     recalculating: false,
     navPrompt: null,
+    locationPrimer: false,
     sim: initialSim,
+    speeding: { speeding: false, since: null },
+    alertState: initialDriverAlertState,
+    activeAlert: null,
+    poi: null,
+    assistant: initialAssistant,
+    online: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
     clockMs: Date.now(),
     derived: emptyDerived,
     notice: null,
@@ -225,48 +327,66 @@ export const useAppStore = create<AppState>()(
     highlightedPointId: null,
     sheet: 'default',
     followVehicle: true,
+    settingsOpen: false,
 
+    // ---------------- Search ----------------
     setOriginText: (text) => set({ origin: { text, place: null } }),
     setDestinationText: (text) => set({ destination: { text, place: null } }),
     setOriginPlace: (place) => set({ origin: { text: place?.name ?? '', place } }),
     setDestinationPlace: (place) => set({ destination: { text: place?.name ?? '', place } }),
-    swapPlaces: () => set((s) => ({ origin: s.destination, destination: s.origin })),
+    swapPlaces: () => set((s) => ({ origin: s.destination, destination: s.origin, waypoints: [...s.waypoints].reverse() })),
+    addWaypoint: () => set((s) => (s.waypoints.length >= 3 ? {} : { waypoints: [...s.waypoints, { text: '', place: null }] })),
+    setWaypointText: (i, text) => set((s) => ({ waypoints: s.waypoints.map((w, k) => (k === i ? { text, place: null } : w)) })),
+    setWaypointPlace: (i, place) =>
+      set((s) => ({ waypoints: s.waypoints.map((w, k) => (k === i ? { text: place?.name ?? '', place } : w)) })),
+    removeWaypoint: (i) => set((s) => ({ waypoints: s.waypoints.filter((_, k) => k !== i) })),
 
     setDeparture: (departure) => {
       set({ departure, clockMs: Date.now() });
       const s = get();
       if (s.mode === 'planning') set({ derived: derive(s) });
-      // A later departure may need a longer forecast horizon.
       if (s.plan) void get().loadWeather({ reason: 'auto' });
     },
 
     async calculateRoute() {
-      const s = get();
-      if (s.mode !== 'planning') get().stopNavigation();
+      if (get().mode !== 'planning') get().stopNavigation();
       routeAbort?.abort();
       weatherAbort?.abort();
       const ctrl = new AbortController();
       routeAbort = ctrl;
-      set({ routeStatus: 'geocoding', routeError: null });
+      const m = currentMessages();
+      set({ routeStatus: 'geocoding', routeError: null, poi: null });
       const providers = getProviders();
       try {
-        const origin = await resolvePlace(providers, get().origin, ctrl.signal);
-        const destination = await resolvePlace(providers, get().destination, ctrl.signal);
-        if (haversineM(origin.coordinate, destination.coordinate) < 50) {
+        const origin = await resolvePlace(providers, get().origin, ctrl.signal, m);
+        const destination = await resolvePlace(providers, get().destination, ctrl.signal, m);
+        const waypoints: Place[] = [];
+        for (const w of get().waypoints) {
+          if (w.place || w.text.trim()) waypoints.push(await resolvePlace(providers, w, ctrl.signal, m));
+        }
+        if (haversineM(origin.coordinate, destination.coordinate) < 50 && waypoints.length === 0) {
           throw new Error('same-place');
         }
         set({
           origin: { text: get().origin.text || origin.name, place: origin },
           destination: { text: get().destination.text || destination.name, place: destination },
         });
-        const plan = await planRoute(providers, origin, destination, {
+        const { primary, alternatives } = await planRouteOptions(providers, origin, destination, {
           signal: ctrl.signal,
+          waypoints,
+          alternatives: true,
+          language: m.locale,
           onStage: (stage) => set({ routeStatus: stage }),
         });
         if (ctrl.signal.aborted) return;
         tracker = null;
+        namingAttempted.clear();
+        spokenManeuvers.clear();
         set({
-          plan,
+          plan: primary,
+          routeOptions: [primary, ...alternatives],
+          selectedOption: 0,
+          speedLimits: null,
           routeStatus: 'ready',
           clockMs: Date.now(),
           selectedPointId: null,
@@ -274,38 +394,69 @@ export const useAppStore = create<AppState>()(
           selectionSource: null,
           scrubMs: null,
           lastRefresh: null,
+          alertState: initialDriverAlertState,
+          activeAlert: null,
           derived: emptyDerived,
           sheet: 'default',
         });
         set({ derived: derive(get()) });
-        watchLatePlaces(plan);
-        if (plan.warnings.includes('places-unavailable')) {
-          get().showNotice('info', 'Place names are limited right now — weather is unaffected');
-        }
+        startPlanTasks(primary);
+        if (primary.warnings.includes('places-unavailable')) get().showNotice('info', m.ui.placesLimited);
         await get().loadWeather({ reason: 'initial' });
       } catch (e) {
         if (isAbortError(e)) return;
-        const msg =
-          (e as Error)?.message === 'same-place'
-            ? 'Start and destination are the same place'
-            : describeError(e, 'Unable to calculate route');
+        const msg = (e as Error)?.message === 'same-place' ? m.ui.samePlace : describeError(e, m.ui.unableRoute, m);
         set({ routeStatus: 'error', routeError: msg });
       } finally {
         if (routeAbort === ctrl) routeAbort = null;
       }
     },
 
+    async selectRouteOption(i) {
+      const s = get();
+      const option = s.routeOptions[i];
+      if (!option || i === s.selectedOption || s.mode !== 'planning') return;
+      set({ selectedOption: i, plan: option, selectedPointId: null, scrubMs: null, speedLimits: null });
+      set({ derived: derive(get()) });
+      if (option.warnings.includes('not-enriched')) {
+        // Alternatives were only timed + sampled; add names/elevation now.
+        try {
+          const enriched = await enrichRoute(getProviders(), option.timed.route, {
+            signal: newPlanTasks(),
+            language: currentMessages().locale,
+          });
+          const cur = get();
+          if (cur.routeOptions[i] !== option) return;
+          const options = [...cur.routeOptions];
+          options[i] = enriched;
+          set({ routeOptions: options, ...(cur.selectedOption === i ? { plan: enriched } : {}) });
+          if (get().plan === enriched) startPlanTasks(enriched, true);
+        } catch (e) {
+          if (!isAbortError(e)) get().rederive();
+        }
+      } else {
+        startPlanTasks(option, true);
+      }
+      await get().loadWeather({ reason: 'auto' });
+    },
+
     clearRoute: () => {
       routeAbort?.abort();
       weatherAbort?.abort();
+      planTasks?.abort();
+      getVoiceQueue().clear();
       tracker = null;
       set({
         plan: null,
+        routeOptions: [],
+        selectedOption: 0,
+        speedLimits: null,
         routeStatus: 'idle',
         routeError: null,
         mode: 'planning',
         vehicle: null,
         progress: null,
+        guidance: null,
         sim: { ...initialSim, speed: get().sim.speed },
         derived: emptyDerived,
         weatherStatus: 'idle',
@@ -315,31 +466,39 @@ export const useAppStore = create<AppState>()(
         lastRefresh: null,
         selectedPointId: null,
         highlightedPointId: null,
-        scrubMs: null,
         navPrompt: null,
+        poi: null,
+        activeAlert: null,
       });
     },
 
+    // ---------------- Weather ----------------
     async loadWeather({ force = false, reason = 'auto' } = {}) {
       const s = get();
       const plan = s.plan;
       if (!plan) return;
+      const routeKey = plan.timed; // a new object ≠ a new route: naming/refinement keep `timed`
       weatherAbort?.abort();
       const ctrl = new AbortController();
       weatherAbort = ctrl;
       set({ weatherStatus: 'loading' });
       const providers = getProviders();
+      const m = currentMessages();
+      // Every option's samples in one batched lookup (alternatives compare weather).
+      const samples = s.mode === 'planning' ? s.routeOptions.flatMap((o) => o.samples) : plan.samples;
+      const longest = Math.max(plan.timed.totalTimeS, ...s.routeOptions.map((o) => o.timed.totalTimeS));
       const latestArrival = Math.max(
         s.derived.arrivalMs ?? 0,
-        departureMsOf(s) + plan.timed.totalTimeS * 1000,
+        departureMsOf(s) + longest * 1000,
         s.mode === 'simulating' ? s.sim.nowMs + plan.timed.totalTimeS * 1000 : 0,
       );
+      const isCurrent = () => !ctrl.signal.aborted && get().plan?.timed === routeKey;
       try {
-        const lookup = await fetchSampleForecasts(providers, plan.samples, latestArrival, {
+        const lookup = await fetchSampleForecasts(providers, samples.length ? samples : plan.samples, latestArrival, {
           force,
           signal: ctrl.signal,
         });
-        if (ctrl.signal.aborted || get().plan !== plan) return;
+        if (!isCurrent()) return;
         const forecasts = new Map(get().forecasts);
         for (const [k, f] of lookup.forecasts) forecasts.set(k, f);
         const prevPoints = get().derived.points;
@@ -347,57 +506,76 @@ export const useAppStore = create<AppState>()(
         set({
           forecasts,
           weatherStatus: lookup.error && !hasData ? 'error' : 'ready',
-          weatherError: lookup.error ? 'Weather data temporarily unavailable' : null,
+          weatherError: lookup.error ? m.weather.summary.unavailable : null,
           weatherStale: lookup.staleKeys.size > 0,
-          weatherUpdatedAt: oldestFetch(plan.samples, forecasts),
+          weatherUpdatedAt: oldestFetch(get().plan!.samples, forecasts),
         });
         const derived = derive(get());
-        const changedIds = reason === 'initial' ? [] : diffForecast(prevPoints, derived.points);
+        const upcomingIds = new Set(derived.upcoming.map((p) => p.id));
+        const changedIds =
+          reason === 'initial' ? [] : diffForecast(prevPoints, derived.points).filter((id) => upcomingIds.has(id));
         set({ derived, lastRefresh: { atMs: Date.now(), changedIds, reason } });
-        if (reason === 'model-update' && changedIds.length) {
-          get().showNotice(
-            'info',
-            `New forecast · ${changedIds.length} change${changedIds.length > 1 ? 's' : ''} along your route`,
-          );
-        }
+        const changes = countOf(changedIds.length, 'change', m);
+        if (reason === 'model-update' && changedIds.length) get().showNotice('info', m.ui.newForecast(changes));
         if (reason === 'manual') {
           get().showNotice(
             lookup.error ? 'warning' : 'success',
-            lookup.error
-              ? 'Weather data temporarily unavailable — showing the last forecast'
-              : changedIds.length
-                ? `Forecast updated · ${changedIds.length} change${changedIds.length > 1 ? 's' : ''}`
-                : 'Forecast is up to date',
+            lookup.error ? m.weather.summary.unavailable : changedIds.length ? m.ui.forecastUpdated(changes) : m.ui.forecastUpToDate,
           );
         }
 
         // One-time refinement where neighbouring forecasts differ a lot.
-        if (!plan.refined && !lookup.error) {
+        const current = get().plan!;
+        if (!current.refined && !lookup.error) {
           const st = get();
           const arrivalById = new Map(st.derived.points.map((p) => [p.id, p.arrivalMs]));
           const dep = departureMsOf(st);
           const { plan: refined, lookup: extra } = await refinePlanWithWeather(
             providers,
-            plan,
+            current,
             (smp) => arrivalById.get(smp.id) ?? dep + smp.travelTimeS * 1000,
             forecasts,
             ctrl.signal,
           );
-          if (ctrl.signal.aborted || get().plan !== plan) return;
+          if (!isCurrent()) return;
           const merged = new Map(get().forecasts);
           if (extra) for (const [k, f] of extra.forecasts) merged.set(k, f);
-          set({ plan: refined, forecasts: merged });
+          replacePlan(refined);
+          set({ forecasts: merged });
           set({ derived: derive(get()) });
         }
       } catch (e) {
         if (isAbortError(e)) return;
         set({
           weatherStatus: get().forecasts.size ? 'ready' : 'error',
-          weatherError: 'Weather data temporarily unavailable',
+          weatherError: m.weather.summary.unavailable,
           weatherStale: get().forecasts.size > 0,
         });
       } finally {
-        if (weatherAbort === ctrl) weatherAbort = null;
+        // Never leave the status stuck in "loading" (audit race).
+        if (weatherAbort === ctrl) {
+          weatherAbort = null;
+          if (get().weatherStatus === 'loading') set({ weatherStatus: get().forecasts.size ? 'ready' : 'idle' });
+        }
+      }
+    },
+
+    async refreshIfStale() {
+      const s = get();
+      const plan = s.plan;
+      if (!plan || s.weatherStatus === 'loading' || !s.online) return;
+      const ageMs = s.weatherUpdatedAt ? Date.now() - s.weatherUpdatedAt : Infinity;
+      if (ageMs >= config.weather.refreshMinutes * 60000) {
+        await get().loadWeather({ reason: 'auto' });
+        return;
+      }
+      if (ageMs < 5 * 60000) return;
+      const lookup = lookupFor(s.forecasts);
+      const used = plan.samples.map(lookup).filter((f): f is LocationForecast => !!f);
+      const newer = await getProviders().weather.hasNewerForecast(used);
+      const cur = get();
+      if (newer && cur.plan?.timed === plan.timed && cur.weatherStatus !== 'loading') {
+        await cur.loadWeather({ force: true, reason: 'model-update' });
       }
     },
 
@@ -405,52 +583,31 @@ export const useAppStore = create<AppState>()(
       const s = get();
       const plan = s.plan;
       if (!plan) return;
-      const unnamed = s.derived.displayPoints
-        .filter((p) => !p.placeName && !namingAttempted.has(p.id))
-        .slice(0, 8);
+      const unnamed = s.derived.displayPoints.filter((p) => !p.placeName && !namingAttempted.has(p.id)).slice(0, 8);
       if (unnamed.length === 0) return;
       unnamed.forEach((p) => namingAttempted.add(p.id));
       const providers = getProviders();
+      const signal = planTasks?.signal;
       const names = await mapWithConcurrency(unnamed, 2, async (p) => {
         try {
-          return (await providers.reverseGeocoding.reverse([p.longitude, p.latitude]))?.name ?? null;
+          return (await providers.reverseGeocoding.reverse([p.longitude, p.latitude], { signal, language: currentMessages().locale }))?.name ?? null;
         } catch {
           return null;
         }
       });
       const current = get().plan;
-      if (current !== plan) return;
+      if (!current || current.timed !== plan.timed) return;
       const byId = new Map(unnamed.map((p, i) => [p.id, names[i]]));
       if (![...byId.values()].some(Boolean)) return;
-      const samples = plan.samples.map((smp) => {
-        const name = byId.get(smp.id);
-        return name ? { ...smp, placeName: name, placeRelation: 'near' as const } : smp;
+      // Apply by sample id to whatever the current plan object is (audit race).
+      replacePlan({
+        ...current,
+        samples: current.samples.map((smp) => {
+          const name = byId.get(smp.id);
+          return name && !smp.placeName ? { ...smp, placeName: name, placeRelation: 'near' as const } : smp;
+        }),
       });
-      set({ plan: { ...plan, samples } });
       set({ derived: derive(get()) });
-    },
-
-    refreshIfStale() {
-      const s = get();
-      const plan = s.plan;
-      if (!plan || s.weatherStatus === 'loading') return;
-      const ageMs = s.weatherUpdatedAt ? Date.now() - s.weatherUpdatedAt : Infinity;
-      if (ageMs >= config.weather.refreshMinutes * 60000) {
-        void get().loadWeather({ reason: 'auto' });
-        return;
-      }
-      // A newer model run upstream? (The service asks at most every few minutes.)
-      if (ageMs < 5 * 60000) return;
-      const lookup = lookupFor(s.forecasts);
-      const used = plan.samples.map(lookup).filter((f): f is LocationForecast => !!f);
-      void getProviders()
-        .weather.hasNewerForecast(used)
-        .then((newer) => {
-          const cur = get();
-          if (newer && cur.plan === plan && cur.weatherStatus !== 'loading') {
-            void cur.loadWeather({ force: true, reason: 'model-update' });
-          }
-        });
     },
 
     tickClock() {
@@ -461,6 +618,7 @@ export const useAppStore = create<AppState>()(
       }
     },
 
+    // ---------------- UI ----------------
     select: (id, source) => {
       const s = get();
       set({
@@ -476,47 +634,84 @@ export const useAppStore = create<AppState>()(
     setScrub: (scrubMs) => set({ scrubMs }),
     setSheet: (sheet) => set({ sheet }),
     setFollow: (followVehicle) => set({ followVehicle, ...(followVehicle ? { selectedPointId: null } : {}) }),
+    setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     showNotice: (kind, text, persistent) => set({ notice: { id: ++noticeSeq, kind, text, persistent } }),
     dismissNotice: () => set({ notice: null }),
+    dismissAlert: () => {
+      const a = get().activeAlert;
+      if (!a) return;
+      set({ activeAlert: null, alertState: acknowledge(get().alertState, a.eventIds) });
+    },
+    setOnline: (online) => {
+      if (get().online === online) return;
+      set({ online });
+      if (online) void get().refreshIfStale();
+    },
+    rederive: () => set({ derived: derive(get()) }),
 
     // ---------------- Live GPS navigation ----------------
+    async requestNavigation() {
+      if (!get().plan) return;
+      getVoiceQueue(); // create inside the user gesture
+      getProviders().tts.unlock();
+      let state: PermissionState | 'unknown' = 'unknown';
+      try {
+        state = (await navigator.permissions?.query({ name: 'geolocation' as PermissionName }))?.state ?? 'unknown';
+      } catch {
+        state = 'unknown';
+      }
+      if (state === 'granted') get().startNavigation();
+      else if (state === 'denied') get().showNotice('warning', currentMessages().ui.locationUnavailable);
+      else set({ locationPrimer: true }); // explain before the browser asks
+    },
+
+    confirmLocationPrimer(allow) {
+      set({ locationPrimer: false });
+      if (allow) get().startNavigation();
+    },
+
     startNavigation() {
       const s = get();
       if (!s.plan) return;
       tracker = createProgressTracker(s.plan.timed);
+      spokenManeuvers.clear();
       set({
         mode: 'navigating',
         navStartedMs: Date.now(),
         progress: null,
         vehicle: null,
+        guidance: null,
         deviation: initialDeviationState,
         followVehicle: true,
         selectedPointId: null,
         scrubMs: null,
         sheet: 'compact',
         navPrompt: null,
+        alertState: initialDriverAlertState,
+        activeAlert: null,
       });
-      get().showNotice('info', 'Waiting for your location…', true);
+      get().showNotice('info', currentMessages().ui.waitingForLocation, true);
+      loadSpeedLimits();
     },
 
     handlePosition(pos) {
       const s = get();
       if (s.mode !== 'navigating' || !s.plan || s.navPrompt) return;
-      if (!tracker) tracker = createProgressTracker(s.plan.timed);
+      const settings = settingsSnapshot();
       const now = Date.now();
-      const progress = tracker(pos.coordinate, now);
+      // Battery saver: when the next maneuver is far, process at most one fix per 3 s.
+      if (settings.batterySaver && s.progress && s.guidance && s.guidance.distanceToNextM > 3000 && now - s.progress.nowMs < 3000) {
+        set({ vehicle: { ...pos } });
+        return;
+      }
+      if (!tracker) tracker = createProgressTracker(s.plan.timed);
+      const progress = tracker(pos.coordinate, now, { headingDeg: pos.headingDeg, accuracyM: pos.accuracyM });
       const vehicle: VehicleState = { ...pos };
 
-      // First fix far from the route: ask instead of silently re-routing.
       if (!s.progress && progress.distanceFromRouteM > config.navigation.farFromRouteM) {
         set({
           vehicle,
-          navPrompt: {
-            kind: 'far-from-route',
-            distanceM: progress.distanceFromRouteM,
-            coordinate: pos.coordinate,
-            headingDeg: pos.headingDeg,
-          },
+          navPrompt: { kind: 'far-from-route', distanceM: progress.distanceFromRouteM, coordinate: pos.coordinate, headingDeg: pos.headingDeg },
           notice: null,
         });
         return;
@@ -539,18 +734,21 @@ export const useAppStore = create<AppState>()(
           persistSeconds: config.navigation.offRoutePersistSeconds,
         },
       );
-      set({ vehicle, progress, deviation });
-      set({ derived: derive(get()) });
+      set({ deviation });
+      onProgress(vehicle, progress, pos.speedMps, true);
 
+      const st = get();
       if (
         deviation.status === 'off-route' &&
-        !s.recalculating &&
+        !st.recalculating &&
         now - lastRecalcAt > config.navigation.minRecalculationIntervalS * 1000
       ) {
-        void recalculateFrom(pos.coordinate, pos.headingDeg);
+        if (st.online) void recalculateFrom(pos.coordinate, pos.headingDeg);
       }
-      if (progress.remainingDistanceM < 40) {
-        get().showNotice('success', `You've arrived at ${s.plan.timed.route.destination.name}`);
+      if (hasArrived(progress)) {
+        const m = currentMessages();
+        get().say(m.voice.arrived(st.plan!.timed.route.destination.name), 1);
+        get().showNotice('success', m.ui.arrivedAt(st.plan!.timed.route.destination.name));
         get().stopNavigation();
       }
     },
@@ -558,35 +756,39 @@ export const useAppStore = create<AppState>()(
     handleGeolocationError(message) {
       if (get().mode !== 'navigating') return;
       get().stopNavigation();
-      get().showNotice('warning', `${message} — you can still plan or simulate the drive`);
+      get().showNotice('warning', message, true);
     },
 
     resolveNavPrompt(choice) {
       const p = get().navPrompt;
       set({ navPrompt: null });
       if (!p) return;
-      if (choice === 'route-from-here') {
-        void recalculateFrom(p.coordinate, p.headingDeg);
-      } else if (choice === 'simulate') {
+      if (choice === 'route-from-here') void recalculateFrom(p.coordinate, p.headingDeg);
+      else if (choice === 'simulate') {
         get().stopNavigation();
         get().startSimulation();
-      } else {
-        get().stopNavigation();
-      }
+      } else get().stopNavigation();
     },
 
     stopNavigation() {
+      // Cancel an in-flight re-route so it can't resurrect navigation (audit race).
+      routeAbort?.abort();
+      routeAbort = null;
       tracker = null;
+      getVoiceQueue().clear();
       set({
         mode: 'planning',
         vehicle: null,
         progress: null,
+        guidance: null,
         navStartedMs: null,
         deviation: initialDeviationState,
         navPrompt: null,
         recalculating: false,
         sheet: 'default',
         clockMs: Date.now(),
+        activeAlert: null,
+        speeding: { speeding: false, since: null },
         notice: get().notice?.persistent ? null : get().notice,
       });
       set({ derived: derive(get()) });
@@ -596,6 +798,9 @@ export const useAppStore = create<AppState>()(
     startSimulation() {
       const s = get();
       if (!s.plan) return;
+      getVoiceQueue();
+      getProviders().tts.unlock();
+      spokenManeuvers.clear();
       const startMs = departureMsOf({ ...s, clockMs: Date.now() });
       const first = advanceSimulation(s.plan.timed, { nowMs: startMs, modelTimeS: 0 }, startMs, 0, 1);
       set({
@@ -609,8 +814,13 @@ export const useAppStore = create<AppState>()(
         highlightedPointId: null,
         scrubMs: null,
         sheet: 'compact',
+        alertState: initialDriverAlertState,
+        activeAlert: null,
       });
-      set({ derived: derive(get()) });
+      set({ derived: derive(get()), guidance: computeGuidance(get().derived.maneuvers, s.plan.timed, 0) });
+      const m = currentMessages();
+      get().say(m.voice.routeStarted(s.plan.timed.route.destination.name, spokenDuration(s.plan.timed.totalTimeS, m, false)), 3);
+      loadSpeedLimits();
     },
     pauseSimulation: () => set((s) => ({ sim: { ...s.sim, playing: false } })),
     resumeSimulation: () => {
@@ -627,91 +837,273 @@ export const useAppStore = create<AppState>()(
       const s = get();
       if (s.mode !== 'simulating' || !s.sim.playing || !s.plan) return;
       const step = advanceSimulation(s.plan.timed, s.sim, s.sim.startMs, realDtMs, s.sim.speed);
-      const vehicle: VehicleState = { coordinate: step.coordinate, headingDeg: step.headingDeg, timestampMs: step.nowMs };
-      const sim = { ...s.sim, nowMs: step.nowMs, modelTimeS: step.modelTimeS, arrived: step.arrived, playing: !step.arrived };
-      // Vehicle + progress update every frame (cheap). The weather timeline
-      // re-derives at most ~4×/s of real time, or every 30 s of simulated time.
-      set({ vehicle, sim, progress: simProgress(s.plan.timed, step) });
-      if (step.arrived || step.nowMs - lastDeriveSimMs >= 30_000 || performance.now() - lastDeriveAt > 250) {
-        set({ derived: derive(get()) });
-      }
+      const simDtS = step.nowMs - s.sim.nowMs > 0 ? (step.nowMs - s.sim.nowMs) / 1000 : 0;
+      const speedMps = simDtS > 0 && s.progress ? (step.distanceM - s.progress.distanceAlongM) / simDtS : undefined;
+      const vehicle: VehicleState = { coordinate: step.coordinate, headingDeg: step.headingDeg, speedMps, timestampMs: step.nowMs };
+      set({ sim: { ...s.sim, nowMs: step.nowMs, modelTimeS: step.modelTimeS, arrived: step.arrived, playing: !step.arrived } });
+      onProgress(vehicle, simProgress(s.plan.timed, step), speedMps, false);
       if (step.arrived) {
-        get().showNotice('success', `Arrived at ${s.plan.timed.route.destination.name} (simulated)`);
+        const m = currentMessages();
+        get().showNotice('success', m.ui.arrivedSim(s.plan.timed.route.destination.name));
       }
     },
 
     exitSimulation() {
+      getVoiceQueue().clear();
       set({
         mode: 'planning',
         vehicle: null,
         progress: null,
+        guidance: null,
         navStartedMs: null,
         sim: { ...get().sim, playing: false, arrived: false },
         sheet: 'default',
         clockMs: Date.now(),
         followVehicle: true,
+        activeAlert: null,
       });
       set({ derived: derive(get()) });
+    },
+
+    // ---------------- Places along the route ----------------
+    async searchPoi(category, opts = {}) {
+      const s = get();
+      const providers = getProviders();
+      if (!s.plan || !providers.poi) return [];
+      set({ poi: { category, status: 'loading', results: [] } });
+      const fromM = opts.aroundM !== undefined ? Math.max(0, opts.aroundM - 5000) : (s.progress?.distanceAlongM ?? 0);
+      const aheadM = opts.aroundM !== undefined ? 10_000 : 60_000;
+      try {
+        const results = await searchAlongRoute({
+          places: providers.poi,
+          routing: providers.routing,
+          timed: s.plan.timed,
+          category,
+          fromM,
+          aheadM,
+          signal: opts.signal ?? planTasks?.signal,
+          language: currentMessages().locale,
+        });
+        if (get().plan?.timed !== s.plan.timed) return [];
+        set({ poi: { category, status: 'ready', results } });
+        return results;
+      } catch (e) {
+        if (!isAbortError(e)) set({ poi: { category, status: 'error', results: [] } });
+        return [];
+      }
+    },
+    clearPoi: () => set({ poi: null }),
+
+    async addStop(place) {
+      const s = get();
+      if (s.mode !== 'planning' && s.vehicle) {
+        // While driving: re-route from here through the stop.
+        await recalculateFrom(s.vehicle.coordinate, s.vehicle.headingDeg, [place]);
+        return;
+      }
+      set({ waypoints: [...s.waypoints, { text: place.name, place }].slice(0, 3), poi: null });
+      await get().calculateRoute();
+    },
+
+    // ---------------- Voice ----------------
+    setAssistant: (patch) => set((s) => ({ assistant: { ...s.assistant, ...patch } })),
+    say(text, priority = 3) {
+      const speed = get().mode === 'simulating' ? get().sim.speed : 1;
+      getVoiceQueue().enqueue({
+        id: `say:${text}:${Math.floor(Date.now() / 1000)}`,
+        text,
+        priority,
+        expiresAt: Date.now() + Math.max(5000, 60_000 / speed),
+        interruptible: priority > 1,
+      });
     },
   })),
 );
 
-/** When settlement names arrive after the plan, name samples in place (same ids → same forecasts). */
-function watchLatePlaces(plan: PlannedRoute) {
-  if (!plan.latePlaces) return;
-  void plan.latePlaces.then((places) => {
-    const cur = useAppStore.getState().plan;
-    if (!cur || cur.timed !== plan.timed) return;
-    useAppStore.setState({ plan: applyLatePlaces(cur, places) });
-    useAppStore.setState({ derived: derive(useAppStore.getState()) });
-  });
+/** Replace the plan object everywhere it is referenced (plan + its option slot). */
+function replacePlan(next: PlannedRoute) {
+  const s = useAppStore.getState();
+  const options = s.routeOptions.map((o) => (o.timed === next.timed ? next : o));
+  useAppStore.setState({ plan: next, routeOptions: options.length ? options : [next] });
 }
 
-/** Off-route (or far-from-route start): re-plan from the vehicle to the destination. */
-async function recalculateFrom(coordinate: LngLat, headingDeg?: number): Promise<void> {
+/** Background work for a route: late place names and OSM speed limits. */
+function startPlanTasks(plan: PlannedRoute, keepSignal = false) {
+  const signal = keepSignal && planTasks && !planTasks.signal.aborted ? planTasks.signal : newPlanTasks();
+  if (plan.latePlaces) {
+    void plan.latePlaces.then((places) => {
+      const cur = useAppStore.getState().plan;
+      if (signal.aborted || !cur || cur.timed !== plan.timed) return;
+      replacePlan(applyLatePlaces(cur, places));
+      useAppStore.getState().rederive();
+    });
+  }
+}
+
+let speedLimitsFor: PlannedRoute['timed'] | null = null;
+
+/**
+ * OSM speed limits, fetched once per route and only when a drive starts
+ * (planning doesn't need them; the public Overpass servers are shared).
+ */
+function loadSpeedLimits() {
+  const s = useAppStore.getState();
+  const provider = getProviders().speedLimits;
+  const timed = s.plan?.timed;
+  if (!provider || !timed || !useSettings.getState().speedWarnings || speedLimitsFor === timed) return;
+  speedLimitsFor = timed;
+  const signal = planTasks?.signal ?? newPlanTasks();
+  provider
+    .getSpeedLimits(timed.route.geometry, signal)
+    .then((ways) => {
+      if (signal.aborted || useAppStore.getState().plan?.timed !== timed) return;
+      useAppStore.setState({ speedLimits: matchSpeedLimits(timed, ways) });
+      useAppStore.getState().rederive();
+    })
+    .catch(() => {
+      if (speedLimitsFor === timed) speedLimitsFor = null; // allow a retry on the next drive
+    });
+}
+
+/**
+ * THE REAL-TIME LOOP (GPS fix or simulation step):
+ * position → map-matched progress → guidance → maneuver voice → speed →
+ * (throttled) weather/events → alert prioritisation → voice + visual.
+ */
+function onProgress(vehicle: VehicleState, progress: RouteProgress, speedMps: number | undefined, live: boolean) {
   const store = useAppStore;
   const s = store.getState();
   if (!s.plan) return;
+  const settings = settingsSnapshot();
+  const m = currentMessages();
+  const simSpeed = s.mode === 'simulating' ? s.sim.speed : 1;
+
+  // 1. Position + progress (every update; the map reads these imperatively).
+  const maneuvers = s.derived.maneuvers.length ? s.derived.maneuvers : [];
+  const guidance = computeGuidance(maneuvers, s.plan.timed, progress.distanceAlongM);
+  const prevG = s.guidance;
+  const guidanceChanged =
+    !prevG || prevG.next?.id !== guidance.next?.id || Math.round(prevG.distanceToNextM / 10) !== Math.round(guidance.distanceToNextM / 10);
+
+  // 2. Speed limit + speeding (hysteresis).
+  const speedKmh = speedMps !== undefined && Number.isFinite(speedMps) ? speedMps * 3.6 : null;
+  const limit = speedLimitAt(s.speedLimits, progress.distanceAlongM);
+  const speeding = settings.speedWarnings ? updateSpeeding(s.speeding, live ? speedKmh : null, limit, progress.nowMs) : s.speeding;
+
+  store.setState({
+    vehicle,
+    progress,
+    ...(guidanceChanged ? { guidance } : {}),
+    ...(speeding !== s.speeding ? { speeding } : {}),
+  });
+
+  // 3. Maneuver voice — immediate, top priority. At fast simulation speeds the
+  //    prompts would be meaningless, so only real-time-ish playback speaks them.
+  const queue = getVoiceQueue();
+  const next = guidance.next;
+  if (next && simSpeed <= 10) {
+    const v = speedMps ?? edgeSpeedMps(s.plan.timed, progress.segmentIndex) ?? 14;
+    const stage = dueManeuverPrompt(next, guidance.distanceToNextM, v, spokenManeuvers);
+    if (stage) {
+      markSpoken(next, stage, spokenManeuvers);
+      queue.enqueue({
+        id: `mv:${next.id}:${stage}`,
+        text: spokenPrompt(next, stage, guidance.distanceToNextM, m, settings.units.distance, guidance.then),
+        priority: 1,
+        expiresAt: Date.now() + Math.max(3000, 15_000 / simSpeed),
+        interruptible: false,
+      });
+    }
+    // Weather waits while a maneuver is seconds away.
+    queue.holdBelowPriority(guidance.timeToNextS < 12 ? 1 : null);
+  } else {
+    queue.holdBelowPriority(null);
+  }
+
+  // 4. Weather + route events: throttled (≤1/s real time, or every 30 s of simulated time).
+  const due = performance.now() - lastDeriveAt > 1000 || progress.nowMs - lastDeriveSimMs >= 30_000;
+  if (!due) return;
+  store.setState({ derived: derive(store.getState()) });
+  const st = store.getState();
+  const decision = evaluateDriverAlerts(st.derived.intelligence.events, st.alertState, {
+    nowMs: progress.nowMs,
+    prefs: { output: settings.alertOutput, timing: settings.alertTiming },
+    m,
+  });
+  store.setState({ alertState: decision.state, ...(decision.visual ? { activeAlert: decision.visual } : {}) });
+  for (const v of decision.voice) {
+    queue.enqueue({
+      id: v.id,
+      text: v.text,
+      priority: v.priority,
+      // Alert time runs on the (possibly simulated) route clock; the queue on real time.
+      expiresAt: Date.now() + Math.max(5000, (v.expiresAt - progress.nowMs) / simSpeed),
+      interruptible: true,
+    });
+  }
+}
+
+/** Off-route (or far-from-route start): re-plan from the vehicle to the destination. */
+async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraStops: Place[] = []): Promise<void> {
+  const store = useAppStore;
+  const s = store.getState();
+  if (!s.plan) return;
+  const m = currentMessages();
   lastRecalcAt = Date.now();
   routeAbort?.abort();
   const ctrl = new AbortController();
   routeAbort = ctrl;
   store.setState({ recalculating: true });
-  s.showNotice('info', 'Recalculating route…', true);
-  const origin: Place = {
-    id: `here:${coordinate.join(',')}`,
-    name: 'Current location',
-    label: 'Current location',
-    coordinate,
-  };
+  s.showNotice('info', m.ui.recalculating, true);
+  const origin: Place = { id: `here:${coordinate.join(',')}`, name: m.ui.currentLocation, label: m.ui.currentLocation, coordinate };
+  // Keep only stops still ahead of the vehicle.
+  const route = s.plan.timed.route;
+  const progressM = s.progress?.distanceAlongM ?? 0;
+  const aheadStops =
+    route.waypoints?.filter((_, i) => {
+      const arrive = s.derived.maneuvers.find((mv) => mv.kind === 'arrive' && mv.legIndex === i);
+      return !arrive || arrive.distanceAlongM > progressM;
+    }) ?? [];
   try {
-    const plan = await planRoute(getProviders(), origin, s.plan.timed.route.destination, {
+    const plan = await planRoute(getProviders(), origin, route.destination, {
       signal: ctrl.signal,
       startBearingDeg: headingDeg,
+      waypoints: [...extraStops, ...aheadStops],
+      language: m.locale,
     });
-    if (ctrl.signal.aborted) return;
+    const cur = store.getState();
+    // Navigation ended while we were re-routing → drop the result (audit race).
+    if (ctrl.signal.aborted || cur.mode === 'planning') return;
     tracker = createProgressTracker(plan.timed);
-    watchLatePlaces(plan);
+    spokenManeuvers.clear();
     const now = Date.now();
-    const progress = tracker(coordinate, now);
+    const progress = tracker(coordinate, now, { headingDeg });
     store.setState({
       plan,
+      routeOptions: [plan],
+      selectedOption: 0,
+      speedLimits: null,
       navStartedMs: now,
       progress,
       deviation: initialDeviationState,
       recalculating: false,
-      mode: 'navigating',
+      mode: cur.mode === 'simulating' ? 'simulating' : 'navigating',
       navPrompt: null,
       followVehicle: true,
       selectedPointId: null,
+      poi: null,
     });
     store.setState({ derived: derive(store.getState()) });
-    store.getState().showNotice('success', 'Route updated');
+    startPlanTasks(plan);
+    loadSpeedLimits();
+    store.getState().showNotice('success', m.ui.routeUpdated);
+    store.getState().say(m.voice.rerouted, 3);
     await store.getState().loadWeather({ reason: 'recalculation' });
   } catch (e) {
     if (isAbortError(e)) return;
     store.setState({ recalculating: false });
-    store.getState().showNotice('error', describeError(e, 'Unable to calculate route'));
+    const offline = !store.getState().online;
+    store.getState().showNotice('error', offline ? m.ui.offlineDetail : describeError(e, m.ui.unableRoute, m));
   } finally {
     if (routeAbort === ctrl) routeAbort = null;
   }
@@ -721,11 +1113,17 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number): Promise
 export function __resetStoreRuntime() {
   routeAbort?.abort();
   weatherAbort?.abort();
+  planTasks?.abort();
   routeAbort = null;
   weatherAbort = null;
+  planTasks = null;
   tracker = null;
   namingAttempted.clear();
+  spokenManeuvers.clear();
+  voiceQueue = null;
+  speedLimitsFor = null;
   lastDeriveAt = 0;
   lastDeriveSimMs = 0;
   lastRecalcAt = 0;
 }
+

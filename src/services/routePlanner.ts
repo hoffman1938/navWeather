@@ -3,11 +3,13 @@ import { nameSamples, refineSamplesForWeather, mergeSamples, sampleRoute } from 
 import { buildTimedRoute, positionAtDistance } from '../algorithms/routeTiming';
 import { matchForecastToTime } from '../algorithms/weatherMatching';
 import { config } from '../config';
+import { en, type Messages } from '../i18n/en';
 import type { LngLat, Place } from '../types/geo';
-import type { ElevationProfile, PlaceAlongRoute, RouteSample, TimedRoute } from '../types/route';
+import type { ElevationProfile, PlaceAlongRoute, Route, RouteSample, TimedRoute } from '../types/route';
 import type { LocationForecast, WeatherAtTime } from '../types/weather';
 import { isAbortError, ProviderError } from './http';
 import type { Providers } from './providers';
+import type { AvoidOption } from './routing/RoutingProvider';
 import type { ForecastLookup } from './weather/WeatherService';
 
 export type PlanStage = 'geocoding' | 'routing' | 'places' | 'weather';
@@ -38,14 +40,14 @@ export interface PlaceQuery {
 }
 
 /** Resolve a user input to a place (skips the network if already resolved). */
-export async function resolvePlace(providers: Providers, q: PlaceQuery, signal?: AbortSignal): Promise<Place> {
+export async function resolvePlace(providers: Providers, q: PlaceQuery, signal?: AbortSignal, m: Messages = en): Promise<Place> {
   if (q.place) return q.place;
   const text = q.text.trim();
-  if (!text) throw new ProviderError('Enter a place', 'not-found', 'Geocoding service');
+  if (!text) throw new ProviderError(m.ui.enterPlace, 'not-found', 'Geocoding service');
   const coord = parseCoordinateText(text);
   if (coord) return { id: `coord:${coord.join(',')}`, name: text, label: text, coordinate: coord };
-  const place = await providers.geocoding.geocode(text, { signal });
-  if (!place) throw new ProviderError(`Couldn't find “${text}”`, 'not-found', 'Geocoding service');
+  const place = await providers.geocoding.geocode(text, { signal, language: m.locale });
+  if (!place) throw new ProviderError(m.ui.notFound(text), 'not-found', 'Geocoding service');
   return place;
 }
 
@@ -59,39 +61,96 @@ export function parseCoordinateText(text: string): LngLat | null {
   return [lon, lat];
 }
 
+export interface PlanOptions {
+  signal?: AbortSignal;
+  startBearingDeg?: number;
+  onStage?: (s: PlanStage) => void;
+  placesDeadlineMs?: number;
+  waypoints?: Place[];
+  /** Request alternative routes when the routing provider supports them. */
+  alternatives?: boolean;
+  avoid?: AvoidOption[];
+  /** Language for place names along the route. */
+  language?: string;
+}
+
+export interface RouteOptionsResult {
+  /** Selected (best) route, fully enriched. */
+  primary: PlannedRoute;
+  /** Alternatives: timed + sampled, place names/elevation loaded on selection. */
+  alternatives: PlannedRoute[];
+}
+
 /**
- * ROUTE → SAMPLES. Calculates the road route, then (in parallel, both
- * optional) finds settlements and the elevation profile along it, and
- * finally picks adaptive weather sample points.
+ * ROUTE → SAMPLES. Calculates the road route(s), then enriches the best one
+ * (settlements + elevation in parallel, both optional) and picks adaptive
+ * weather samples. Alternatives get timing + sampling only, so their weather
+ * can be compared without extra place/elevation traffic.
  */
+export async function planRouteOptions(
+  providers: Providers,
+  origin: Place,
+  destination: Place,
+  options: PlanOptions = {},
+): Promise<RouteOptionsResult> {
+  const { signal, onStage } = options;
+  onStage?.('routing');
+  const routes = await providers.routing.calculateRoutes({
+    origin,
+    destination,
+    waypoints: options.waypoints,
+    startBearingDeg: options.startBearingDeg,
+    alternatives: options.alternatives,
+    avoid: options.avoid,
+    signal,
+  });
+  const withTraffic = await Promise.all(routes.map((r) => providers.traffic.applyTraffic(r, signal)));
+  onStage?.('places');
+  const primary = await enrichRoute(providers, withTraffic[0], {
+    signal,
+    placesDeadlineMs: options.placesDeadlineMs,
+    language: options.language,
+  });
+  const alternatives = withTraffic.slice(1).map((r) => basicPlan(buildTimedRoute(r)));
+  return { primary, alternatives };
+}
+
+/** Single best route (navigation re-routes, tests). */
 export async function planRoute(
   providers: Providers,
   origin: Place,
   destination: Place,
-  options: {
-    signal?: AbortSignal;
-    startBearingDeg?: number;
-    onStage?: (s: PlanStage) => void;
-    placesDeadlineMs?: number;
-  } = {},
+  options: PlanOptions = {},
 ): Promise<PlannedRoute> {
-  const { signal, onStage } = options;
-  onStage?.('routing');
-  let route = await providers.routing.calculateRoute({
-    origin,
-    destination,
-    startBearingDeg: options.startBearingDeg,
-    signal,
-  });
-  route = await providers.traffic.applyTraffic(route, signal);
-  const timed = buildTimedRoute(route);
+  return (await planRouteOptions(providers, origin, destination, { ...options, alternatives: false })).primary;
+}
 
-  onStage?.('places');
+/** Timing + distance/time sampling only (no network). */
+export function basicPlan(timed: TimedRoute): PlannedRoute {
+  const samples = sampleRoute({ timed, maxIntervalMinutes: config.sampling.maxIntervalMinutes });
+  return { timed, places: [], elevation: null, samples, warnings: ['not-enriched'], refined: false };
+}
+
+/**
+ * Settlements (soft deadline) + elevation in parallel, then adaptive
+ * sampling anchored on them. Used for the primary route and when the user
+ * picks an alternative.
+ */
+export async function enrichRoute(
+  providers: Providers,
+  route: Route,
+  options: { signal?: AbortSignal; placesDeadlineMs?: number; language?: string } = {},
+): Promise<PlannedRoute> {
+  const { signal } = options;
+  const timed = buildTimedRoute(route);
   const warnings: string[] = [];
   const totalKm = timed.totalDistM / 1000;
   // Places are a nicety (names + anchors) — never let a slow server block the forecast.
   const placesPromise: Promise<PlaceAlongRoute[]> = providers.places
-    ? withTimeout(providers.places.getPlacesNearRoute(route.geometry, { includeVillages: totalKm < 80, signal }), 25000).then(
+    ? withTimeout(
+        providers.places.getPlacesNearRoute(route.geometry, { includeVillages: totalKm < 80, signal, language: options.language }),
+        25000,
+      ).then(
         (raw) => snapPlacesToRoute(raw, timed),
       )
     : Promise.resolve([]);
@@ -240,13 +299,13 @@ export async function refinePlanWithWeather(
   }
 }
 
-/** Human-friendly error text for the UI. */
-export function describeError(e: unknown, fallback: string): string {
+/** Human-friendly, localized error text for the UI. */
+export function describeError(e: unknown, fallback: string, m: Messages = en): string {
   if (e instanceof ProviderError) {
-    if (e.kind === 'no-route') return 'Unable to calculate route — no drivable road connects these places';
+    if (e.kind === 'no-route') return m.ui.noRoadRoute;
     if (e.kind === 'not-found') return e.message;
-    if (e.kind === 'rate-limited') return `${fallback} — the free service is busy, try again in a moment`;
-    if (e.kind === 'timeout' || e.kind === 'network') return `${fallback} — check your connection`;
+    if (e.kind === 'rate-limited') return `${fallback} — ${m.ui.busyService}`;
+    if (e.kind === 'timeout' || e.kind === 'network') return `${fallback} — ${m.ui.checkConnection}`;
   }
   return fallback;
 }

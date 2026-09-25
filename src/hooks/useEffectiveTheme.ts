@@ -1,4 +1,5 @@
 import { useLayoutEffect } from 'react';
+import { useSettings } from '../state/settings';
 import { useAppStore, type AppState } from '../state/store';
 import { isDaylight } from '../utils/sun';
 import { useDarkMode } from './useMediaQuery';
@@ -6,33 +7,44 @@ import { useDarkMode } from './useMediaQuery';
 export type Theme = 'light' | 'dark';
 
 /**
- * Planning follows the system theme. While driving (or simulating), the UI
- * switches to day/night by the sun at the vehicle's position and time — like
- * a car navigation system.
+ * Theme: the user's choice (light/dark), or automatic. Automatic follows the
+ * system while planning, and day/night at the vehicle while driving — like a
+ * car navigation system.
  */
-export function useEffectiveTheme(): { theme: Theme; auto: boolean } {
+export function useEffectiveTheme(): { theme: Theme; forced: boolean } {
   const systemDark = useDarkMode();
+  const choice = useSettings((s) => s.theme);
   const auto = useAppStore(autoThemeFor);
-  if (auto === null) return { theme: systemDark ? 'dark' : 'light', auto: false };
-  return { theme: auto, auto: true };
+  if (choice !== 'auto') return { theme: choice, forced: true };
+  if (auto === null) return { theme: systemDark ? 'dark' : 'light', forced: false };
+  return { theme: auto, forced: true };
 }
 
 /** Day/night at the vehicle's position and (real or simulated) time; null while planning. */
-export function autoThemeFor(
-  s: Pick<AppState, 'mode' | 'vehicle' | 'sim'>,
-  now: () => number = Date.now,
-): Theme | null {
+export function autoThemeFor(s: Pick<AppState, 'mode' | 'vehicle' | 'sim'>, now: () => number = Date.now): Theme | null {
   if (s.mode === 'planning' || !s.vehicle) return null;
   const t = s.mode === 'simulating' ? s.sim.nowMs : now();
   return isDaylight(s.vehicle.coordinate[1], s.vehicle.coordinate[0], t) ? 'light' : 'dark';
 }
 
-/** Apply the automatic theme to the document (removed again when planning). */
+/** Apply the theme to the document (and the browser bar colour). */
 export function useApplyTheme() {
-  const { theme, auto } = useEffectiveTheme();
+  const { theme, forced } = useEffectiveTheme();
+  const lang = useSettings((s) => s.language);
   useLayoutEffect(() => {
     const root = document.documentElement;
-    if (auto) root.dataset.theme = theme;
+    if (forced) root.dataset.theme = theme;
     else delete root.dataset.theme;
-  }, [theme, auto]);
+    root.lang = lang;
+    const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]:not([media])');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    // light-dark() isn't resolved in custom properties — pick the concrete colour.
+    meta.content = theme === 'dark' ? '#0e1013' : '#eceef1';
+    void bg;
+  }, [theme, forced, lang]);
 }

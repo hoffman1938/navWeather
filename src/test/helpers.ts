@@ -7,6 +7,7 @@ import { normalizeWmoCode } from '../services/weather/weatherCodes';
 import type { Place } from '../types/geo';
 import type { Route } from '../types/route';
 import type { LocationForecast } from '../types/weather';
+import type { SpeechRecognitionProvider, TextToSpeechProvider } from '../voice/providers';
 
 export const TBILISI: Place = {
   id: 'test:tbilisi',
@@ -114,8 +115,13 @@ export class FakeWeatherProvider implements WeatherProvider {
     public hourFn?: (lat: number, lon: number, hourMs: number, version: number) => HourlyValues,
   ) {}
 
+  /** Simulated network latency (ms); requests honour their abort signal. */
+  delayMs = 0;
+
   async getForecasts(req: ForecastRequest): Promise<LocationForecast[]> {
     this.requests.push(req);
+    if (this.delayMs) await new Promise((r) => setTimeout(r, this.delayMs));
+    if (req.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     if (this.fail) throw Object.assign(new Error('boom'), { name: 'Error' });
     const start = Math.floor(this.baseMs / 3600_000) * 3600_000 - 3 * 3600_000;
     const fn =
@@ -140,5 +146,42 @@ export class FakeWeatherProvider implements WeatherProvider {
         hourFn: (t) => fn(loc.latitude, loc.longitude, t, this.version),
       }),
     );
+  }
+}
+
+/** Records speech; finishes each utterance immediately unless `holdSpeech` is set. */
+export class FakeTTS implements TextToSpeechProvider {
+  readonly name = 'fake-tts';
+  readonly supported = true;
+  spoken: string[] = [];
+  holdSpeech = false;
+  private pending: (() => void) | null = null;
+  speak(text: string, opts: { lang: string; onEnd: () => void }): void {
+    this.spoken.push(text);
+    if (this.holdSpeech) this.pending = opts.onEnd;
+    else opts.onEnd();
+  }
+  /** Finish the utterance currently being "spoken". */
+  finish(): void {
+    const f = this.pending;
+    this.pending = null;
+    f?.();
+  }
+  cancel(): void {
+    this.pending = null;
+  }
+  unlock(): void {}
+}
+
+export class FakeRecognition implements SpeechRecognitionProvider {
+  readonly name = 'fake-stt';
+  supported = true;
+  nextTranscript = '';
+  listen(opts: Parameters<SpeechRecognitionProvider['listen']>[0]) {
+    queueMicrotask(() => {
+      opts.onResult(this.nextTranscript, true);
+      opts.onEnd();
+    });
+    return { stop() {} };
   }
 }

@@ -1,9 +1,10 @@
+import { en, type Messages } from '../i18n/en';
+import { formatTemp, type TemperatureUnit } from '../i18n/format';
 import type {
   RouteWeatherPoint,
   RouteWeatherSummary,
   WeatherAtTime,
   WeatherCondition,
-  WeatherEvent,
   WeatherGroup,
   WeatherGroupClass,
   WeatherRouteSegment,
@@ -53,25 +54,26 @@ export function isNotableClass(c: WeatherGroupClass): boolean {
 }
 
 /** Hedged, forecast-style wording — never "guaranteed". */
-export function groupLabel(groupClass: WeatherGroupClass, points: WeatherAtTime[]): string {
+export function groupLabel(groupClass: WeatherGroupClass, points: WeatherAtTime[], m: Messages = en): string {
   const maxProb = Math.max(0, ...points.map((w) => w.precipitationProbability ?? 0));
+  const g = m.weather.group;
   switch (groupClass) {
     case 'clear':
-      return points.every((w) => w.condition === 'CLEAR') ? 'Clear' : 'Mostly clear';
+      return points.every((w) => w.condition === 'CLEAR') ? g.clear : g.mostlyClear;
     case 'cloudy':
-      return 'Cloudy';
+      return g.cloudy;
     case 'fog':
-      return 'Fog possible';
+      return g.fog;
     case 'rain':
-      return maxProb >= 60 ? 'Rain likely' : maxProb >= 30 ? 'Rain possible' : 'Light rain possible';
+      return maxProb >= 60 ? g.rainLikely : maxProb >= 30 ? g.rainPossible : g.lightRainPossible;
     case 'heavy-rain':
-      return 'Heavy rain possible';
+      return g.heavyRain;
     case 'snow':
-      return maxProb >= 60 ? 'Snow likely' : 'Snow possible';
+      return maxProb >= 60 ? g.snowLikely : g.snowPossible;
     case 'sleet':
-      return 'Freezing rain possible';
+      return g.sleet;
     case 'thunderstorm':
-      return 'Thunderstorms possible';
+      return g.thunderstorm;
   }
 }
 
@@ -98,7 +100,7 @@ function dominantCondition(points: WeatherAtTime[]): WeatherCondition {
  * between two groups of the same class is absorbed to avoid flicker;
  * notable weather (rain, fog, snow…) is never absorbed.
  */
-export function groupWeather(points: RouteWeatherPoint[]): WeatherGroup[] {
+export function groupWeather(points: RouteWeatherPoint[], m: Messages = en): WeatherGroup[] {
   const pts = points.filter(hasWeather);
   const runs: WithWeather[][] = [];
   for (const p of pts) {
@@ -127,7 +129,7 @@ export function groupWeather(points: RouteWeatherPoint[]): WeatherGroup[] {
       id: `g-${first.id}`,
       groupClass: cls,
       condition: dominantCondition(ws),
-      label: groupLabel(cls, ws),
+      label: groupLabel(cls, ws, m),
       fromPointId: first.id,
       toPointId: last.id,
       fromName: first.placeName,
@@ -144,93 +146,6 @@ export function groupWeather(points: RouteWeatherPoint[]): WeatherGroup[] {
   });
 }
 
-function placePhrase(p: RouteWeatherPoint, first: boolean, last: boolean): string {
-  if (!p.placeName) return `around km ${Math.round(p.distanceFromStartKm)}`;
-  if ((first || last) && p.placeRelation === 'in') return `in ${p.placeName}`;
-  return `near ${p.placeName}`;
-}
-
-/** Significant transitions along the route (rain begins, gusts, fog…). */
-export function detectWeatherEvents(points: RouteWeatherPoint[]): WeatherEvent[] {
-  const pts = points.filter(hasWeather);
-  const events: WeatherEvent[] = [];
-  const add = (type: WeatherEvent['type'], p: WithWeather, message: string, severity: WeatherEvent['severity']) =>
-    events.push({
-      id: `${type}:${p.id}`,
-      type,
-      pointId: p.id,
-      message,
-      severity,
-      arrivalMs: p.arrivalMs,
-      distanceM: p.distanceFromStartKm * 1000,
-    });
-
-  // Treat a short dry blip between wet stretches (wet neighbours <40 km apart,
-  // i.e. about one sample) as wet, so rain "starts" once instead of flickering.
-  const wetRaw = pts.map((p) => isPrecipitating(p.weather.condition));
-  const wetSmoothed = [...wetRaw];
-  for (let i = 0; i < pts.length; i++) {
-    if (wetRaw[i] || !wetRaw[i - 1]) continue;
-    let j = i;
-    while (j < pts.length && !wetRaw[j]) j++;
-    if (j < pts.length && pts[j].distanceFromStartKm - pts[i - 1].distanceFromStartKm < 40) {
-      for (let k = i; k < j; k++) wetSmoothed[k] = true;
-    }
-    i = j;
-  }
-
-  let windActive = false;
-  let visActive = false;
-  let lastTempDropAtM = -Infinity;
-  const startTemp = pts[0]?.weather.temperature;
-
-  pts.forEach((p, i) => {
-    const w = p.weather;
-    const prev = pts[i - 1]?.weather;
-    const where = placePhrase(p, i === 0, i === pts.length - 1);
-    const wet = wetSmoothed[i];
-    const prevWet = i > 0 ? wetSmoothed[i - 1] : false;
-    const prob = w.precipitationProbability ?? 0;
-
-    if (w.condition === 'THUNDERSTORM' && prev?.condition !== 'THUNDERSTORM') {
-      add('thunderstorm', p, `Thunderstorms possible ${where}`, 'warning');
-    } else if (w.condition === 'SNOW' && prev?.condition !== 'SNOW') {
-      add('snow-start', p, `${prob >= 60 ? 'Snow likely' : 'Snow possible'} ${where}`, 'warning');
-    } else if (w.condition === 'SLEET' && prev?.condition !== 'SLEET') {
-      add('icy', p, `Freezing rain possible ${where} — roads may be icy`, 'warning');
-    } else if ((w.condition === 'HEAVY_RAIN' || (w.precipitation ?? 0) >= 4) && prev?.condition !== 'HEAVY_RAIN') {
-      add('heavy-precipitation', p, `Heavy rain possible ${where}`, 'warning');
-    } else if (wet && !prevWet && isPrecipitating(w.condition)) {
-      add('rain-start', p, `${prob >= 60 ? 'Rain likely' : 'Rain possible'} ${i === 0 ? where : `from ${where.replace(/^(near|in) /, '')}`}`, 'caution');
-    } else if (!wet && prevWet) {
-      add('rain-end', p, `Drier ${where}`, 'info');
-    }
-
-    if (wet && w.temperature <= 1 && w.condition !== 'SLEET') {
-      add('icy', p, `Near-freezing with precipitation ${where} — roads may be icy`, 'warning');
-    }
-
-    const gusty = (w.windGusts ?? 0) >= 60 || (w.windSpeed ?? 0) >= 40;
-    if (gusty && !windActive) {
-      add('strong-wind', p, `Strong gusts (${w.windGusts ?? w.windSpeed} km/h) ${where}`, 'caution');
-    }
-    windActive = gusty;
-
-    const lowVis = (w.visibility !== undefined && w.visibility < 1000) || w.condition === 'FOG';
-    if (lowVis && !visActive) add('low-visibility', p, `Low visibility possible ${where}`, 'caution');
-    visActive = lowVis;
-
-    const distM = p.distanceFromStartKm * 1000;
-    const dropFromPrev = prev ? prev.temperature - w.temperature : 0;
-    const dropFromStart = startTemp !== undefined ? startTemp - w.temperature : 0;
-    if ((dropFromPrev >= 5 || dropFromStart >= 8) && distM - lastTempDropAtM > 50_000) {
-      add('temperature-drop', p, `Colder ${where}: ${Math.round(w.temperature)}°`, 'info');
-      lastTempDropAtM = distM;
-    }
-  });
-  return events;
-}
-
 /**
  * Pick the handful of points worth a card/marker: the ends, weather
  * transitions and events, named settlements — spread out in time. Avoids 30
@@ -238,7 +153,7 @@ export function detectWeatherEvents(points: RouteWeatherPoint[]): WeatherEvent[]
  */
 export function selectDisplayPoints(
   points: RouteWeatherPoint[],
-  options: { includeFirst?: boolean; maxCards?: number } = {},
+  options: { includeFirst?: boolean; maxCards?: number; eventPointIds?: Set<string> } = {},
 ): RouteWeatherPoint[] {
   const pts = points;
   if (pts.length <= 2) return pts;
@@ -251,7 +166,7 @@ export function selectDisplayPoints(
   const groups = groupWeather(pts);
   const groupStarts = new Set(groups.map((g) => g.fromPointId));
   const groupEnds = new Set(groups.map((g) => g.toPointId));
-  const eventPoints = new Set(detectWeatherEvents(pts).filter((e) => e.severity !== 'info').map((e) => e.pointId));
+  const eventPoints = options.eventPointIds ?? new Set<string>();
 
   const score = (p: RouteWeatherPoint, i: number): number => {
     if (i === pts.length - 1 || (includeFirst && i === 0)) return Infinity;
@@ -318,23 +233,25 @@ export function weatherRouteSegments(points: RouteWeatherPoint[], totalDistM: nu
 }
 
 /** One-glance summary: headline + per-stretch highlights. */
-export function summarizeRouteWeather(points: RouteWeatherPoint[]): RouteWeatherSummary {
+export function summarizeRouteWeather(
+  points: RouteWeatherPoint[],
+  m: Messages = en,
+  temperatureUnit: TemperatureUnit = 'c',
+): RouteWeatherSummary {
   const pts = points.filter(hasWeather);
+  const S = m.weather.summary;
   if (pts.length === 0) {
-    return { headline: 'Weather data temporarily unavailable', tone: 'unknown', highlights: [] };
+    return { headline: S.unavailable, tone: 'unknown', highlights: [] };
   }
-  const groups = groupWeather(pts);
+  const groups = groupWeather(pts, m);
   const temps = pts.map((p) => p.weather.temperature);
   const minT = Math.round(Math.min(...temps));
   const maxT = Math.round(Math.max(...temps));
-  const detail = minT === maxT ? `Around ${minT}° along the way` : `${minT}–${maxT}° along the way`;
+  const detail = S.range(formatTemp(minT, temperatureUnit), formatTemp(maxT, temperatureUnit));
   const totalM = Math.max(1, pts[pts.length - 1].distanceFromStartKm * 1000 - pts[0].distanceFromStartKm * 1000);
   const byId = new Map(pts.map((p) => [p.id, p]));
 
-  const where = (g: WeatherGroup) => {
-    const p = bestNamedPoint(g, byId);
-    return p?.placeName ? ` near ${p.placeName}` : '';
-  };
+  const near = (g: WeatherGroup) => bestNamedPoint(g, byId)?.placeName;
   const find = (...classes: WeatherGroupClass[]) => groups.find((g) => classes.includes(g.groupClass));
 
   let headline: string;
@@ -347,37 +264,34 @@ export function summarizeRouteWeather(points: RouteWeatherPoint[]): RouteWeather
   const fog = find('fog');
 
   if (storm) {
-    headline = `Thunderstorms possible${where(storm)}`;
+    headline = S.storms(near(storm));
     tone = 'severe';
   } else if (wintry) {
-    headline = `${wintry.groupClass === 'snow' ? 'Snow' : 'Freezing rain'} possible${where(wintry)}`;
+    headline = wintry.groupClass === 'snow' ? S.snow(near(wintry)) : S.freezing(near(wintry));
     tone = 'wintry';
   } else if (wetGroups.length > 0) {
     tone = 'wet';
-    if (wetShare >= 0.5) headline = 'Rain expected along much of your route';
+    if (wetShare >= 0.5) headline = S.rainMuch;
     else {
       const g = wetGroups[0];
-      headline = `${g.label}${where(g)}`;
+      headline = S.group(g.label, near(g));
     }
   } else if (fog) {
-    headline = `Fog possible${where(fog)}`;
+    headline = S.fog(near(fog));
     tone = 'wet';
   } else {
     tone = 'dry';
-    headline = groups.every((g) => g.groupClass === 'clear')
-      ? 'Clear and dry along your route'
-      : 'Mostly dry conditions along your route';
+    headline = groups.every((g) => g.groupClass === 'clear') ? S.clearDry : S.mostlyDry;
   }
 
   // Highlights: origin stretch, destination stretch, plus the most notable others.
   const firstId = pts[0].id;
   const lastId = pts[pts.length - 1].id;
   const phrase = (g: WeatherGroup): string => {
-    if (g.pointIds.includes(firstId) && pts[0].placeName) return `${g.label} in ${pts[0].placeName}`;
-    if (g.pointIds.includes(lastId) && pts[pts.length - 1].placeName)
-      return `${g.label} in ${pts[pts.length - 1].placeName}`;
-    const named = bestNamedPoint(g, byId);
-    return named ? `${g.label} near ${named.placeName}` : g.label;
+    if (g.pointIds.includes(firstId) && pts[0].placeName) return S.groupIn(g.label, pts[0].placeName);
+    const lastName = pts[pts.length - 1].placeName;
+    if (g.pointIds.includes(lastId) && lastName) return S.groupIn(g.label, lastName);
+    return S.group(g.label, bestNamedPoint(g, byId)?.placeName);
   };
   let chosen = groups;
   if (groups.length > 5) {

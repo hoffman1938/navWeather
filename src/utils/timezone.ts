@@ -16,22 +16,38 @@ function formatter(timeZone: string, options: Intl.DateTimeFormatOptions, locale
   return f;
 }
 
+let deviceTz: { tz: string; at: number } | null = null;
+
+/** Device timezone (re-read every 10 min — the device may cross zones). */
 export function deviceTimeZone(): string {
+  const now = Date.now();
+  if (deviceTz && now - deviceTz.at < 600_000) return deviceTz.tz;
+  let tz = 'UTC';
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   } catch {
-    return 'UTC';
+    /* keep UTC */
   }
+  deviceTz = { tz, at: now };
+  return tz;
 }
 
+const validTz = new Map<string, boolean>();
+
+/** Cached: constructing Intl.DateTimeFormat per call was the main derive() cost. */
 export function isValidTimeZone(tz: string | undefined): tz is string {
   if (!tz) return false;
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz });
-    return true;
-  } catch {
-    return false;
+  let ok = validTz.get(tz);
+  if (ok === undefined) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: tz });
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    validTz.set(tz, ok);
   }
+  return ok;
 }
 
 /** "10:05" — 24h clock in the given timezone. */

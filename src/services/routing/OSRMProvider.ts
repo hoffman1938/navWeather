@@ -1,17 +1,33 @@
 import type { LngLat } from '../../types/geo';
-import type { Route, RouteLeg, RouteSegment, RouteStep, TimingSource } from '../../types/route';
+import type { Lane, Route, RouteLeg, RouteSegment, RouteStep, TimingSource } from '../../types/route';
 import { bboxOf } from '../../utils/distance';
 import { fetchJson, ProviderError } from '../http';
-import type { RouteRequest, RoutingProvider } from './RoutingProvider';
+import type { RouteRequest, RoutingCapabilities, RoutingProvider, TravelMatrix } from './RoutingProvider';
 
 // --- Raw OSRM response shapes (never leave this file) ---
+interface OsrmIntersection {
+  location: LngLat;
+  lanes?: { indications: string[]; valid: boolean }[];
+  classes?: string[];
+}
 interface OsrmStep {
   distance: number;
   duration: number;
   name: string;
   ref?: string;
+  destinations?: string;
+  rotary_name?: string;
+  driving_side?: 'left' | 'right';
   geometry?: { coordinates: LngLat[] };
-  maneuver: { type: string; modifier?: string; location: LngLat };
+  intersections?: OsrmIntersection[];
+  maneuver: {
+    type: string;
+    modifier?: string;
+    location: LngLat;
+    exit?: number;
+    bearing_before?: number;
+    bearing_after?: number;
+  };
 }
 interface OsrmLeg {
   distance: number;
@@ -32,6 +48,8 @@ interface OsrmResponse {
   routes?: OsrmRoute[];
 }
 
+const coordParam = ([lon, lat]: LngLat) => `${lon.toFixed(6)},${lat.toFixed(6)}`;
+
 export class OSRMProvider implements RoutingProvider {
   readonly name = 'osrm';
 
@@ -39,24 +57,39 @@ export class OSRMProvider implements RoutingProvider {
     private baseUrl: string,
     private profile = 'driving',
     private timeoutMs = 20000,
+    /**
+     * Declared, verified capabilities. The public demo server returns
+     * alternatives, lanes and a table service, but rejects every `exclude`
+     * (avoid) flag — so no avoid options are offered by default.
+     */
+    readonly capabilities: RoutingCapabilities = {
+      alternatives: true,
+      avoid: [],
+      laneGuidance: true,
+      matrix: true,
+      multiStop: true,
+    },
   ) {}
 
-  async calculateRoute(req: RouteRequest): Promise<Route> {
-    const { origin, destination } = req;
-    const coords = [origin.coordinate, destination.coordinate]
-      .map(([lon, lat]) => `${lon.toFixed(6)},${lat.toFixed(6)}`)
-      .join(';');
+  async calculateRoutes(req: RouteRequest): Promise<Route[]> {
+    const points = [req.origin, ...(req.waypoints ?? []), req.destination];
+    const coords = points.map((p) => coordParam(p.coordinate)).join(';');
     const params = new URLSearchParams({
       overview: 'full',
       geometries: 'geojson',
       steps: 'true',
       annotations: 'duration,distance',
-      alternatives: 'false',
+      // OSRM only computes alternatives for two-point requests.
+      alternatives: req.alternatives && this.capabilities.alternatives && points.length === 2 ? 'true' : 'false',
     });
     if (req.startBearingDeg !== undefined && Number.isFinite(req.startBearingDeg)) {
-      params.set('bearings', `${Math.round(req.startBearingDeg) % 360},60;`);
+      params.set('bearings', [`${Math.round(req.startBearingDeg) % 360},60`, ...points.slice(1).map(() => '')].join(';'));
     }
-    const url = `${this.baseUrl.replace(/\/$/, '')}/route/v1/${this.profile}/${coords}?${params}`;
+    const exclude = (req.avoid ?? [])
+      .filter((a) => this.capabilities.avoid.includes(a))
+      .map((a) => ({ tolls: 'toll', highways: 'motorway', ferries: 'ferry' })[a]);
+    if (exclude.length) params.set('exclude', exclude.join(','));
+    const url = `${this.base}/route/v1/${encodeURIComponent(this.profile)}/${coords}?${params}`;
     const data = await fetchJson<OsrmResponse>(url, {
       provider: 'Routing service',
       signal: req.signal,
@@ -66,12 +99,38 @@ export class OSRMProvider implements RoutingProvider {
       const kind = data.code === 'NoRoute' || data.code === 'NoSegment' ? 'no-route' : 'invalid-response';
       throw new ProviderError(data.message ?? `Routing failed (${data.code})`, kind, 'Routing service');
     }
-    return normalizeOsrmRoute(data.routes[0], req);
+    return data.routes.map((r) => normalizeOsrmRoute(r, req));
+  }
+
+  /** OSRM table service: real driving durations/distances (used for detours). */
+  async travelMatrix(sources: LngLat[], destinations: LngLat[], signal?: AbortSignal): Promise<TravelMatrix> {
+    const all = [...sources, ...destinations];
+    const params = new URLSearchParams({
+      sources: sources.map((_, i) => i).join(';'),
+      destinations: destinations.map((_, i) => sources.length + i).join(';'),
+      annotations: 'duration,distance',
+    });
+    const url = `${this.base}/table/v1/${encodeURIComponent(this.profile)}/${all.map(coordParam).join(';')}?${params}`;
+    const data = await fetchJson<{ code: string; durations?: (number | null)[][]; distances?: (number | null)[][] }>(
+      url,
+      { provider: 'Routing service', signal, timeoutMs: this.timeoutMs },
+    );
+    if (data.code !== 'Ok' || !data.durations) {
+      throw new ProviderError(`Travel matrix failed (${data.code})`, 'invalid-response', 'Routing service');
+    }
+    return { durations: data.durations, distances: data.distances ?? data.durations.map((r) => r.map(() => null)) };
+  }
+
+  private get base() {
+    return this.baseUrl.replace(/\/$/, '');
   }
 }
 
 /** Convert an OSRM route into the app's normalized Route. Exported for tests. */
-export function normalizeOsrmRoute(raw: OsrmRoute, req: Pick<RouteRequest, 'origin' | 'destination'>): Route {
+export function normalizeOsrmRoute(
+  raw: OsrmRoute,
+  req: Pick<RouteRequest, 'origin' | 'destination' | 'waypoints'>,
+): Route {
   const geometry = raw.geometry.coordinates;
   if (geometry.length < 2) {
     throw new ProviderError('Route geometry is empty', 'invalid-response', 'Routing service');
@@ -88,14 +147,25 @@ export function normalizeOsrmRoute(raw: OsrmRoute, req: Pick<RouteRequest, 'orig
       const fromIndex = vertex;
       const toIndex = Math.min(geometry.length - 1, vertex + Math.max(0, n - 1));
       if (!s.geometry || n === 0) stepsAligned = false;
+      const first = s.intersections?.[0];
+      const classes = [...new Set((s.intersections ?? []).flatMap((it) => it.classes ?? []))];
       steps.push({
         distanceM: s.distance,
         durationS: s.duration,
         name: s.name ?? '',
         ref: s.ref || undefined,
+        destinations: s.destinations || undefined,
+        rotaryName: s.rotary_name || undefined,
         maneuverType: s.maneuver.type,
         maneuverModifier: s.maneuver.modifier,
+        exit: s.maneuver.exit,
         location: s.maneuver.location,
+        bearingBefore: s.maneuver.bearing_before,
+        bearingAfter: s.maneuver.bearing_after,
+        // Lanes at the maneuver point (first intersection of the step) — real data only.
+        lanes: first?.lanes?.length ? first.lanes.map((l): Lane => ({ indications: [...l.indications], valid: !!l.valid })) : undefined,
+        classes: classes.length ? classes : undefined,
+        drivingSide: s.driving_side,
         fromIndex,
         toIndex,
       });
@@ -122,6 +192,7 @@ export function normalizeOsrmRoute(raw: OsrmRoute, req: Pick<RouteRequest, 'orig
     provider: 'osrm',
     origin: req.origin,
     destination: req.destination,
+    waypoints: req.waypoints?.length ? req.waypoints : undefined,
     geometry,
     distanceM: raw.distance,
     durationS: raw.duration,

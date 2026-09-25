@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteWeatherPoint, WeatherAtTime, WeatherCondition } from '../types/weather';
 import {
-  detectWeatherEvents,
   groupWeather,
   selectDisplayPoints,
   summarizeRouteWeather,
@@ -78,31 +77,9 @@ describe('groupWeather', () => {
   });
 });
 
-describe('detectWeatherEvents', () => {
-  it('detects rain starting and ending', () => {
-    const e = detectWeatherEvents(journey);
-    expect(e.find((x) => x.type === 'rain-start')?.message).toBe('Rain likely from Khashuri');
-    expect(e.find((x) => x.type === 'rain-end')?.pointId).toBe('p6');
-  });
-
-  it('detects thunderstorms, snow, wind, fog, temperature drops and icy roads', () => {
-    const pts = [
-      pt(0, 0, 0, 'CLEAR', 20, { name: 'A' }),
-      pt(1, 50, 40, 'THUNDERSTORM', 18, { name: 'B' }),
-      pt(2, 100, 80, 'CLOUDY', 12, { name: 'C', windGusts: 75 }),
-      pt(3, 150, 120, 'FOG', 11, { name: 'D', visibility: 300 }),
-      pt(4, 200, 160, 'SNOW', 0, { name: 'E', precipitationProbability: 80 }),
-    ];
-    const types = detectWeatherEvents(pts).map((e) => e.type);
-    expect(types).toEqual(
-      expect.arrayContaining(['thunderstorm', 'strong-wind', 'low-visibility', 'snow-start', 'temperature-drop', 'icy']),
-    );
-  });
-});
-
 describe('selectDisplayPoints', () => {
   it('keeps ends, weather transitions and named places, spread over time', () => {
-    const shown = selectDisplayPoints(journey, { maxCards: 7 });
+    const shown = selectDisplayPoints(journey, { maxCards: 7, eventPointIds: new Set(['p4']) });
     const ids = shown.map((p) => p.id);
     expect(ids[0]).toBe('p0');
     expect(ids[ids.length - 1]).toBe('p11');
@@ -118,7 +95,7 @@ describe('summarizeRouteWeather', () => {
     const s = summarizeRouteWeather(journey);
     expect(s.headline).toBe('Rain likely near Khashuri');
     expect(s.tone).toBe('wet');
-    expect(s.detail).toBe('15–23° along the way');
+    expect(s.detail).toBe('15°–23° along the way');
     const texts = s.highlights.map((h) => h.text);
     expect(texts[0]).toBe('Cloudy in Tbilisi');
     expect(texts).toContain('Rain likely near Khashuri');
@@ -143,20 +120,5 @@ describe('weatherRouteSegments', () => {
     expect(segs[0].groupClass).toBe('rain');
     expect(segs[0].startM).toBeGreaterThan(110_000);
     expect(segs[0].endM).toBeLessThan(183_000);
-  });
-});
-
-describe('rain event smoothing', () => {
-  it('does not restart rain after a short dry blip', () => {
-    const pts = [
-      pt(0, 0, 0, 'CLOUDY', 18, { name: 'A' }),
-      pt(1, 40, 30, 'RAIN', 17, { name: 'B', precipitationProbability: 50 }),
-      pt(2, 55, 42, 'CLOUDY', 17, { name: 'C' }),
-      pt(3, 70, 55, 'RAIN', 17, { name: 'D', precipitationProbability: 60 }),
-      pt(4, 150, 120, 'CLEAR', 20, { name: 'E' }),
-    ];
-    const types = detectWeatherEvents(pts).map((e) => `${e.type}:${e.pointId}`);
-    expect(types.filter((t) => t.startsWith('rain-start'))).toEqual(['rain-start:p1']);
-    expect(types.filter((t) => t.startsWith('rain-end'))).toEqual(['rain-end:p4']);
   });
 });

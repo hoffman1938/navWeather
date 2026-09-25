@@ -54,7 +54,8 @@ export function updateDeviation(
     // Unreliable fix: don't advance or reset the deviation evidence.
     return { ...state, status: state.status === 'off-route' ? 'off-route' : state.consecutiveOff > 0 ? 'uncertain' : state.status };
   }
-  const threshold = offRouteThreshold(reading, cfg);
+  // Never call a fix off-route when it is within its own uncertainty.
+  const threshold = Math.max(offRouteThreshold(reading, cfg), reading.accuracyM ?? 0);
   const d = reading.distanceFromRouteM;
 
   if (d <= threshold * 0.7 || (d <= threshold && state.consecutiveOff === 0)) {

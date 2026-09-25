@@ -17,10 +17,12 @@ import { isDaylight } from '../utils/sun';
  *    value for an arrival at 10:37 is the 11:00 entry (10:00–11:00). They
  *    are never interpolated — that would invent precision the forecast
  *    does not have.
- *  - Categorical values (condition/icon) are never interpolated: we take the
- *    nearest forecast hour, escalated to the precipitating state of the
- *    other bracketing hour when precipitation is forecast in the hour that
- *    contains the arrival (so the icon never contradicts "Rain 2 mm").
+ *  - Categorical values (condition/icon) are never interpolated. They come
+ *    from the same forecast hour as precipitation — the hour containing the
+ *    arrival. Open-Meteo derives the weather code from that hour's
+ *    precipitation, so the icon never contradicts "0 mm" or "Rain 2 mm".
+ *  - Wind gusts are the maximum over the preceding hour, so they are also
+ *    taken from the hour containing the arrival (never averaged down).
  *  - Arrivals outside the forecast range return null — no extrapolation.
  */
 export function matchForecastToTime(forecast: LocationForecast, arrivalMs: number): WeatherAtTime | null {
@@ -46,22 +48,10 @@ export function matchForecastToTime(forecast: LocationForecast, arrivalMs: numbe
   const intervalIdx = arrivalMs === times[k] || !hasNext ? k : k + 1;
   const interval = (arr: (number | null)[]): number | undefined => arr[intervalIdx] ?? undefined;
 
-  // Categorical: nearest hour, escalated for precipitation consistency.
+  // Categorical: the hour containing the arrival (consistent with precipitation).
   const nearestIdx = hasNext && frac >= 0.5 ? k + 1 : k;
-  let condIdx = nearestIdx;
-  const nearestCond = hourly.condition[nearestIdx];
-  const intervalCond = hourly.condition[intervalIdx];
-  const intervalPrecip = hourly.precipitation[intervalIdx] ?? 0;
-  if (
-    nearestCond &&
-    intervalCond &&
-    !isPrecipitating(nearestCond) &&
-    isPrecipitating(intervalCond) &&
-    intervalPrecip >= 0.1
-  ) {
-    condIdx = intervalIdx;
-  }
-  const condition = hourly.condition[condIdx] ?? hourly.condition[nearestIdx === k ? k + 1 : k] ?? null;
+  const condIdx = hourly.condition[intervalIdx] ? intervalIdx : nearestIdx;
+  const condition = hourly.condition[condIdx] ?? null;
 
   const temperature = instant(hourly.temperature);
   if (temperature === undefined || condition === null) return null;
@@ -79,7 +69,7 @@ export function matchForecastToTime(forecast: LocationForecast, arrivalMs: numbe
     rain: round1(interval(hourly.rain)),
     snowfall: round1(interval(hourly.snowfall)),
     windSpeed: round0(instant(hourly.windSpeed)),
-    windGusts: round0(instant(hourly.windGusts)),
+    windGusts: round0(interval(hourly.windGusts)),
     windDirection: round0(hourly.windDirection[nearestIdx] ?? undefined),
     visibility: round0(instant(hourly.visibility)),
     cloudCover: round0(instant(hourly.cloudCover)),

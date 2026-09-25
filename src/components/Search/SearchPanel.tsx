@@ -1,48 +1,47 @@
 import { useEffect, useRef, useState } from 'react';
 import { getProviders } from '../../services/providers';
-import { useAppStore, type RouteStatus } from '../../state/store';
 import { useLayoutStore } from '../../state/layout';
+import { useMessages } from '../../state/settings';
+import { useAppStore } from '../../state/store';
 import { useElementSize } from '../../hooks/useElementSize';
 import { getCurrentPosition } from '../../hooks/useGeolocation';
-import { EditIcon, SwapIcon } from '../Icons/Icons';
+import { CloseIcon, EditIcon, SettingsIcon, SwapIcon } from '../Icons/Icons';
 import { PlaceInput } from './PlaceInput';
 import './Search.css';
 
-const STAGE_TEXT: Partial<Record<RouteStatus, string>> = {
-  geocoding: 'Finding places…',
-  routing: 'Calculating route…',
-  places: 'Finding towns along your route…',
-};
-
 export function SearchPanel() {
+  const m = useMessages();
   const origin = useAppStore((s) => s.origin);
   const destination = useAppStore((s) => s.destination);
+  const waypoints = useAppStore((s) => s.waypoints);
   const routeStatus = useAppStore((s) => s.routeStatus);
   const routeError = useAppStore((s) => s.routeError);
-  const hasRoute = useAppStore((s) => s.plan !== null);
-  const routeTitle = useAppStore((s) =>
-    s.plan ? `${s.plan.timed.route.origin.name} → ${s.plan.timed.route.destination.name}` : '',
-  );
+  const hasPlan = useAppStore((s) => s.plan !== null);
+  const title = useAppStore((s) => {
+    const r = s.plan?.timed.route;
+    return r ? [r.origin.name, ...(r.waypoints ?? []).map((w) => w.name), r.destination.name].join(' → ') : '';
+  });
   const mode = useAppStore((s) => s.mode);
-  const [editing, setEditing] = useState(!hasRoute);
+  const [editing, setEditing] = useState(!hasPlan);
   const [locating, setLocating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const firstField = useRef<HTMLInputElement>(null);
   const setInsets = useLayoutStore((s) => s.setInsets);
-
   useElementSize(ref, (r) => setInsets({ top: Math.round(r.bottom) }));
 
   const busy = routeStatus === 'geocoding' || routeStatus === 'routing' || routeStatus === 'places';
 
-  // Collapse into a compact route pill once a route is ready.
   useEffect(() => {
-    if (routeStatus === 'ready') setEditing(false);
+    if (routeStatus === 'ready') {
+      setEditing(false);
+    }
     if (routeStatus === 'error') setEditing(true);
   }, [routeStatus]);
 
   const submit = () => {
     const s = useAppStore.getState();
-    if (!s.origin.text.trim() && !s.origin.place) return;
-    if (!s.destination.text.trim() && !s.destination.place) return;
+    if ((!s.origin.text.trim() && !s.origin.place) || (!s.destination.text.trim() && !s.destination.place)) return;
     void s.calculateRoute();
   };
 
@@ -50,65 +49,81 @@ export function SearchPanel() {
     setLocating(true);
     try {
       const coordinate = await getCurrentPosition();
-      let name = 'Current location';
+      let name = m.ui.currentLocation;
       try {
-        name = (await getProviders().geocoding.reverse(coordinate))?.name ?? name;
+        name = (await getProviders().geocoding.reverse(coordinate, { language: m.locale }))?.name ?? name;
       } catch {
         /* keep generic name */
       }
-      useAppStore.getState().setOriginPlace({
-        id: `here:${coordinate.join(',')}`,
-        name,
-        label: 'Current location',
-        coordinate,
-      });
-    } catch (e) {
-      useAppStore.getState().showNotice('warning', (e as Error).message);
+      useAppStore.getState().setOriginPlace({ id: `here:${coordinate.join(',')}`, name, label: m.ui.currentLocation, coordinate });
+    } catch {
+      useAppStore.getState().showNotice('warning', m.ui.locationUnavailable);
     } finally {
       setLocating(false);
     }
   };
 
-  if (mode !== 'planning') return <div ref={ref} className="search-panel search-panel--hidden" />;
+  if (mode !== 'planning') return <div ref={ref} className="search search--hidden" />;
 
-  if (!editing && hasRoute) {
+  if (!editing && hasPlan) {
     return (
-      <div ref={ref} className="search-panel search-panel--collapsed">
-        <button className="route-pill" onClick={() => setEditing(true)} aria-label={`Edit route ${routeTitle}`}>
-          <span className="route-pill__title">{routeTitle}</span>
-          <EditIcon size={18} className="route-pill__edit" />
+      <div ref={ref} className="search search--collapsed">
+        <button ref={editButton} className="routeline" onClick={() => setEditing(true)} aria-label={m.ui.editRoute(title)}>
+          <span className="routeline__title">{title}</span>
+          <EditIcon size={16} />
+        </button>
+        <button className="icon-btn search__settings" onClick={() => useAppStore.getState().setSettingsOpen(true)} aria-label={m.ui.settings}>
+          <SettingsIcon size={20} />
         </button>
       </div>
     );
   }
 
   return (
-    <div ref={ref} className="search-panel" role="search">
+    <div ref={ref} className="search" role="search">
       <form
-        className="search-card"
+        className="search__card"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
-        <div className="search-card__fields">
+        <div className="search__fields">
           <PlaceInput
-            label="From"
+            inputRef={firstField}
+            label={m.ui.from}
             icon="origin"
-            placeholder={locating ? 'Locating…' : 'From — city, address or place'}
+            placeholder={locating ? m.ui.locating : m.ui.fromPlaceholder}
             value={origin.text}
             place={origin.place}
             onChangeText={(t) => useAppStore.getState().setOriginText(t)}
             onSelect={(p) => useAppStore.getState().setOriginPlace(p)}
             onSubmit={submit}
             onUseCurrentLocation={useCurrent}
-            autoFocus={!hasRoute && typeof window !== 'undefined' && window.innerWidth >= 900}
+            autoFocus={!hasPlan && typeof window !== 'undefined' && window.innerWidth >= 900}
           />
-          <div className="search-card__divider" aria-hidden="true" />
+          {waypoints.map((w, i) => (
+            <div className="search__stop" key={i}>
+              <PlaceInput
+                label={`${m.ui.stopPlaceholder} ${i + 1}`}
+                icon="stop"
+                placeholder={m.ui.stopPlaceholder}
+                value={w.text}
+                place={w.place}
+                near={origin.place?.coordinate}
+                onChangeText={(t) => useAppStore.getState().setWaypointText(i, t)}
+                onSelect={(p) => useAppStore.getState().setWaypointPlace(i, p)}
+                onSubmit={submit}
+              />
+              <button type="button" className="icon-btn" onClick={() => useAppStore.getState().removeWaypoint(i)} aria-label={m.ui.removeStop}>
+                <CloseIcon size={16} />
+              </button>
+            </div>
+          ))}
           <PlaceInput
-            label="To"
+            label={m.ui.to}
             icon="destination"
-            placeholder="To — where are you driving?"
+            placeholder={m.ui.toPlaceholder}
             value={destination.text}
             place={destination.place}
             near={origin.place?.coordinate}
@@ -116,34 +131,47 @@ export function SearchPanel() {
             onSelect={(p) => useAppStore.getState().setDestinationPlace(p)}
             onSubmit={submit}
           />
-          <button
-            type="button"
-            className="icon-btn search-card__swap"
-            onClick={() => useAppStore.getState().swapPlaces()}
-            aria-label="Swap start and destination"
-          >
+          <button type="button" className="icon-btn search__swap" onClick={() => useAppStore.getState().swapPlaces()} aria-label={m.ui.swap}>
             <SwapIcon size={18} />
           </button>
         </div>
         {routeError ? (
-          <p className="search-card__error" role="alert">
+          <p className="search__error" role="alert">
             {routeError}
           </p>
         ) : null}
-        <div className="search-card__actions">
-          {hasRoute ? (
-            <button type="button" className="btn btn-ghost" onClick={() => setEditing(false)} disabled={busy}>
-              Cancel
+        <div className="search__actions">
+          {waypoints.length < 3 ? (
+            <button type="button" className="btn btn-quiet" onClick={() => useAppStore.getState().addWaypoint()}>
+              + {m.ui.addStop}
             </button>
           ) : null}
-          <button type="submit" className="btn btn-primary search-card__go" disabled={busy}>
+          <span className="search__spacer" />
+          {hasPlan ? (
+            <button
+              type="button"
+              className="btn btn-quiet"
+              onClick={() => {
+                setEditing(false);
+                requestAnimationFrame(() => editButton.current?.focus());
+              }}
+              disabled={busy}
+            >
+              {m.ui.cancel}
+            </button>
+          ) : (
+            <button type="button" className="icon-btn" onClick={() => useAppStore.getState().setSettingsOpen(true)} aria-label={m.ui.settings}>
+              <SettingsIcon size={20} />
+            </button>
+          )}
+          <button type="submit" className="btn btn-primary" disabled={busy}>
             {busy ? (
               <>
                 <span className="spinner" aria-hidden="true" />
-                <span aria-live="polite">{STAGE_TEXT[routeStatus] ?? 'Working…'}</span>
+                <span aria-live="polite">{m.ui.stage[routeStatus] ?? m.ui.stage.routing}</span>
               </>
             ) : (
-              'Calculate route'
+              m.ui.go
             )}
           </button>
         </div>

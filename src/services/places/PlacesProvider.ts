@@ -14,6 +14,6 @@ export interface PlacesProvider {
   readonly name: string;
   getPlacesNearRoute(
     geometry: LngLat[],
-    options: { includeVillages: boolean; signal?: AbortSignal },
+    options: { includeVillages: boolean; signal?: AbortSignal; language?: string },
   ): Promise<RawPlace[]>;
 }

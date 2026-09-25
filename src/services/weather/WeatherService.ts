@@ -48,7 +48,7 @@ export interface ForecastLookup {
  */
 export class WeatherService {
   private cache: TtlCache<LocationForecast>;
-  private inflight = new Map<string, Promise<LocationForecast>>();
+  private inflight = new Map<string, { promise: Promise<LocationForecast>; signal?: AbortSignal }>();
   private now: () => number;
   /** Newest upstream model run we know of, and when we last asked. */
   private latestUpdate: { value: number | null; checkedAt: number } | null = null;
@@ -84,13 +84,14 @@ export class WeatherService {
    * Newest upstream forecast availability time (UTC ms), asked at most every
    * `updateCheckMs`. Null when the provider doesn't expose it.
    */
-  async latestUpdateTime(signal?: AbortSignal): Promise<number | null> {
+  async latestUpdateTime(): Promise<number | null> {
     if (!this.provider.getLatestUpdateTime) return null;
     const maxAge = this.opts.updateCheckMs ?? 10 * 60000;
     if (this.latestUpdate && this.now() - this.latestUpdate.checkedAt < maxAge) return this.latestUpdate.value;
     if (!this.latestUpdatePending) {
       this.latestUpdatePending = this.provider
-        .getLatestUpdateTime(signal)
+        // No caller signal: this check is shared and must not be cancelled by one caller.
+        .getLatestUpdateTime()
         .catch(() => null)
         .then((value) => {
           // Keep the last known value if this check failed.
@@ -107,8 +108,8 @@ export class WeatherService {
    * Has a newer forecast become available than the one behind any of these
    * forecasts? (Unknown generation times count as "not newer".)
    */
-  async hasNewerForecast(forecasts: Iterable<LocationForecast>, signal?: AbortSignal): Promise<boolean> {
-    const latest = await this.latestUpdateTime(signal);
+  async hasNewerForecast(forecasts: Iterable<LocationForecast>): Promise<boolean> {
+    const latest = await this.latestUpdateTime();
     if (latest === null) return false;
     for (const f of forecasts) {
       if (f.forecastGeneratedAt !== undefined && latest > f.forecastGeneratedAt) return true;
@@ -135,6 +136,7 @@ export class WeatherService {
     const missingKeys = new Set<string>();
     const waits: Promise<void>[] = [];
     const toFetch: ForecastLocation[] = [];
+    const adoptFailed: ForecastLocation[] = [];
 
     // 2. Cache + in-flight dedupe.
     for (const loc of unique.values()) {
@@ -144,11 +146,11 @@ export class WeatherService {
         continue;
       }
       const pending = options.force ? undefined : this.inflight.get(loc.key);
-      if (pending) {
+      if (pending && !pending.signal?.aborted) {
         waits.push(
-          pending.then(
+          pending.promise.then(
             (f) => void forecasts.set(loc.key, f),
-            () => undefined, // handled by the owner of the request; fall back below
+            () => void adoptFailed.push(loc), // owner failed/aborted → fetch ourselves
           ),
         );
         continue;
@@ -157,7 +159,7 @@ export class WeatherService {
     }
 
     // 3. Batch the rest (learning the current model-run time alongside).
-    const generatedAtPromise = toFetch.length ? this.latestUpdateTime(options.signal) : Promise.resolve(null);
+    const generatedAtPromise = toFetch.length ? this.latestUpdateTime() : Promise.resolve(null);
     const forecastHours = this.forecastHoursFor(needUntil, now);
     const batchSize = Math.max(1, Math.min(this.opts.batchSize, this.provider.maxLocationsPerRequest));
     let error: ProviderError | undefined;
@@ -178,7 +180,7 @@ export class WeatherService {
           return { ...f, fetchedAt: this.now() };
         });
         p.catch(() => undefined);
-        this.inflight.set(loc.key, p);
+        this.inflight.set(loc.key, { promise: p, signal: options.signal });
       });
       waits.push(
         request.then(
@@ -200,12 +202,23 @@ export class WeatherService {
                 : new ProviderError(String((e as Error)?.message ?? e), 'network', 'Weather service');
           },
         ).finally(() => {
-          for (const loc of batch) this.inflight.delete(loc.key);
+          for (const loc of batch) {
+            const cur = this.inflight.get(loc.key);
+            if (cur && cur.signal === options.signal) this.inflight.delete(loc.key);
+          }
         }),
       );
     }
 
     await Promise.all(waits);
+
+    // Shared requests that were cancelled by their owner: fetch those keys now.
+    if (adoptFailed.length && !options.signal?.aborted) {
+      const retry = await this.getForecasts(adoptFailed, { ...options, force: true });
+      for (const [k, f] of retry.forecasts) forecasts.set(k, f);
+      requestCount += retry.requestCount;
+      if (retry.error && !error) error = retry.error;
+    }
 
     // 4. Anything still missing: serve stale cache if we have it.
     for (const loc of unique.values()) {

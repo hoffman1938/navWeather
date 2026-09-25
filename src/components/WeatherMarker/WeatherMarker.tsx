@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { RouteWeatherPoint } from '../../types/weather';
-import { conditionLabel, formatTemp, placeLabel } from '../../ui/weatherText';
+import { formatTemp } from '../../i18n/format';
+import { useMessages, useSettings } from '../../state/settings';
 import { WeatherIcon } from '../WeatherIcon/WeatherIcon';
 import './WeatherMarker.css';
 
@@ -14,9 +15,12 @@ interface Props {
 
 /** Subtle map pill: icon + temperature. Place & time appear when selected. */
 export const WeatherMarker = memo(function WeatherMarker({ point, selected, highlighted, navigating, onSelect }: Props) {
+  const m = useMessages();
+  const unit = useSettings((s) => s.units.temperature);
   const w = point.weather;
   if (!w) return null;
-  const time = navigating ? `+${Math.max(0, point.estimatedTravelMinutes)} min` : point.localTime;
+  const place = point.placeName ? (point.placeRelation === 'near' ? m.ui.near(point.placeName) : point.placeName) : m.ui.km(String(Math.round(point.distanceFromStartKm)));
+  const time = navigating ? `+${Math.max(0, point.estimatedTravelMinutes)} ${m.units.min}` : point.localTime;
   return (
     <button
       type="button"
@@ -25,15 +29,15 @@ export const WeatherMarker = memo(function WeatherMarker({ point, selected, high
         e.stopPropagation();
         onSelect(point.id);
       }}
-      aria-label={`${placeLabel(point)}, ${conditionLabel(w)}, ${Math.round(w.temperature)} degrees, estimated arrival ${point.localTime}`}
+      aria-label={`${place}, ${m.weather.condition[w.condition]}, ${formatTemp(w.temperature, unit)}, ${m.ui.eta} ${point.localTime}`}
       aria-pressed={selected}
     >
       <span className="wmarker__pill">
         <WeatherIcon condition={w.condition} isDay={w.isDay} size={22} />
-        <span className="wmarker__temp tabular">{formatTemp(w.temperature)}</span>
+        <span className="wmarker__temp tabular">{formatTemp(w.temperature, unit)}</span>
         {selected ? (
           <span className="wmarker__place">
-            {placeLabel(point)} · <span className="tabular">{time}</span>
+            {place} · <span className="tabular">{time}</span>
           </span>
         ) : null}
       </span>

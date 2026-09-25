@@ -1,67 +1,72 @@
 /*
- * Design tokens — restrained, consumer-navigation look.
- * Colours use light-dark(): the system preference applies by default; during
- * navigation the app sets [data-theme] from local day/night at the vehicle.
+ * Design tokens. Quiet, navigation-first: neutral surfaces, one accent,
+ * semantic colours that are always paired with an icon or a word.
+ * Colours use light-dark(): the system preference applies by default; the
+ * app sets [data-theme] from settings or from day/night while driving.
  */
 :root {
   color-scheme: light dark;
-  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, system-ui, sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, 'Noto Sans Georgian', system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, 'Noto Sans Georgian', system-ui, sans-serif;
 
-  --bg: light-dark(#eef0f3, #0e1013);
-  --surface: light-dark(#ffffff, #181b20);
-  --surface-2: light-dark(#f3f4f6, #22262d);
-  --surface-3: light-dark(#e9ebef, #2b3038);
-  --surface-night: light-dark(#e9ecf7, #1c2031);
-  --surface-glass: light-dark(rgba(255, 255, 255, 0.94), rgba(24, 27, 32, 0.94));
-  --text: light-dark(#0f1216, #f2f4f7);
-  --text-2: light-dark(#4f5661, #b3bac4);
-  --text-3: light-dark(#6f7682, #8b939e);
-  --border: light-dark(rgba(15, 18, 22, 0.08), rgba(255, 255, 255, 0.08));
-  --border-strong: light-dark(rgba(15, 18, 22, 0.14), rgba(255, 255, 255, 0.16));
+  --bg: light-dark(#eceef1, #0e1013);
+  --surface: light-dark(#ffffff, #16181c);
+  --surface-2: light-dark(#f3f4f6, #1f2227);
+  --surface-3: light-dark(#e7e9ed, #2a2e35);
+  --surface-night: light-dark(#e6e9f5, #1a1e2c);
+  --surface-inverse: light-dark(#15171a, #f3f4f6);
+  --on-inverse: light-dark(#ffffff, #15171a);
+  /* Maneuver banner: dark in both themes so it never glares at night. */
+  --banner: light-dark(#14171b, #20252c);
+  --on-banner: #ffffff;
+  --text: light-dark(#111418, #f2f4f7);
+  --text-2: light-dark(#454c56, #b8bfc9);
+  --text-3: light-dark(#5f6670, #8f98a3);
+  --border: light-dark(rgba(17, 20, 24, 0.1), rgba(255, 255, 255, 0.09));
+  --border-strong: light-dark(rgba(17, 20, 24, 0.2), rgba(255, 255, 255, 0.2));
 
-  --accent: light-dark(#0a6cff, #3d8bff);
-  --accent-hover: light-dark(#075ad6, #5c9dff);
-  --accent-soft: light-dark(rgba(10, 108, 255, 0.1), rgba(61, 139, 255, 0.16));
-  --accent-contrast: #ffffff;
+  /* Accent for text/lines, and a deeper fill that keeps white text ≥ 4.5:1. */
+  --accent: light-dark(#0a64e8, #5c9dff);
+  --accent-fill: light-dark(#0a64e8, #2f6fe0);
+  --accent-fill-hover: light-dark(#0853c2, #2a63c9);
+  --accent-soft: light-dark(rgba(10, 100, 232, 0.1), rgba(92, 157, 255, 0.16));
+  --on-accent: #ffffff;
 
-  --rain: light-dark(#1f73e8, #5aa2ff);
-  --rain-soft: light-dark(rgba(31, 115, 232, 0.1), rgba(90, 162, 255, 0.14));
-  --sun: light-dark(#f5a300, #ffc233);
-  --moon: light-dark(#6f7fa8, #c5cff0);
-  --cloud: light-dark(#aeb6c2, #9aa3b0);
-  --cloud-dark: light-dark(#7f8896, #6b7482);
-  --snow: light-dark(#7db4e6, #a9d2f5);
-  --fog: light-dark(#9aa2ad, #8c95a1);
-  --storm: light-dark(#6d4ad6, #9a7bff);
-  --warning: light-dark(#b45309, #f0a54a);
-  --warning-soft: light-dark(rgba(217, 119, 6, 0.12), rgba(240, 165, 74, 0.14));
-  --danger: light-dark(#c62828, #ff6b6b);
-  --danger-soft: light-dark(rgba(198, 40, 40, 0.1), rgba(255, 107, 107, 0.12));
-  --success: light-dark(#15803d, #4ade80);
+  --rain: light-dark(#1b67d1, #6aa8ff);
+  --sun: light-dark(#e89a00, #ffc233);
+  --moon: light-dark(#5d6d96, #c5cff0);
+  --cloud: light-dark(#a3acb8, #9aa3b0);
+  --cloud-dark: light-dark(#6f7886, #6b7482);
+  --snow: light-dark(#5b9bd8, #a9d2f5);
+  --fog: light-dark(#8a929d, #8c95a1);
+  --storm: light-dark(#5b3cc4, #a48bff);
 
-  --route: light-dark(#0a6cff, #3d8bff);
+  --sev-high: light-dark(#b45309, #f0a54a);
+  --sev-high-soft: light-dark(rgba(217, 119, 6, 0.12), rgba(240, 165, 74, 0.14));
+  --sev-critical: light-dark(#b42318, #ff7b72);
+  --sev-critical-soft: light-dark(rgba(180, 35, 24, 0.1), rgba(255, 123, 114, 0.14));
+  --danger-fill: #c62828;
+  --success: light-dark(#157a3a, #4ade80);
+
+  --route: light-dark(#0a64e8, #4c8dff);
   --route-casing: light-dark(#ffffff, #0b0d10);
-  --route-traveled: light-dark(#9aa3ad, #5b636e);
+  --route-traveled: light-dark(#9aa3ad, #59616c);
 
-  --shadow-color: light-dark(rgba(15, 23, 42, 0.1), rgba(0, 0, 0, 0.45));
-  --shadow-color-soft: light-dark(rgba(15, 23, 42, 0.05), rgba(0, 0, 0, 0.35));
-  --shadow-sm: 0 1px 2px var(--shadow-color-soft), 0 1px 1px var(--shadow-color-soft);
-  --shadow-md: 0 6px 20px var(--shadow-color), 0 1px 3px var(--shadow-color-soft);
-  --shadow-lg: 0 12px 40px var(--shadow-color), 0 2px 6px var(--shadow-color-soft);
+  --shadow-float: 0 2px 12px light-dark(rgba(15, 23, 42, 0.16), rgba(0, 0, 0, 0.5)), 0 0 0 1px var(--border);
+  --shadow-marker: 0 1px 4px light-dark(rgba(15, 23, 42, 0.25), rgba(0, 0, 0, 0.6));
 
-  --radius-xl: 22px;
-  --radius-lg: 18px;
-  --radius-md: 14px;
-  --radius-sm: 10px;
-  --radius-pill: 999px;
+  --r-surface: 14px;
+  --r-control: 10px;
+  --r-small: 6px;
 
   --tap: 44px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dur: 220ms;
+  --dur: 200ms;
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 :root[data-theme='light'] {
@@ -74,5 +79,13 @@
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur: 0ms;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --text-2: light-dark(#23282f, #dde2e8);
+    --text-3: light-dark(#3a4048, #c2c8d0);
+    --border: light-dark(rgba(17, 20, 24, 0.35), rgba(255, 255, 255, 0.35));
   }
 }

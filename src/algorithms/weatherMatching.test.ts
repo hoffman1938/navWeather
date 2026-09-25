@@ -74,3 +74,31 @@ describe('getWeatherForArrivalTime / matchForecastToTime', () => {
     expect(forecastConfidence(80)).toBe('low');
   });
 });
+
+describe('arrival-hour semantics (audit regressions)', () => {
+  // 00:00 rain (00–01 had rain stored at 01:00), 01:00–02:00 dry.
+  const f = makeForecast({
+    startMs: T0,
+    hours: 3,
+    latitude: 42,
+    longitude: 43.6,
+    hourFn: (_t, i) =>
+      [
+        { temperature: 15, code: 3, precipitation: 0, windGusts: 20 },
+        { temperature: 15, code: 61, precipitation: 0.8, precipitationProbability: 60, windGusts: 75 },
+        { temperature: 15, code: 3, precipitation: 0, precipitationProbability: 5, windGusts: 25 },
+      ][i],
+  });
+
+  it('never shows a rain icon for a dry arrival hour', () => {
+    // 11:20 falls in 11:00–12:00 (stored at 12:00): dry.
+    const w = matchForecastToTime(f, T0 + H + 20 * 60000)!;
+    expect(w.condition).toBe('CLOUDY');
+    expect(w.precipitation).toBe(0);
+  });
+
+  it('uses the hourly maximum for gusts, not an average', () => {
+    // 10:30 falls in 10:00–11:00 whose gust maximum is 75 km/h.
+    expect(matchForecastToTime(f, T0 + 30 * 60000)!.windGusts).toBe(75);
+  });
+});

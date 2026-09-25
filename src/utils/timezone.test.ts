@@ -7,7 +7,9 @@ import {
   toDateTimeLocalValue,
   zonedWallTimeToUtc,
 } from './timezone';
-import { formatDuration, formatRelative } from './time';
+import { en } from '../i18n/en';
+import { ru } from '../i18n/ru';
+import { defaultUnits, formatDistance, formatDuration, formatAgo, spokenDistance, spokenDuration } from '../i18n/format';
 
 const T = Date.UTC(2026, 8, 26, 4, 5); // 2026-09-26 04:05Z
 
@@ -45,13 +47,44 @@ describe('timezone conversion', () => {
   });
 });
 
-describe('duration formatting', () => {
+describe('localized formatting', () => {
   it('formats travel durations', () => {
-    expect(formatDuration(0)).toBe('<1 min');
-    expect(formatDuration(55 * 60)).toBe('55 min');
-    expect(formatDuration(5 * 3600 + 5 * 60)).toBe('5h 05m');
-    expect(formatDuration(2 * 3600)).toBe('2h');
-    expect(formatRelative(30)).toBe('Now');
-    expect(formatRelative(105 * 60)).toBe('+1h 45m');
+    expect(formatDuration(0, en)).toBe('<1 min');
+    expect(formatDuration(55 * 60, en)).toBe('55 min');
+    expect(formatDuration(5 * 3600 + 5 * 60, en)).toBe('5 h 5 min');
+    expect(formatDuration(2 * 3600, en)).toBe('2 h');
+    expect(formatDuration(3 * 3600 + 12 * 60, ru)).toBe('3 ч 12 мин');
+    expect(formatAgo(0, 18 * 60000, en)).toBe('18 min ago');
+    expect(formatAgo(0, 20_000, en)).toBe('just now');
+  });
+
+  it('speaks durations and distances naturally (with plurals)', () => {
+    expect(spokenDuration(25 * 60, en)).toBe('about 25 minutes');
+    expect(spokenDuration(60 * 60, en)).toBe('about an hour');
+    expect(spokenDuration(80 * 60, en)).toBe('about 1 hour 20 minutes');
+    expect(spokenDuration(2 * 60, en)).toBe('a few minutes');
+    expect(spokenDuration(21 * 60, ru)).toBe('примерно через 20 минут');
+    expect(spokenDuration(3 * 3600 + 5 * 60, ru)).toBe('примерно через 3 часа 5 минут');
+    expect(spokenDistance(480, 'metric', en)).toBe('500 meters');
+    expect(spokenDistance(2400, 'metric', en)).toBe('2.5 kilometers');
+    expect(spokenDistance(1200, 'metric', ru)).toBe('1 километр');
+    expect(spokenDistance(22_000, 'metric', ru)).toBe('22 километра');
+    expect(spokenDistance(800, 'imperial', en)).toBe('half a mile');
+  });
+
+  it('formats distances in the user\'s units', () => {
+    expect(formatDistance(357_700, 'metric', en)).toBe('358 km');
+    expect(formatDistance(1_250, 'metric', en)).toBe('1.3 km');
+    expect(formatDistance(357_700, 'imperial', en)).toBe('222 mi');
+    expect(formatDistance(1_250, 'metric', ru)).toBe('1,3 км');
+  });
+});
+
+describe('unit defaults', () => {
+  it('uses imperial only for US locale + US timezone', () => {
+    expect(defaultUnits('en-US', 'America/New_York')).toEqual({ distance: 'imperial', temperature: 'f', wind: 'mph' });
+    expect(defaultUnits('en-US', 'Asia/Tbilisi')).toEqual({ distance: 'metric', temperature: 'c', wind: 'kmh' });
+    expect(defaultUnits('en-GB', 'Europe/London')).toEqual({ distance: 'imperial', temperature: 'c', wind: 'mph' });
+    expect(defaultUnits('ka-GE', 'Asia/Tbilisi').distance).toBe('metric');
   });
 });

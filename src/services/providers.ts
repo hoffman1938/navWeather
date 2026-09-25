@@ -7,6 +7,16 @@ import { PhotonProvider } from './geocoding/PhotonProvider';
 import { StyleUrlMapProvider, type MapProvider } from './map/MapProvider';
 import { OverpassPlacesProvider } from './places/OverpassPlacesProvider';
 import type { PlacesProvider } from './places/PlacesProvider';
+import { OverpassPoiProvider } from './places/OverpassPoiProvider';
+import type { PoiProvider } from './places/PoiProvider';
+import { OverpassSpeedLimitProvider } from './speed/OverpassSpeedLimitProvider';
+import type { SpeedLimitProvider } from './speed/SpeedLimitProvider';
+import {
+  BrowserSpeechRecognition,
+  BrowserSpeechSynthesis,
+  type SpeechRecognitionProvider,
+  type TextToSpeechProvider,
+} from '../voice/providers';
 import { OSRMProvider } from './routing/OSRMProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
 import { NoTrafficProvider, type TrafficProvider } from './traffic/TrafficProvider';
@@ -21,10 +31,15 @@ export interface Providers {
   /** Lightweight reverse geocoder for naming route points. */
   reverseGeocoding: GeocodingProvider;
   places: PlacesProvider | null;
+  /** Places along the route (fuel, food, hotels…). */
+  poi: PoiProvider | null;
+  speedLimits: SpeedLimitProvider | null;
   elevation: ElevationProvider | null;
   traffic: TrafficProvider;
   map: MapProvider;
   weather: WeatherService;
+  tts: TextToSpeechProvider;
+  speechRecognition: SpeechRecognitionProvider;
 }
 
 function unknown(kind: string, name: string): never {
@@ -79,14 +94,28 @@ export function createProviders(cfg: AppConfig = config): Providers {
       ? new StyleUrlMapProvider(p.map, e.mapStyleLight, e.mapStyleDark)
       : unknown('map', p.map);
 
+  const poi: PoiProvider | null =
+    p.poi === 'overpass' ? new OverpassPoiProvider(e.overpass, cfg.geocoding.language) : p.poi === 'none' ? null : unknown('poi', p.poi);
+  const speedLimits: SpeedLimitProvider | null =
+    p.speedLimits === 'overpass'
+      ? new OverpassSpeedLimitProvider(e.overpass)
+      : p.speedLimits === 'none'
+        ? null
+        : unknown('speed limit', p.speedLimits);
+  // No free live-traffic source exists; the interface is ready for one.
+  const traffic: TrafficProvider = p.traffic === 'none' ? new NoTrafficProvider() : unknown('traffic', p.traffic);
+  if (p.speech !== 'browser') unknown('speech', p.speech);
+
   return {
     routing,
     geocoding,
     autocomplete,
     reverseGeocoding: photon,
     places,
+    poi,
+    speedLimits,
     elevation,
-    traffic: new NoTrafficProvider(),
+    traffic,
     map,
     weather: new WeatherService(weatherProvider, {
       ttlMs: cfg.weather.cacheTtlMinutes * 60000,
@@ -96,6 +125,8 @@ export function createProviders(cfg: AppConfig = config): Providers {
       minForecastHours: cfg.weather.minForecastHours,
       updateCheckMs: cfg.weather.updateCheckMinutes * 60000,
     }),
+    tts: new BrowserSpeechSynthesis(),
+    speechRecognition: new BrowserSpeechRecognition(),
   };
 }
 

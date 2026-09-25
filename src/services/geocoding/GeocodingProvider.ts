@@ -5,6 +5,8 @@ export interface GeocodeOptions {
   /** Bias results toward this location, if supported. */
   near?: LngLat;
   limit?: number;
+  /** Preferred language for names (falls back to the provider default). */
+  language?: string;
 }
 
 /** Resolve free text / coordinates into normalized places. */

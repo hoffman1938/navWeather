@@ -25,7 +25,8 @@ export function buildTimelineItems(points: RouteWeatherPoint[]): TimelineItem[] 
         id: `sun-${t.type}-${t.atMs}`,
         kind: t.type,
         atMs: t.atMs,
-        localTime: formatLocalTime(t.atMs, p.timezone),
+        // Transition happens between the two cards: use the closer one's timezone.
+        localTime: formatLocalTime(t.atMs, t.atMs - p.arrivalMs <= next.arrivalMs - t.atMs ? p.timezone : next.timezone),
       });
     }
   });

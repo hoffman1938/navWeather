@@ -37,10 +37,12 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
     if (q.length < 2) return [];
     const params = new URLSearchParams({ q, limit: String(options.limit ?? 6) });
     // Photon only supports a few languages; others fall back to local names.
-    if (['en', 'de', 'fr', 'it'].includes(this.language)) params.set('lang', this.language);
+    const lang = options.language ?? this.language;
+    if (['en', 'de', 'fr', 'it'].includes(lang)) params.set('lang', lang);
+    // Coarse bias only (~10 km) — ranking needs the region, not the start point.
     if (options.near) {
-      params.set('lon', options.near[0].toFixed(3));
-      params.set('lat', options.near[1].toFixed(3));
+      params.set('lon', options.near[0].toFixed(1));
+      params.set('lat', options.near[1].toFixed(1));
     }
     const data = await fetchJson<{ features: PhotonFeature[] }>(`${this.base}/api/?${params}`, {
       provider: 'Search service',
@@ -50,6 +52,8 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
     const seen = new Set<string>();
     const out: Place[] = [];
     for (const f of data.features ?? []) {
+      const [lon, lat] = f.geometry?.coordinates ?? [];
+      if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
       const p = toPlace(f);
       const dedupe = `${p.name}|${p.label}`;
       if (seen.has(dedupe)) continue;
@@ -66,7 +70,7 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
 
   async reverse(coordinate: LngLat, options: GeocodeOptions = {}): Promise<Place | null> {
     const [lon, lat] = coordinate;
-    const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+    const key = `${options.language ?? this.language}:${lat.toFixed(3)},${lon.toFixed(3)}`;
     if (this.reverseCache.has(key)) return this.reverseCache.get(key) ?? null;
     const params = new URLSearchParams({
       lon: lon.toFixed(5),
@@ -76,14 +80,17 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
     });
     params.append('layer', 'city');
     params.append('layer', 'locality');
-    if (['en', 'de', 'fr', 'it'].includes(this.language)) params.set('lang', this.language);
+    const lang = options.language ?? this.language;
+    // Unsupported languages (ka, ru) get local names — Georgian names for a Georgian UI.
+    if (['en', 'de', 'fr', 'it'].includes(lang)) params.set('lang', lang);
     const data = await fetchJson<{ features: PhotonFeature[] }>(`${this.base}/reverse?${params}`, {
       provider: 'Search service',
       signal: options.signal,
       timeoutMs: 8000,
     });
     const f = data.features?.[0];
-    const place = f ? toPlace(f) : null;
+    const valid = f && Number.isFinite(f.geometry?.coordinates?.[0]) && Number.isFinite(f.geometry?.coordinates?.[1]);
+    const place = valid ? toPlace(f) : null;
     this.reverseCache.set(key, place);
     return place;
   }

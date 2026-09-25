@@ -9,6 +9,7 @@ const HOURLY_VARS = [
   'precipitation_probability',
   'precipitation',
   'rain',
+  'showers',
   'snowfall',
   'weather_code',
   'cloud_cover',
@@ -48,7 +49,7 @@ export class OpenMeteoProvider implements WeatherProvider {
     const base = this.baseUrl.replace(/\/$/, '');
     const times = await Promise.all(
       this.updateModels.map((m) =>
-        fetchJson<{ last_run_availability_time?: number }>(`${base}/data/${m}/static/meta.json`, {
+        fetchJson<{ last_run_availability_time?: number }>(`${base}/data/${encodeURIComponent(m)}/static/meta.json`, {
           provider: 'Weather service',
           signal,
           timeoutMs: 8000,
@@ -108,6 +109,7 @@ export function normalize(
     return Array.isArray(arr) && arr.length === n ? arr : new Array(n).fill(null);
   };
   const codes = col('weather_code').map(normalizeWmoCode);
+  const showers = col('showers');
   return {
     locationKey: loc.key,
     latitude: loc.latitude,
@@ -120,7 +122,11 @@ export function normalize(
       apparentTemperature: col('apparent_temperature'),
       precipitationProbability: col('precipitation_probability'),
       precipitation: col('precipitation'),
-      rain: col('rain'),
+      // Open-Meteo splits large-scale rain from convective showers.
+      rain: col('rain').map((r, i) => {
+        const sh = showers[i];
+        return r === null && sh === null ? null : (r ?? 0) + (sh ?? 0);
+      }),
       snowfall: col('snowfall'),
       condition: codes.map((c) => c?.condition ?? null),
       description: codes.map((c) => c?.description ?? null),

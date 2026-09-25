@@ -1,0 +1,6 @@
+# Cloudflare Pages (static). Build: `npm run build` → dist/.
+# Deploy: `npx wrangler pages deploy` (or connect the repo in the Pages UI,
+# build command `npm run build`, output directory `dist`, NODE_VERSION=22).
+name = "navweather"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "dist"

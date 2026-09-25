@@ -34,14 +34,15 @@ export class NominatimProvider implements GeocodingProvider {
   async geocode(query: string, options: GeocodeOptions = {}): Promise<Place | null> {
     const q = query.trim();
     if (!q) return null;
-    const key = `g:${q.toLowerCase()}`;
+    const lang = options.language ?? this.language;
+    const key = `g:${lang}:${q.toLowerCase()}`;
     if (this.cache.has(key)) return this.cache.get(key) ?? null;
     const params = new URLSearchParams({
       q,
       format: 'jsonv2',
       limit: '1',
       addressdetails: '1',
-      'accept-language': this.language,
+      'accept-language': lang,
     });
     const results = await this.limiter.schedule(() =>
       fetchJson<NominatimResult[]>(`${this.base}/search?${params}`, {
@@ -56,15 +57,17 @@ export class NominatimProvider implements GeocodingProvider {
 
   async reverse(coordinate: LngLat, options: GeocodeOptions = {}): Promise<Place | null> {
     const [lon, lat] = coordinate;
-    const key = `r:${lat.toFixed(3)},${lon.toFixed(3)}`;
+    const lang = options.language ?? this.language;
+    const key = `r:${lang}:${lat.toFixed(3)},${lon.toFixed(3)}`;
     if (this.cache.has(key)) return this.cache.get(key) ?? null;
+    // ~100 m precision is plenty for a street/town name; don't send exact GPS.
     const params = new URLSearchParams({
-      lat: lat.toFixed(6),
-      lon: lon.toFixed(6),
+      lat: lat.toFixed(3),
+      lon: lon.toFixed(3),
       format: 'jsonv2',
       zoom: '14',
       addressdetails: '1',
-      'accept-language': this.language,
+      'accept-language': lang,
     });
     const result = await this.limiter.schedule(() =>
       fetchJson<NominatimResult & { error?: string }>(`${this.base}/reverse?${params}`, {
@@ -82,17 +85,23 @@ export class NominatimProvider implements GeocodingProvider {
   }
 }
 
-function toPlace(r: NominatimResult, exact?: LngLat): Place {
+function validCoord(lon: number, lat: number): boolean {
+  return Number.isFinite(lon) && Number.isFinite(lat) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
+
+function toPlace(r: NominatimResult, exact?: LngLat): Place | null {
   const a = r.address ?? {};
   const settlement = a.city ?? a.town ?? a.village ?? a.hamlet ?? a.suburb ?? a.municipality;
   const name = r.name || settlement || r.display_name.split(',')[0];
   const parts = r.display_name.split(',').map((s) => s.trim());
   const label = parts.length > 2 ? `${parts[0]}, ${parts[parts.length - 1]}` : r.display_name;
+  const coordinate: LngLat = exact ?? [Number(r.lon), Number(r.lat)];
+  if (!validCoord(coordinate[0], coordinate[1])) return null;
   return {
     id: `nominatim:${r.place_id}`,
     name,
     label,
-    coordinate: exact ?? [Number(r.lon), Number(r.lat)],
+    coordinate,
     kind: r.addresstype ?? r.type,
   };
 }

@@ -1,7 +1,7 @@
 import type { LngLat } from '../../types/geo';
 import type { PlaceKind } from '../../types/route';
 import { cumulativeDistances } from '../../utils/distance';
-import { fetchJson, isAbortError, ProviderError } from '../http';
+import { overpassQuery } from '../overpass';
 import type { PlacesProvider, RawPlace } from './PlacesProvider';
 
 interface OverpassElement {
@@ -29,32 +29,16 @@ export class OverpassPlacesProvider implements PlacesProvider {
 
   async getPlacesNearRoute(
     geometry: LngLat[],
-    options: { includeVillages: boolean; signal?: AbortSignal },
+    options: { includeVillages: boolean; signal?: AbortSignal; language?: string },
   ): Promise<RawPlace[]> {
     if (geometry.length < 2) return [];
     const query = buildOverpassQuery(geometry, options.includeVillages);
-    let lastError: unknown;
-    for (const endpoint of this.endpoints) {
-      try {
-        const data = await fetchJson<{ elements: OverpassElement[] }>(endpoint, {
-          provider: 'Places service',
-          signal: options.signal,
-          timeoutMs: this.timeoutMs,
-          init: {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ data: query }).toString(),
-          },
-        });
-        return parseOverpassElements(data.elements ?? [], this.language);
-      } catch (e) {
-        if (isAbortError(e)) throw e;
-        lastError = e;
-      }
-    }
-    throw lastError instanceof ProviderError
-      ? lastError
-      : new ProviderError('Places service unavailable', 'network', 'Places service');
+    const data = await overpassQuery<{ elements: OverpassElement[] }>(this.endpoints, query, {
+      provider: 'Places service',
+      signal: options.signal,
+      timeoutMs: this.timeoutMs,
+    });
+    return parseOverpassElements(data.elements ?? [], options.language ?? this.language);
   }
 }
 

@@ -6,18 +6,20 @@
   bottom: 0;
   display: flex;
   flex-direction: column;
-  max-height: calc(100dvh - var(--safe-top) - 72px);
-  padding-bottom: calc(var(--safe-bottom) + 10px);
+  max-height: calc(100dvh - var(--safe-top) - 64px);
+  padding-bottom: calc(var(--safe-bottom) + 8px);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
   background: var(--surface);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
+  box-shadow: var(--shadow-float);
   transition: transform var(--dur) var(--ease);
 }
 .sheet.is-dragging {
   transition: none;
 }
 .sheet--expanded {
-  height: calc(100dvh - var(--safe-top) - 72px);
+  height: calc(100dvh - var(--safe-top) - 64px);
 }
 @media (min-width: 900px) {
   .sheet {
@@ -25,13 +27,32 @@
     right: 16px;
     bottom: 16px;
     max-width: 1180px;
-    border-radius: var(--radius-xl);
-    padding-bottom: 12px;
-    max-height: calc(100dvh - 32px - 84px);
+    border-radius: var(--r-surface);
+    padding-bottom: 8px;
+    max-height: calc(100dvh - 32px - 80px);
   }
   .sheet--expanded {
     height: auto;
-    max-height: min(calc(100dvh - 32px - 84px), 760px);
+    max-height: min(calc(100dvh - 32px - 80px), 760px);
+  }
+}
+/* Landscape phones: dock at the side so the road ahead stays visible. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sheet,
+  .sheet--expanded {
+    top: calc(var(--safe-top) + 8px);
+    bottom: 8px;
+    left: calc(var(--safe-left) + 8px);
+    right: auto;
+    width: min(380px, 46vw);
+    height: auto;
+    max-height: none;
+    border-radius: var(--r-surface);
+    padding-left: 0;
+    padding-bottom: 8px;
+  }
+  .sheet--compact {
+    bottom: auto;
   }
 }
 .sheet__grab {
@@ -42,20 +63,23 @@
   display: grid;
   place-items: center;
   width: 100%;
-  height: var(--tap); /* full-width 44px touch target… */
-  margin-bottom: -16px; /* …without adding visual height */
+  height: var(--tap);
+  margin-bottom: -18px;
   cursor: grab;
   position: relative;
   z-index: 1;
 }
+.sheet__spacer {
+  height: 14px;
+}
 .sheet__grabber {
-  width: 40px;
+  width: 36px;
   height: 5px;
   border-radius: 3px;
   background: var(--border-strong);
 }
 .sheet__header {
-  padding-bottom: 12px;
+  padding-bottom: 10px;
 }
 .sheet__scroll {
   flex: 1;
@@ -66,14 +90,10 @@
 .sheet__body {
   display: grid;
   gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 .sheet__extra {
-  padding: 16px 16px 4px;
-  animation: sheet-extra-in var(--dur) var(--ease);
-}
-@keyframes sheet-extra-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
+  padding: 20px 16px 4px;
 }

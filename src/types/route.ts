@@ -23,14 +23,36 @@ export interface RouteSegment {
   speedMps?: number;
 }
 
+/**
+ * One lane at a maneuver, straight from routing data (OSM turn:lanes).
+ * `indications` use OSRM vocabulary: 'left', 'slight right', 'straight', 'uturn', 'none'…
+ */
+export interface Lane {
+  indications: string[];
+  /** Lane can be used for this maneuver. */
+  valid: boolean;
+}
+
 export interface RouteStep {
   distanceM: number;
   durationS: number;
   name: string;
   ref?: string;
+  /** Signposted destinations, e.g. "Kutaisi, Batumi". */
+  destinations?: string;
+  rotaryName?: string;
   maneuverType: string;
   maneuverModifier?: string;
+  /** Roundabout exit number. */
+  exit?: number;
   location: LngLat;
+  bearingBefore?: number;
+  bearingAfter?: number;
+  /** Lanes at the maneuver point — only when the routing data has them. */
+  lanes?: Lane[];
+  /** Road classes along the step when provided (e.g. 'toll', 'motorway', 'ferry'). */
+  classes?: string[];
+  drivingSide?: 'left' | 'right';
   /** Geometry vertex range covered by this step, when it could be aligned. */
   fromIndex?: number;
   toIndex?: number;
@@ -48,6 +70,8 @@ export interface Route {
   provider: string;
   origin: Place;
   destination: Place;
+  /** Intermediate stops (multi-stop trips), in order. */
+  waypoints?: Place[];
   /** Full-resolution road geometry. */
   geometry: LngLat[];
   distanceM: number;

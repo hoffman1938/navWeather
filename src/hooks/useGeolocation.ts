@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
+import { currentMessages } from '../state/settings';
 import { useAppStore } from '../state/store';
 
-function describe(err: GeolocationPositionError): string {
-  if (err.code === err.PERMISSION_DENIED) return 'Location unavailable (permission denied)';
-  if (err.code === err.TIMEOUT) return 'Location unavailable (timed out)';
-  return 'Location unavailable';
+function describe(_err: GeolocationPositionError): string {
+  return currentMessages().ui.locationUnavailable;
 }
 
 /**
@@ -17,7 +16,7 @@ export function useGeolocation() {
   useEffect(() => {
     if (!navigating) return;
     if (!('geolocation' in navigator)) {
-      useAppStore.getState().handleGeolocationError('Location unavailable on this device');
+      useAppStore.getState().handleGeolocationError(currentMessages().ui.locationUnavailable);
       return;
     }
     const id = navigator.geolocation.watchPosition(
@@ -42,7 +41,7 @@ export function useGeolocation() {
 export function getCurrentPosition(): Promise<[number, number]> {
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) {
-      reject(new Error('Location unavailable on this device'));
+      reject(new Error(currentMessages().ui.locationUnavailable));
       return;
     }
     navigator.geolocation.getCurrentPosition(

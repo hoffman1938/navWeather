@@ -1,5 +1,4 @@
 .wmarker-host {
-  /* MapLibre positions this element; keep it inert except for the button. */
   pointer-events: none;
 }
 .wmarker {
@@ -9,26 +8,23 @@
   align-items: center;
   pointer-events: auto;
   transform-origin: 50% 100%;
-  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  transition: transform var(--dur) var(--ease);
 }
-/* Invisible hit area so the 34px pill still has a ≥44px touch target. */
+/* Invisible hit area so the small pill still has a ≥44px touch target. */
 .wmarker::before {
   content: '';
   position: absolute;
   inset: -6px -6px -2px;
 }
-.wmarker-host.is-collapsed .wmarker::before {
-  inset: -14px;
-}
 .wmarker__pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 34px;
-  padding: 3px 10px 3px 6px;
-  border-radius: var(--radius-pill);
+  gap: 3px;
+  min-height: 32px;
+  padding: 2px 9px 2px 5px;
+  border-radius: 8px;
   background: var(--surface);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-marker);
   white-space: nowrap;
 }
 .wmarker__temp {
@@ -45,31 +41,26 @@
 }
 .wmarker__stem {
   width: 2px;
-  height: 8px;
+  height: 7px;
   background: var(--surface);
-  box-shadow: var(--shadow-sm);
 }
 .wmarker.is-highlighted {
-  transform: scale(1.08);
+  transform: scale(1.06);
 }
 .wmarker.is-selected {
-  transform: scale(1.12);
+  transform: scale(1.1);
   z-index: 2;
 }
 .wmarker.is-selected .wmarker__pill {
-  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-marker);
 }
-.wmarker.is-night .wmarker__pill {
-  background: var(--surface-night);
-}
-/* Decluttered: collapse to a small dot so nothing overlaps. */
 .wmarker-host.is-collapsed .wmarker__pill {
-  width: 14px;
-  min-height: 14px;
-  height: 14px;
+  width: 12px;
+  min-height: 12px;
+  height: 12px;
   padding: 0;
   overflow: hidden;
-  border: 3px solid var(--surface);
+  border: 2px solid var(--surface);
   background: var(--text-3);
 }
 .wmarker-host.is-collapsed .wmarker__pill > * {
@@ -78,8 +69,8 @@
 .wmarker-host.is-collapsed .wmarker__stem {
   display: none;
 }
-.wmarker-host.is-collapsed .wmarker {
-  transform: translateY(7px);
+.wmarker-host.is-collapsed .wmarker::before {
+  inset: -16px;
 }
 .wmarker-host.is-selected-host {
   z-index: 3;

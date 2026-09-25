@@ -1,8 +1,9 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { config } from '../../config';
 import { isAbortError } from '../../services/http';
 import { getProviders } from '../../services/providers';
 import type { LngLat, Place } from '../../types/geo';
+import { useMessages } from '../../state/settings';
 import { LocateIcon, PinIcon } from '../Icons/Icons';
 
 interface Props {
@@ -10,7 +11,8 @@ interface Props {
   value: string;
   place: Place | null;
   placeholder: string;
-  icon: 'origin' | 'destination';
+  icon: 'origin' | 'destination' | 'stop';
+  inputRef?: RefObject<HTMLInputElement | null>;
   onChangeText(text: string): void;
   onSelect(place: Place): void;
   onSubmit(): void;
@@ -22,15 +24,19 @@ interface Props {
 /** Autocomplete input following the WAI-ARIA combobox pattern. */
 export function PlaceInput(props: Props) {
   const { label, value, place, placeholder, icon, onChangeText, onSelect, onSubmit, onUseCurrentLocation, near } = props;
+  const m = useMessages();
   const id = useId();
   const listId = `${id}-list`;
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Place[]>([]);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const ownRef = useRef<HTMLInputElement>(null);
+  const inputRef = props.inputRef ?? ownRef;
   const nearRef = useRef(near);
   nearRef.current = near;
+  const langRef = useRef(m.locale);
+  langRef.current = m.locale;
 
   // Debounced, abortable suggestions — only while the user is typing.
   useEffect(() => {
@@ -43,7 +49,11 @@ export function PlaceInput(props: Props) {
     setLoading(true);
     const t = window.setTimeout(async () => {
       try {
-        const res = await getProviders().autocomplete.suggest(value, { signal: ctrl.signal, near: nearRef.current });
+        const res = await getProviders().autocomplete.suggest(value, {
+          signal: ctrl.signal,
+          near: nearRef.current,
+          language: langRef.current,
+        });
         setItems(res);
         setActive(res.length ? 0 : -1);
       } catch (e) {
@@ -77,7 +87,7 @@ export function PlaceInput(props: Props) {
   return (
     <div className="place-input">
       <span className={`place-input__icon place-input__icon--${icon}`} aria-hidden="true">
-        {icon === 'destination' ? <PinIcon size={18} /> : <span className="place-input__dot" />}
+        {icon === 'destination' ? <PinIcon size={18} /> : <span className={`place-input__dot${icon === 'stop' ? ' is-stop' : ''}`} />}
       </span>
       <label className="sr-only" htmlFor={id}>
         {label}
@@ -126,7 +136,7 @@ export function PlaceInput(props: Props) {
       />
       {loading && open ? <span className="spinner place-input__spinner" aria-hidden="true" /> : null}
       {expanded ? (
-        <ul className="suggestions" id={listId} role="listbox" aria-label={`${label} suggestions`}>
+        <ul className="suggestions" id={listId} role="listbox" aria-label={m.ui.suggestions(label)}>
           {options.map((o, i) => (
             <li
               key={o.kind === 'current' ? 'current' : o.place.id}
@@ -143,7 +153,7 @@ export function PlaceInput(props: Props) {
               {o.kind === 'current' ? (
                 <>
                   <LocateIcon size={18} className="suggestion__icon suggestion__icon--accent" />
-                  <span className="suggestion__name">Current location</span>
+                  <span className="suggestion__name">{m.ui.currentLocation}</span>
                 </>
               ) : (
                 <>
