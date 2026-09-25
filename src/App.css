@@ -1,0 +1,10 @@
+.app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+.map-placeholder {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}

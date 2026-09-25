@@ -1,0 +1,128 @@
+.navstat {
+  padding: 0 16px;
+}
+.navstat__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.navstat__main {
+  flex: 1;
+  min-width: 0;
+}
+.navstat__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.navstat__badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.navstat__remaining {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--success);
+  line-height: 1.15;
+}
+.navstat__meta {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-2);
+}
+.navstat__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.navstat__btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+}
+.navstat__btn:hover {
+  background: var(--surface-3);
+}
+.navstat__btn--primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.navstat__btn--primary:hover {
+  background: var(--accent-hover);
+}
+.navstat__speed {
+  width: 56px;
+  border-radius: var(--radius-pill);
+}
+.navstat__end {
+  background: var(--danger);
+  color: #fff;
+  min-width: 80px;
+}
+.navstat__next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: 14px;
+  color: var(--text-2);
+}
+.navstat__next strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.speed {
+  position: relative;
+}
+.speed__menu {
+  position: absolute;
+  z-index: 40;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.speed__opt {
+  min-height: var(--tap);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 14px;
+}
+.speed__opt:hover {
+  background: var(--surface-3);
+}
+.speed__opt.is-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}

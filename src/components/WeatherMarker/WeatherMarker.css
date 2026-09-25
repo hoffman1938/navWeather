@@ -1,0 +1,86 @@
+.wmarker-host {
+  /* MapLibre positions this element; keep it inert except for the button. */
+  pointer-events: none;
+}
+.wmarker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  transform-origin: 50% 100%;
+  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+/* Invisible hit area so the 34px pill still has a ≥44px touch target. */
+.wmarker::before {
+  content: '';
+  position: absolute;
+  inset: -6px -6px -2px;
+}
+.wmarker-host.is-collapsed .wmarker::before {
+  inset: -14px;
+}
+.wmarker__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 3px 10px 3px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+}
+.wmarker__temp {
+  font-weight: 700;
+  font-size: 14px;
+}
+.wmarker__place {
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-strong);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.wmarker__stem {
+  width: 2px;
+  height: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.wmarker.is-highlighted {
+  transform: scale(1.08);
+}
+.wmarker.is-selected {
+  transform: scale(1.12);
+  z-index: 2;
+}
+.wmarker.is-selected .wmarker__pill {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+}
+.wmarker.is-night .wmarker__pill {
+  background: var(--surface-night);
+}
+/* Decluttered: collapse to a small dot so nothing overlaps. */
+.wmarker-host.is-collapsed .wmarker__pill {
+  width: 14px;
+  min-height: 14px;
+  height: 14px;
+  padding: 0;
+  overflow: hidden;
+  border: 3px solid var(--surface);
+  background: var(--text-3);
+}
+.wmarker-host.is-collapsed .wmarker__pill > * {
+  display: none;
+}
+.wmarker-host.is-collapsed .wmarker__stem {
+  display: none;
+}
+.wmarker-host.is-collapsed .wmarker {
+  transform: translateY(7px);
+}
+.wmarker-host.is-selected-host {
+  z-index: 3;
+}
