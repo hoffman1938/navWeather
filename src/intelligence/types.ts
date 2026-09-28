@@ -22,6 +22,7 @@ export type RouteEventType =
   | 'SPEED_LIMIT_CHANGE'
   | 'FUEL_STOP'
   | 'CHARGE_STOP'
+  | 'REST_BREAK'
   | 'DESTINATION'
   | 'STOP'
   | 'POI'
@@ -36,6 +37,7 @@ export type EventCategory =
   | 'speed'
   | 'fuel'
   | 'charging'
+  | 'rest'
   | 'destination'
   | 'stop';
 
@@ -53,6 +55,7 @@ export type EventIcon =
   | 'speed'
   | 'fuel'
   | 'charging'
+  | 'rest'
   | 'flag'
   | 'stop'
   | 'poi'

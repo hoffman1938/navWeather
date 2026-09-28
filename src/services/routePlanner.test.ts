@@ -11,6 +11,7 @@ import {
 import { StyleUrlMapProvider } from './map/MapProvider';
 import type { Providers } from './providers';
 import { applyLatePlaces, parseCoordinateText, planRoute, resolvePlace } from './routePlanner';
+import { NoIncidentProvider } from './traffic/IncidentProvider';
 import { NoTrafficProvider } from './traffic/TrafficProvider';
 import { WeatherService } from './weather/WeatherService';
 
@@ -37,6 +38,7 @@ function providers(placesDelayMs: number, failPlaces = false): Providers {
     tts: new FakeTTS(),
     speechRecognition: new FakeRecognition(),
     traffic: new NoTrafficProvider(),
+    incidents: new NoIncidentProvider(),
     map: new StyleUrlMapProvider('t', 'l', 'd'),
     weather: new WeatherService(new FakeWeatherProvider(Date.now()), {
       ttlMs: 1e6,

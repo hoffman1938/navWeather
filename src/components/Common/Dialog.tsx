@@ -16,6 +16,10 @@ export function Dialog({
   size?: 'small' | 'large';
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Latest onClose without re-running the focus setup: callers often pass a new
+  // function each render, and re-running would steal focus mid-typing.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const el = ref.current;
@@ -23,7 +27,7 @@ export function Dialog({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        closeRef.current();
         return;
       }
       if (e.key !== 'Tab' || !el) return;
@@ -44,7 +48,7 @@ export function Dialog({
       document.removeEventListener('keydown', onKey);
       previous?.focus?.();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div className="dialog-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={ref} className={`dialog dialog--${size}`} role="dialog" aria-modal="true" aria-label={label}>

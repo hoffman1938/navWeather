@@ -9,6 +9,7 @@ import { useEffectiveTheme } from '../../hooks/useEffectiveTheme';
 import { useReducedMotion } from '../../hooks/useMediaQuery';
 import { navigationZoom } from '../../navigation/instructions';
 import { getProviders } from '../../services/providers';
+import { useExplore } from '../../state/explore';
 import { useLayoutStore } from '../../state/layout';
 import { selectScrub } from '../../state/scrub';
 import { useMessages, useSettings } from '../../state/settings';
@@ -19,9 +20,14 @@ import { lowerIndex, sliceLine } from '../../utils/distance';
 import { LocateIcon } from '../Icons/Icons';
 import { WeatherMarker } from '../WeatherMarker/WeatherMarker';
 import { addRouteLayers, EMPTY_FC, lineFeature, pointFeature, routeGradient, setData } from './mapLayers';
+import { useExploreLayer } from './useExploreLayer';
+import { useLiveLayer } from './useLiveLayer';
 import './Map.css';
 
 setWorkerUrl(maplibreWorkerUrl);
+
+/** While driving, the camera returns to the car this long after the last pan/zoom. */
+const RECENTER_AFTER_MS = 12_000;
 
 interface Host {
   id: string;
@@ -54,7 +60,7 @@ function mercatorProgress(timed: TimedRoute): (distanceM: number) => number {
  * (the same points as the strip), places, the vehicle, and a navigation
  * camera (heading-up, auto-zoom around maneuvers, manual override + recenter).
  */
-export default function RouteMap() {
+export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const hostsRef = useRef(new Map<string, Host>());
@@ -126,15 +132,12 @@ export default function RouteMap() {
       setUserMoved(true);
       const s = useAppStore.getState();
       if (s.mode !== 'planning' && s.followVehicle) s.setFollow(false);
+      if (useExplore.getState().followMe) useExplore.getState().setFollowMe(false);
     };
     map.on('dragstart', stopFollow);
     map.on('zoomstart', stopFollow);
     map.on('rotatestart', stopFollow);
     map.on('move', () => scheduleDeclutter());
-    map.on('click', () => {
-      const s = useAppStore.getState();
-      if (s.selectedPointId) s.select(null, 'map');
-    });
     mapRef.current = map;
     return () => {
       map.remove();
@@ -166,7 +169,13 @@ export default function RouteMap() {
         map.off('moveend', apply);
       };
     }
-    map.setPadding(padding);
+    // Keep what's on screen still (a sheet opening must not slide the map
+    // and the pin under your finger); camera moves use the new padding.
+    const { width, height } = map.getContainer().getBoundingClientRect();
+    const x = padding.left + (width - padding.left - padding.right) / 2;
+    const y = padding.top + (height - padding.top - padding.bottom) / 2;
+    if (width > 0 && height > 0) map.jumpTo({ center: map.unproject([x, y]), padding });
+    else map.setPadding(padding);
   }, [padding]);
 
   const fitRoute = useCallback(
@@ -441,6 +450,32 @@ export default function RouteMap() {
       });
     }
   };
+
+  useExploreLayer(mapRef, styleVersion, { viewer, reduced });
+  useLiveLayer(mapRef, styleVersion, { enabled: viewer, reduced });
+
+  // Driving: after the user pans away and leaves the map alone, go back to following.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !navigating || follow) return;
+    let t = window.setTimeout(maybeRecenter, RECENTER_AFTER_MS);
+    function maybeRecenter() {
+      const s = useAppStore.getState();
+      if (s.mode !== 'planning' && !s.followVehicle && !s.selectedPointId && !map!.isMoving()) recenter();
+    }
+    const restart = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(maybeRecenter, RECENTER_AFTER_MS);
+    };
+    map.on('movestart', restart);
+    map.on('moveend', restart);
+    return () => {
+      window.clearTimeout(t);
+      map.off('movestart', restart);
+      map.off('moveend', restart);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigating, follow, styleVersion]);
 
   const pointsById = useMemo(() => new Map(displayPoints.map((p) => [p.id, p])), [displayPoints]);
 

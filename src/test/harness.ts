@@ -3,6 +3,7 @@ import { StyleUrlMapProvider } from '../services/map/MapProvider';
 import type { Poi, PoiProvider } from '../services/places/PoiProvider';
 import { setProviders, type Providers } from '../services/providers';
 import type { RouteRequest, RoutingProvider } from '../services/routing/RoutingProvider';
+import { NoIncidentProvider } from '../services/traffic/IncidentProvider';
 import { NoTrafficProvider } from '../services/traffic/TrafficProvider';
 import { WeatherService } from '../services/weather/WeatherService';
 import { haversineM } from '../utils/distance';
@@ -103,6 +104,7 @@ export function installFakeProviders(baseMs: number): Harness {
     speedLimits: null,
     elevation: null,
     traffic: new NoTrafficProvider(),
+    incidents: new NoIncidentProvider(),
     map: new StyleUrlMapProvider('test', 'light', 'dark'),
     weather: new WeatherService(weather, {
       ttlMs: 20 * 60000,

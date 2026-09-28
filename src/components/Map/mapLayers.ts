@@ -26,10 +26,21 @@ export function addRouteLayers(map: MLMap) {
   const beforeId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
   // lineMetrics → line-progress, so the driven part is a gradient stop, not a re-uploaded line.
   if (!map.getSource('route')) map.addSource('route', { type: 'geojson', data: EMPTY_FC, lineMetrics: true });
-  for (const id of ['route-weather', 'endpoints', 'focus', 'pois']) {
+  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy']) {
     if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: EMPTY_FC });
   }
   const lineLayout = { 'line-join': 'round', 'line-cap': 'round' } as const;
+
+  // "You are here" accuracy circle (the dot itself is an HTML marker).
+  map.addLayer(
+    {
+      id: 'me-accuracy',
+      type: 'fill',
+      source: 'me-accuracy',
+      paint: { 'fill-color': route, 'fill-opacity': 0.1, 'fill-outline-color': route },
+    },
+    beforeId,
+  );
 
   // Weather: a soft glow *around* the route — never replaces the route colour.
   map.addLayer(
@@ -169,4 +180,17 @@ export function routeGradient(fraction: number): maplibregl.ExpressionSpecificat
   if (f <= 0) return ['interpolate', ['linear'], ['line-progress'], 0, route, 1, route];
   if (f >= 1) return ['interpolate', ['linear'], ['line-progress'], 0, traveled, 1, traveled];
   return ['step', ['line-progress'], traveled, f, route];
+}
+
+/** Geodesic-enough circle polygon (accuracy radius) around a point. */
+export function circleFeature(center: LngLat, radiusM: number, steps = 48): GeoJSON.Feature {
+  const [lon, lat] = center;
+  const dLat = radiusM / 111_320;
+  const dLon = radiusM / (111_320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
+  const ring: LngLat[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * 2 * Math.PI;
+    ring.push([lon + dLon * Math.cos(a), lat + dLat * Math.sin(a)]);
+  }
+  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } };
 }

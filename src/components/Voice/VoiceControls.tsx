@@ -4,11 +4,12 @@ import { useMessages, useSettings } from '../../state/settings';
 import { getVoiceQueue, useAppStore } from '../../state/store';
 import { listenAndAnswer } from '../../voice/assistant';
 import { MicIcon, SpeakerIcon } from '../Icons/Icons';
+import { LocateButton } from '../Map/LocateButton';
 import './Voice.css';
 
 /**
- * Push-to-talk mic + mute. Not a chat window: a one-line caption shows
- * "Listening…", then the short answer, and the screen returns to navigation.
+ * Right-hand map buttons: my location, push-to-talk mic, mute. Not a chat
+ * window: a one-line caption shows "Listening…", then the short answer.
  */
 export function VoiceControls() {
   const m = useMessages();
@@ -28,7 +29,13 @@ export function VoiceControls() {
     return () => window.clearTimeout(t);
   }, [reply]);
 
-  if (!hasPlan) return null;
+  if (!hasPlan) {
+    return (
+      <div className="voice">
+        <LocateButton />
+      </div>
+    );
+  }
   const listening = activity === 'listening';
   const supported = getProviders().speechRecognition.supported;
 
@@ -56,6 +63,7 @@ export function VoiceControls() {
           {caption}
         </p>
       ) : null}
+      {!driving ? <LocateButton /> : null}
       <div className="voice__buttons">
         {driving ? (
           <button className="fab" onClick={toggleVoice} aria-pressed={!voiceOn} aria-label={voiceOn ? m.ui.mute : m.ui.unmute}>

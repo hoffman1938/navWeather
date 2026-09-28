@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { snapIncidentsToRoute, type RouteIncident } from '../algorithms/incidents';
 import { initialDeviationState, updateDeviation } from '../algorithms/routeDeviation';
 import { createProgressTracker, edgeSpeedMps, hasArrived } from '../algorithms/routeProgress';
 import { diffForecast } from '../algorithms/routeWeather';
@@ -17,6 +18,7 @@ import {
 import { dueManeuverPrompt, markSpoken, spokenPrompt } from '../navigation/instructions';
 import { computeGuidance, type Guidance } from '../navigation/maneuvers';
 import { isAbortError, mapWithConcurrency } from '../services/http';
+import { locateOnce, LocationError } from '../services/location';
 import type { PoiCategory } from '../services/places/PoiProvider';
 import { searchAlongRoute, type PoiResult } from '../services/placesAlongRoute';
 import { getProviders } from '../services/providers';
@@ -36,11 +38,12 @@ import {
 import type { LngLat, Place } from '../types/geo';
 import type { DeviationState, NavigationMode, RouteProgress, VehicleState } from '../types/navigation';
 import type { RouteSample } from '../types/route';
-import type { LocationForecast } from '../types/weather';
+import type { LocationForecast, WeatherAtTime, WeatherCondition } from '../types/weather';
 import { haversineM } from '../utils/distance';
 import { deviceTimeZone } from '../utils/timezone';
 import { VoiceQueue } from '../voice/queue';
 import { deriveRouteWeather, emptyDerived, type Derived } from './derive';
+import { useSavedPlaces } from './savedPlaces';
 import { currentMessages, settingsSnapshot, useSettings } from './settings';
 
 export type RouteStatus = 'idle' | PlanStage | 'ready' | 'error';
@@ -83,6 +86,37 @@ export interface PoiSearchState {
   results: PoiResult[];
 }
 
+/** Accumulated while driving; turned into a summary on arrival. Memory only. */
+interface TripTracker {
+  startedAt: number;
+  plannedDurationS: number;
+  distanceM: number;
+  lastCoordinate: LngLat | null;
+  lastWeatherAt: number;
+  /** Minutes (route clock) spent in each condition at the vehicle position. */
+  conditionMinutes: Partial<Record<WeatherCondition, number>>;
+  minTemp: number | null;
+  maxTemp: number | null;
+  reroutes: number;
+  simulated: boolean;
+}
+
+/** "Trip complete" — shown on arrival, never stored. */
+export interface TripSummary {
+  destination: string;
+  simulated: boolean;
+  durationS: number;
+  distanceM: number;
+  /** Actual minus planned drive time (s); positive = later than planned. */
+  delayS: number;
+  conditions: { condition: WeatherCondition; minutes: number }[];
+  minTemp: number | null;
+  maxTemp: number | null;
+  reroutes: number;
+  arrivalWeather: WeatherAtTime | null;
+  timezone: string;
+}
+
 export interface AssistantState {
   activity: 'idle' | 'listening' | 'thinking';
   transcript: string;
@@ -102,8 +136,12 @@ export interface AppState {
   routeOptions: PlannedRoute[];
   selectedOption: number;
   speedLimits: SpeedLimitProfile | null;
+  /** Incidents on the current route (empty without an incident provider). */
+  incidents: RouteIncident[];
 
   forecasts: Map<string, LocationForecast>;
+  /** Dev tools injected simulated weather/incidents — the UI labels it. */
+  simulatedData: boolean;
   weatherStatus: WeatherStatus;
   weatherError: string | null;
   weatherUpdatedAt: number | null;
@@ -124,6 +162,7 @@ export interface AppState {
 
   alertState: DriverAlertState;
   activeAlert: VisualAlert | null;
+  arrival: TripSummary | null;
   poi: PoiSearchState | null;
   assistant: AssistantState;
   online: boolean;
@@ -183,12 +222,17 @@ export interface AppState {
   resumeSimulation(): void;
   setSimulationSpeed(speed: number): void;
   advanceSimulationBy(realDtMs: number): void;
+  /** Skip simulated time forward (dev tools), even while paused. */
+  simulationSkip(simSeconds: number): void;
   exitSimulation(): void;
 
   searchPoi(category: PoiCategory, opts?: { aroundM?: number; signal?: AbortSignal }): Promise<PoiResult[]>;
   clearPoi(): void;
   addStop(place: Place): Promise<void>;
 
+  dismissArrival(): void;
+  /** Re-plan: from the vehicle while driving, else the current request. */
+  recalculate(): void;
   setAssistant(patch: Partial<AssistantState>): void;
   say(text: string, priority?: number): void;
 }
@@ -208,6 +252,63 @@ let noticeSeq = 0;
 const namingAttempted = new Set<string>();
 const spokenManeuvers = new Set<string>();
 let voiceQueue: VoiceQueue | null = null;
+let trip: TripTracker | null = null;
+
+function startTrip(plannedDurationS: number, startedAt: number, simulated: boolean) {
+  trip = {
+    startedAt,
+    plannedDurationS,
+    distanceM: 0,
+    lastCoordinate: null,
+    lastWeatherAt: startedAt,
+    conditionMinutes: {},
+    minTemp: null,
+    maxTemp: null,
+    reroutes: 0,
+    simulated,
+  };
+}
+
+/** Distance driven and the weather actually encountered at the vehicle. */
+function trackTrip(coordinate: LngLat, nowMs: number, weather: WeatherAtTime | null | undefined) {
+  if (!trip) return;
+  if (trip.lastCoordinate) {
+    const d = haversineM(trip.lastCoordinate, coordinate);
+    if (d < 5000) trip.distanceM += d; // ignore GPS jumps
+  }
+  trip.lastCoordinate = coordinate;
+  if (weather && nowMs > trip.lastWeatherAt) {
+    const minutes = (nowMs - trip.lastWeatherAt) / 60_000;
+    trip.conditionMinutes[weather.condition] = (trip.conditionMinutes[weather.condition] ?? 0) + minutes;
+    trip.minTemp = trip.minTemp === null ? weather.temperature : Math.min(trip.minTemp, weather.temperature);
+    trip.maxTemp = trip.maxTemp === null ? weather.temperature : Math.max(trip.maxTemp, weather.temperature);
+  }
+  trip.lastWeatherAt = nowMs;
+}
+
+function finishTrip(s: AppState, arrivedAt: number): TripSummary | null {
+  if (!trip || !s.plan) return null;
+  const t = trip;
+  trip = null;
+  const durationS = Math.max(0, (arrivedAt - t.startedAt) / 1000);
+  const last = s.derived.points.at(-1);
+  return {
+    destination: s.plan.timed.route.destination.name,
+    simulated: t.simulated,
+    durationS,
+    distanceM: Math.max(t.distanceM, s.plan.timed.totalDistM - (s.progress?.remainingDistanceM ?? 0)),
+    delayS: durationS - t.plannedDurationS,
+    conditions: (Object.entries(t.conditionMinutes) as [WeatherCondition, number][])
+      .filter(([, min]) => min >= 3)
+      .sort((a, b) => b[1] - a[1])
+      .map(([condition, minutes]) => ({ condition, minutes: Math.round(minutes) })),
+    minTemp: t.minTemp,
+    maxTemp: t.maxTemp,
+    reroutes: t.reroutes,
+    arrivalWeather: s.derived.currentPoint?.weather ?? last?.weather ?? null,
+    timezone: last?.timezone ?? deviceTimeZone(),
+  };
+}
 
 function newPlanTasks(): AbortSignal {
   planTasks?.abort();
@@ -258,6 +359,8 @@ function derive(s: AppState): Derived {
     speedLimits: s.speedLimits,
     fuelRangeKm: settings.fuelRangeKm,
     vehicle: settings.vehicle,
+    incidents: s.incidents,
+    breakReminders: settings.breakReminders,
     extraEvents: [],
     previous: s.derived,
   });
@@ -296,7 +399,9 @@ export const useAppStore = create<AppState>()(
     routeOptions: [],
     selectedOption: 0,
     speedLimits: null,
+    incidents: [],
     forecasts: new Map(),
+    simulatedData: false,
     weatherStatus: 'idle',
     weatherError: null,
     weatherUpdatedAt: null,
@@ -315,6 +420,7 @@ export const useAppStore = create<AppState>()(
     speeding: { speeding: false, since: null },
     alertState: initialDriverAlertState,
     activeAlert: null,
+    arrival: null,
     poi: null,
     assistant: initialAssistant,
     online: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
@@ -355,13 +461,21 @@ export const useAppStore = create<AppState>()(
       const ctrl = new AbortController();
       routeAbort = ctrl;
       const m = currentMessages();
-      set({ routeStatus: 'geocoding', routeError: null, poi: null });
+      set({ routeStatus: 'geocoding', routeError: null, poi: null, arrival: null, simulatedData: false });
       const providers = getProviders();
       try {
-        const origin = await resolvePlace(providers, get().origin, ctrl.signal, m);
-        const destination = await resolvePlace(providers, get().destination, ctrl.signal, m);
+        // "Your location" (in any field — it can be swapped) is resolved now, with a fresh fix.
+        const resolveHere = async (f: PlaceField): Promise<PlaceField> =>
+          f.place?.kind === 'here' ? { ...f, place: { ...f.place, coordinate: (await locateOnce(undefined, ctrl.signal)).coordinate } } : f;
+        const originField = await resolveHere(get().origin);
+        const destinationField = await resolveHere(get().destination);
+        const waypointFields = await Promise.all(get().waypoints.map(resolveHere));
+        if (ctrl.signal.aborted) return;
+        set({ origin: originField, destination: destinationField, waypoints: waypointFields });
+        const origin = await resolvePlace(providers, originField, ctrl.signal, m);
+        const destination = await resolvePlace(providers, destinationField, ctrl.signal, m);
         const waypoints: Place[] = [];
-        for (const w of get().waypoints) {
+        for (const w of waypointFields) {
           if (w.place || w.text.trim()) waypoints.push(await resolvePlace(providers, w, ctrl.signal, m));
         }
         if (haversineM(origin.coordinate, destination.coordinate) < 50 && waypoints.length === 0) {
@@ -400,12 +514,18 @@ export const useAppStore = create<AppState>()(
           sheet: 'default',
         });
         set({ derived: derive(get()) });
+        useSavedPlaces.getState().addRecent(destination);
         startPlanTasks(primary);
         if (primary.warnings.includes('places-unavailable')) get().showNotice('info', m.ui.placesLimited);
         await get().loadWeather({ reason: 'initial' });
       } catch (e) {
         if (isAbortError(e)) return;
-        const msg = (e as Error)?.message === 'same-place' ? m.ui.samePlace : describeError(e, m.ui.unableRoute, m);
+        const msg =
+          e instanceof LocationError
+            ? locationErrorText(e.kind)
+            : (e as Error)?.message === 'same-place'
+              ? m.ui.samePlace
+              : describeError(e, m.ui.unableRoute, m);
         set({ routeStatus: 'error', routeError: msg });
       } finally {
         if (routeAbort === ctrl) routeAbort = null;
@@ -451,6 +571,7 @@ export const useAppStore = create<AppState>()(
         routeOptions: [],
         selectedOption: 0,
         speedLimits: null,
+        simulatedData: false,
         routeStatus: 'idle',
         routeError: null,
         mode: 'planning',
@@ -654,6 +775,10 @@ export const useAppStore = create<AppState>()(
       if (!get().plan) return;
       getVoiceQueue(); // create inside the user gesture
       getProviders().tts.unlock();
+      if (typeof window !== 'undefined' && window.isSecureContext === false) {
+        get().showNotice('warning', locationErrorText('insecure'), true);
+        return;
+      }
       let state: PermissionState | 'unknown' = 'unknown';
       try {
         state = (await navigator.permissions?.query({ name: 'geolocation' as PermissionName }))?.state ?? 'unknown';
@@ -661,7 +786,7 @@ export const useAppStore = create<AppState>()(
         state = 'unknown';
       }
       if (state === 'granted') get().startNavigation();
-      else if (state === 'denied') get().showNotice('warning', currentMessages().ui.locationUnavailable);
+      else if (state === 'denied') get().showNotice('warning', locationErrorText('denied'), true);
       else set({ locationPrimer: true }); // explain before the browser asks
     },
 
@@ -675,7 +800,9 @@ export const useAppStore = create<AppState>()(
       if (!s.plan) return;
       tracker = createProgressTracker(s.plan.timed);
       spokenManeuvers.clear();
+      startTrip(s.plan.timed.totalTimeS, Date.now(), false);
       set({
+        arrival: null,
         mode: 'navigating',
         navStartedMs: Date.now(),
         progress: null,
@@ -747,9 +874,10 @@ export const useAppStore = create<AppState>()(
       }
       if (hasArrived(progress)) {
         const m = currentMessages();
+        const summary = finishTrip(get(), now);
+        get().stopNavigation(); // clears the voice queue — announce after it
         get().say(m.voice.arrived(st.plan!.timed.route.destination.name), 1);
-        get().showNotice('success', m.ui.arrivedAt(st.plan!.timed.route.destination.name));
-        get().stopNavigation();
+        set({ arrival: summary, sheet: 'default', activeAlert: null });
       }
     },
 
@@ -775,6 +903,7 @@ export const useAppStore = create<AppState>()(
       routeAbort?.abort();
       routeAbort = null;
       tracker = null;
+      trip = null;
       getVoiceQueue().clear();
       set({
         mode: 'planning',
@@ -803,7 +932,9 @@ export const useAppStore = create<AppState>()(
       spokenManeuvers.clear();
       const startMs = departureMsOf({ ...s, clockMs: Date.now() });
       const first = advanceSimulation(s.plan.timed, { nowMs: startMs, modelTimeS: 0 }, startMs, 0, 1);
+      startTrip(s.plan.timed.totalTimeS, startMs, true);
       set({
+        arrival: null,
         mode: 'simulating',
         navStartedMs: startMs,
         sim: { ...s.sim, playing: true, nowMs: startMs, modelTimeS: 0, startMs, arrived: false },
@@ -843,14 +974,26 @@ export const useAppStore = create<AppState>()(
       set({ sim: { ...s.sim, nowMs: step.nowMs, modelTimeS: step.modelTimeS, arrived: step.arrived, playing: !step.arrived } });
       onProgress(vehicle, simProgress(s.plan.timed, step), speedMps, false);
       if (step.arrived) {
-        const m = currentMessages();
-        get().showNotice('success', m.ui.arrivedSim(s.plan.timed.route.destination.name));
+        const summary = finishTrip(get(), step.nowMs);
+        set({ arrival: summary, sheet: 'default', activeAlert: null });
       }
+    },
+
+    simulationSkip(simSeconds) {
+      const s = get();
+      if (s.mode !== 'simulating' || !s.plan || s.sim.arrived) return;
+      const wasPlaying = s.sim.playing;
+      set({ sim: { ...s.sim, playing: true } });
+      get().advanceSimulationBy((simSeconds * 1000) / s.sim.speed);
+      const after = get();
+      if (!wasPlaying && after.mode === 'simulating' && !after.sim.arrived) set({ sim: { ...after.sim, playing: false } });
     },
 
     exitSimulation() {
       getVoiceQueue().clear();
+      trip = null;
       set({
+        arrival: null,
         mode: 'planning',
         vehicle: null,
         progress: null,
@@ -905,6 +1048,19 @@ export const useAppStore = create<AppState>()(
       await get().calculateRoute();
     },
 
+    recalculate() {
+      const s = get();
+      if (s.mode !== 'planning' && s.vehicle) void recalculateFrom(s.vehicle.coordinate, s.vehicle.headingDeg);
+      else if (s.plan) void s.calculateRoute();
+    },
+
+    dismissArrival() {
+      const s = get();
+      set({ arrival: null });
+      if (s.mode === 'simulating') s.exitSimulation();
+      get().clearRoute();
+    },
+
     // ---------------- Voice ----------------
     setAssistant: (patch) => set((s) => ({ assistant: { ...s.assistant, ...patch } })),
     say(text, priority = 3) {
@@ -927,9 +1083,21 @@ function replacePlan(next: PlannedRoute) {
   useAppStore.setState({ plan: next, routeOptions: options.length ? options : [next] });
 }
 
-/** Background work for a route: late place names and OSM speed limits. */
+/** Background work for a route: late place names, incidents (and, on drive start, OSM speed limits). */
 function startPlanTasks(plan: PlannedRoute, keepSignal = false) {
   const signal = keepSignal && planTasks && !planTasks.signal.aborted ? planTasks.signal : newPlanTasks();
+  useAppStore.setState({ incidents: [] });
+  const incidents = getProviders().incidents;
+  if (incidents.name !== 'none') {
+    incidents
+      .getIncidents(plan.timed.route, signal)
+      .then((list) => {
+        if (signal.aborted || useAppStore.getState().plan?.timed !== plan.timed) return;
+        useAppStore.setState({ incidents: snapIncidentsToRoute(list, plan.timed) });
+        useAppStore.getState().rederive();
+      })
+      .catch(() => undefined); // incidents are optional; the route works without them
+  }
   if (plan.latePlaces) {
     void plan.latePlaces.then((places) => {
       const cur = useAppStore.getState().plan;
@@ -990,6 +1158,7 @@ function onProgress(vehicle: VehicleState, progress: RouteProgress, speedMps: nu
   const limit = speedLimitAt(s.speedLimits, progress.distanceAlongM);
   const speeding = settings.speedWarnings ? updateSpeeding(s.speeding, live ? speedKmh : null, limit, progress.nowMs) : s.speeding;
 
+  trackTrip(vehicle.coordinate, progress.nowMs, s.derived.currentPoint?.weather);
   store.setState({
     vehicle,
     progress,
@@ -1053,6 +1222,7 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
   routeAbort?.abort();
   const ctrl = new AbortController();
   routeAbort = ctrl;
+  if (trip) trip.reroutes++;
   store.setState({ recalculating: true });
   s.showNotice('info', m.ui.recalculating, true);
   const origin: Place = { id: `here:${coordinate.join(',')}`, name: m.ui.currentLocation, label: m.ui.currentLocation, coordinate };
@@ -1076,8 +1246,13 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
     if (ctrl.signal.aborted || cur.mode === 'planning') return;
     tracker = createProgressTracker(plan.timed);
     spokenManeuvers.clear();
-    const now = Date.now();
-    const progress = tracker(coordinate, now, { headingDeg });
+    // A simulated drive restarts on the new route (its clock keeps running).
+    const simulating = cur.mode === 'simulating';
+    const now = simulating ? cur.sim.nowMs : Date.now();
+    const start = plan.timed.route.geometry[0];
+    const progress = simulating
+      ? simProgress(plan.timed, { nowMs: now, modelTimeS: 0, distanceM: 0, coordinate: start, headingDeg: headingDeg ?? 0, arrived: false })
+      : tracker(coordinate, now, { headingDeg });
     store.setState({
       plan,
       routeOptions: [plan],
@@ -1085,6 +1260,7 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
       speedLimits: null,
       navStartedMs: now,
       progress,
+      ...(simulating ? { sim: { ...cur.sim, modelTimeS: 0, startMs: now, arrived: false }, vehicle: { coordinate: start, headingDeg, timestampMs: now } } : {}),
       deviation: initialDeviationState,
       recalculating: false,
       mode: cur.mode === 'simulating' ? 'simulating' : 'navigating',
@@ -1109,6 +1285,18 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
   }
 }
 
+/** Same wording as the explore layer (platform-specific help for "denied"). */
+function locationErrorText(kind: LocationError['kind']): string {
+  const m = currentMessages();
+  const ios = typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  return kind === 'denied' && ios ? m.location.deniedIos : m.location.errors[kind];
+}
+
+/** Dev tools: re-route as if the vehicle had left the route at `coordinate`. */
+export function __devRerouteFrom(coordinate: LngLat, headingDeg?: number) {
+  return recalculateFrom(coordinate, headingDeg);
+}
+
 /** Test helper: reset module-level runtime state. */
 export function __resetStoreRuntime() {
   routeAbort?.abort();
@@ -1121,6 +1309,7 @@ export function __resetStoreRuntime() {
   namingAttempted.clear();
   spokenManeuvers.clear();
   voiceQueue = null;
+  trip = null;
   speedLimitsFor = null;
   lastDeriveAt = 0;
   lastDeriveSimMs = 0;

@@ -58,3 +58,11 @@ describe('service worker', () => {
     expect(dispatch('https://navweather.pages.dev/assets/x.js', { method: 'POST' }).respondWith).not.toHaveBeenCalled();
   });
 });
+
+describe('service worker: live data', () => {
+  it('never intercepts the live-share API', () => {
+    const { dispatch } = loadWorker();
+    expect(dispatch('https://navweather.pages.dev/api/share/AAAAAAAAAAAAAAAAAAAAAA', { mode: 'navigate' }).respondWith).not.toHaveBeenCalled();
+    expect(dispatch('https://navweather.pages.dev/api/share/AAAAAAAAAAAAAAAAAAAAAA').respondWith).not.toHaveBeenCalled();
+  });
+});

@@ -10,6 +10,7 @@ export type Intent =
   | { type: 'traffic' }
   | { type: 'find_poi'; category: PoiCategory; maxDetourMin?: number; near?: string }
   | { type: 'alternatives' }
+  | { type: 'recalculate' }
   | { type: 'avoid'; what: 'tolls' | 'highways' | 'ferries' }
   | { type: 'stop_navigation' }
   | { type: 'where_am_i' }
@@ -34,6 +35,7 @@ const POI_WORDS: [RegExp, PoiCategory][] = [
   [/\b(supermarket|grocery|groceries|shop)\b|супермаркет|магазин|სუპერმარკეტ|მაღაზი/, 'supermarket'],
   [/\b(rest area|rest stop|services)\b|зона отдыха|დასასვენებ/, 'rest_area'],
   [/\b(toilet|restroom|bathroom|wc)\b|туалет|ტუალეტ/, 'toilets'],
+  [/\b(hospital|emergency room|er)\b|больниц|госпитал|საავადმყოფ/, 'hospital'],
   [/\bcar wash\b|автомойк|სამრეცხაო/, 'car_wash'],
   [/\b(repair|mechanic|garage|tyre|tire)\b|автосервис|шиномонтаж|ავტოსერვის/, 'car_repair'],
   [/\b(attraction|sight|sightseeing|viewpoint)\b|достопримечательн|ღირსშესანიშნ/, 'attraction'],
@@ -87,6 +89,9 @@ export function parseCommand(utterance: string, ctx: ParseContext = {}): Intent 
   if (avoid) {
     const w = avoid[1] ?? '';
     return { type: 'avoid', what: /toll|платн|ფასიან/.test(w + t) ? 'tolls' : /ferr|паром/.test(w + t) ? 'ferries' : 'highways' };
+  }
+  if (/\b(recalculate|reroute|re-route|recalc)\b|\b(update|refresh) (the |my )?route\b|пересчитай|перестрой маршрут|გადაითვალე მარშრუტი|მარშრუტის გადათვლა/.test(t)) {
+    return { type: 'recalculate' };
   }
   if (/\b(another|alternative|other|different|faster) route\b|\bshow (me )?(the )?(routes|options)\b|другой маршрут|სხვა მარშრუტ/.test(t)) {
     return { type: 'alternatives' };

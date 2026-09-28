@@ -48,3 +48,19 @@
 .set-done {
   width: 100%;
 }
+.set-saved li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+}
+.set-saved li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set-clear {
+  margin-left: -12px;
+}

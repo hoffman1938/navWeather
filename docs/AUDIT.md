@@ -1,69 +1,103 @@
-# Product audit & backlog — weather-aware navigation
+# Product audit, status and gap analysis
 
-Four role-based reviews were run against the existing weather-along-route prototype (read-only), then consolidated here. File references point at the code as it was before this iteration.
+Three rounds of role-based review (product, UX/UI, GIS, weather, navigation,
+voice, mobile, QA, performance, security, Cloudflare) were run against the
+code. Round 1–2 findings were fixed earlier (progress tracking on dual
+carriageways, false arrivals, forecast-hour semantics, flip-flopping events,
+store races, `derive()` cost, re-uploaded polylines, card-heavy UI, contrast,
+i18n, CSP). This document records round 3 and the resulting state.
 
-## Consolidated findings
+## Round 3 — findings (and fixes)
 
-### Product / UX (PM, UX/UI, Mobile)
-- The app answers "what's the weather along my route?" but not **"what's ahead of me?"**: no next turn, no next hazard, and driving mode reuses the planning sheet (`RouteSheet.tsx`, `NavigationStatus.tsx`).
-- Generic "generated" look: rounded tiles for every datum (weather cards, strips, details grid), 13 pill radii, badges, uppercase eyebrows, backdrop blur on opaque surfaces, a marketing hero inside the product.
-- Planning repeats itself: route title twice, weather four ways, the arrival-time disclaimer three times.
-- Mobile: landscape phones got the desktop layout, no left/right safe areas, attribution hidden under the search card, static `theme-color`.
-- Accessibility:
-  - Contrast failures: dark primary buttons 3.3:1, night "End" button 2.8:1, and `--text-3` on tinted surfaces.
-  - Severity shown by colour only.
-  - Focus lost when panels unmount.
-  - The summary is a live region that re-announces every tick.
-- Localization: no i18n layer, English prose built in logic (`weatherGrouping.ts`), and English-only plurals.
+**Reported by the user**
+- "Current location isn't working": location was only requested from the From
+  field, every failure said "Location unavailable", there was no my-location
+  button, and in the Claude desktop browser pane location is blocked outright.
+  → Shared `LocationWatcher`, locate button + blue dot + accuracy, classified
+  errors with fix instructions (desktop, macOS, iOS), "Your location" start
+  resolved when routing, watchdog for unanswered permission prompts.
+- "Like Google Maps, with weather where I want to go; share a pin; share live
+  location" → explore mode, place cards with weather now / at arrival / 7 days,
+  press-and-hold pins, place links, live sharing (Worker relay).
 
-### Routing / weather algorithms (GIS, Weather data)
-- **Progress tracking:** the nearest-segment snap can jump to the opposite carriageway, or snap to the end of out-and-back routes (false "arrived").
-- **Weather event generation:** events repeat and flip-flop (heavy rain per sample, ice per sample, "colder" every 50 km, gusts toggling at 60 km/h). Event ids are unstable while driving because they are keyed off the moving "current" point.
-- **Matching:**
-  - The condition came from the nearest hour. Open-Meteo's code effectively describes the preceding hour, which can show a rain icon for a dry hour.
-  - Gusts were averaged even though the value is the previous hour's maximum.
-  - `rain` excludes showers.
-- **Sampling:** distance fill could break the 45-minute guarantee, and ids collided on tiny routes.
-- **Deviation:** fixes of 100–150 m accuracy could trigger off-route. Arrival ignored lateral offset.
+**Security review of the new relay** — all fixed: a PUT racing a stop could
+leave the last position stored forever (body now read before state, re-checked
+after every await, orphan backstop); share creation rate-limited; bodies
+streamed with a hard byte cap; parallel/out-of-order updates rejected; pings
+answered without waking the object; service worker never caches `/api` or
+non-HTML navigations; bidi/zero-width characters stripped from names; update
+cadence fitted to the Free plan (≥5 s, viewers animate between updates).
+Open: `connect-src 'self'` covers same-origin `wss:` in current browsers; very
+old iOS Safari falls back to polling.
 
-### QA / Performance
-- `derive()` cost about 5 ms, 95% of it timezone validation (a new `Intl.DateTimeFormat` per call).
-- The traveled-route line re-uploaded up to 750 KB several times a second on long routes.
-- Route geometry was re-sent to the map on unrelated plan updates.
-- **Races:**
-  - Weather stuck in "loading" after the plan changed mid-fetch.
-  - New loads joined aborted in-flight requests.
-  - Navigation resurrected after "End" by an in-flight re-route.
-  - Reverse-geocoded names lost.
-  - The model-update check shared a caller's abort signal.
-- **Tests:** no coverage of alert dedupe/priority, snow/fog/heavy rain, forecast change during navigation, or offline. One timing-flaky test.
+**Mobile/QA review of the new flows** — all fixed: cancelling "Creating link…"
+could still start sharing; the share dialog stole focus on every update;
+one GPS timeout downgraded precision for the session; a blocked location left a
+dead share running; heartbeats stopped when a stationary phone stopped
+reporting; "Your location" could route to 0,0 after swapping; route search
+could hang on an ignored permission prompt; double-click zoom dropped pins;
+the viewer leaked a socket under StrictMode and never replaced dead sockets;
+the place card's clock froze; shares silently resumed after reload (now paused
+until the user resumes); no backoff on failures; small touch targets.
 
-### Security / Privacy / Deployment
-- No XSS or injection path, no secrets, 0 npm vulnerabilities, nothing persisted.
-- Tighten:
-  - Round coordinates sent for reverse geocoding and autocomplete bias.
-  - Encode model names in URLs.
-  - Validate geocoder coordinates.
-  - Add an error boundary for a stale lazy chunk after a redeploy.
-  - Explain location permission before prompting.
-- Cloudflare Pages ready as a static site. It needs `_headers` with CSP / Permissions-Policy / Referrer-Policy. The CSP was verified against the running build.
+**Own verification** — pins jumped away from the finger when the card opened
+(map padding shift, now kept still); a lift-off click closed the card after a
+long press; arrival voice line was cleared before it was spoken; a simulated
+re-route kept the old route's progress; arrival time overshot on large
+simulation steps; English provider descriptions leaked into ka/ru UIs.
 
-## Backlog
+## Feature status
 
-| Pri | Item | Data availability (free prototype) |
+| Area | Status | Notes |
 | --- | --- | --- |
-| **P0** | Fix progress tracking, deviation, arrival, matching semantics, sampling guarantees, store races, perf hot spots | — |
-| **P0** | Central route intelligence: `RouteEvent` model, Weather Alert Engine (latched, stable ids), Driver Alert Engine (time-based windows, confidence, grouping, cooldown, dedupe) | Open-Meteo ✔ |
-| **P1** | Turn-by-turn: maneuvers from the route model, localized instructions, lanes (real OSM data), speed-adaptive voice prompts, auto-zoom, heading-up camera, recenter | OSRM steps/lanes ✔ |
-| **P1** | Voice: TTS queue with priorities / expiry / interruption, speech recognition (push-to-talk), command parser with context, natural answers | Browser speech APIs (where supported) |
-| **P1** | Driver mode UI: maneuver banner, ETA bar, next-event line, "Ahead" list, alert banner, night theme; planning redesign (no card soup) | — |
-| **P1** | Settings: language (en/ka/ru), units, alert output / types / timing, voice, speed warnings, battery saver, fuel range — stored locally | — |
-| **P2** | Places along route with real detour time (Overpass + OSRM table), voice place search, add as stop | Overpass ✔ (flaky), OSRM table ✔ |
-| **P2** | Alternative routes with weather comparison ("B is 20 min longer but avoids the heaviest rain"); never auto-selected | OSRM alternatives ✔ |
-| **P2** | Speed limits from OSM with "signs take precedence", speeding warning with hysteresis | OSM maxspeed via Overpass (best effort) |
-| **P2** | Avoid tolls/highways/ferries | ✘ The OSRM demo server rejects `exclude`, so the option is hidden until the provider declares the capability |
-| **P2** | Live traffic, incidents, community reports | ✘ No free source. Only interfaces are provided; the UI stays silent rather than showing fake data |
-| **P3** | Fuel stop suggestion from user-entered range; EV model (battery, connector) | User input only; nothing estimated |
-| **P3** | Multi-stop trips (weather across stops) | OSRM waypoints ✔ |
-| **P4** | PWA (manifest, offline shell), network-loss behaviour (keep route, label stale weather), Cloudflare Pages headers | — |
-| **P4** | Offline map regions, native CarPlay / Android Auto shells | Not possible in a web app. Domain APIs are kept UI-free for a future native shell |
+| Map, search, geocoding, autocomplete | Existing → improved | explore search, saved places, recents, coordinates, place links |
+| Current location | **Fixed / new** | see above |
+| Place card weather (now, arrival, 24 h, 7 days) | New | same matcher as the route |
+| Routing (real geometry), alternatives, multi-stop | Existing | OSRM; lanes/exits kept |
+| ETA per route point, time zones | Existing | per-point IANA zone; DST-safe (UTC internally) |
+| Adaptive sampling | Existing | settlements, passes, junctions, turns, ≤45 min, refinement |
+| Weather along route at arrival time | Existing | the core; interval vs instant semantics |
+| Weather events + transitions | Existing | rain/heavy/snow/storm/fog/wind/temp drop/ice/clearing |
+| Driver alert engine | Existing | time windows, confidence, cooldown, grouping, recurrence, cap |
+| Route comparison | Improved | exposure by condition (storm, snow, heavy rain, fog, gusts) |
+| Turn-by-turn, camera, recenter | Improved | auto re-centre 12 s after panning |
+| Deviation + recalculation | Improved | simulated deviations restart the drive on the new route |
+| Voice | Improved | + recalculate, hospital; incidents answer traffic questions when available |
+| Places along route + detour time | Existing (+ hospital) | Overpass + OSRM table |
+| Speed limits | Existing | OSM, best effort, labelled |
+| Fuel / EV advice | Existing | from user-entered range only |
+| Break reminders | New | every ~2 h of driving, low severity (never interrupts) |
+| Incidents | New (architecture) | provider interface → events; unverified = "reported" |
+| Traffic | Architecture only | no free source → "Not available" |
+| Arrival summary | New | distance, time vs plan, weather encountered; not stored |
+| Live location sharing | New | Worker + Durable Object; latest position only |
+| Data freshness | New | Forecast / Estimated / Stale / Simulated / Not available per source |
+| Wake lock | New | screen stays on while driving or sharing |
+| PWA / offline shell | Existing → hardened | |
+| Dev diagnostics + simulation controls | New | development builds only |
+| Localization | Existing → lazy | ka/ru load on demand (−18 KB gz from main bundle) |
+| Settings | Improved | break reminders, saved places, recents |
+
+## Gap analysis
+
+| Gap | Class | Why it matters | Free? | Priority |
+| --- | --- | --- | --- | --- |
+| Live traffic speeds / congestion | **Blocked by provider** | ETA accuracy | No free source | P2 (needs paid provider) |
+| Official incidents / closures | **Blocked by provider** | safety | Some countries publish feeds; none for Georgia found | P2 |
+| Community incident reports | Missing | coverage where no feed exists | Yes (Worker + D1) — needs moderation, abuse controls, legal review | P2 |
+| Avoid tolls / highways / ferries | **Blocked by provider** | preference | Self-hosted OSRM/Valhalla with profiles | P2 |
+| Weather map layers / radar | Missing | context | Radar tiles are not reliably free for this use | P3 |
+| Browser notifications when backgrounded | Missing | alerts while in another app | Yes, but browsers throttle background pages; limited value | P3 |
+| Background navigation / locked screen | **Blocked by platform** | real driving | Native app only | P3 |
+| CarPlay / Android Auto | **Blocked by platform** | in-car use | Native app only | P3 |
+| Offline map tiles | Missing | tunnels / roaming | PMTiles regions possible, large downloads | P3 |
+| Persisting the active route across reloads | Missing | reload mid-drive | Yes (session storage); deliberately not done yet — privacy trade-off | P2 |
+| Native review of ka/ru text | Missing | quality | Needs native speakers | P1 |
+| Real-device testing (iOS Safari, Android Chrome) | Not done | the target platform | Needs devices | P1 |
+| Sender over WebSocket instead of HTTP PUT | Future | Free-plan request budget | Yes | P3 |
+
+## Principles kept
+
+No fake live data (simulation is always labelled). No invented capabilities
+(unsupported options are hidden). No secrets in the client. No location history.
+Provider-agnostic domain code. Complexity in the engines, not the screen.

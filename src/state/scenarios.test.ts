@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setProviders } from '../services/providers';
 import { installFakeProviders, type Harness } from '../test/harness';
 import { respond, __resetAssistant } from '../voice/assistant';
+import { simulateDeviation, simulateIncident, skipToNextEvent } from '../dev/devTools';
 import { useSettings } from './settings';
 import { __resetStoreRuntime, getVoiceQueue, useAppStore } from './store';
 
@@ -179,5 +180,47 @@ describe('voice assistant', () => {
     await respond("What's the weather in Gori?");
     const r = await respond('What about Kutaisi?');
     expect(r).toMatch(/Kutaisi/);
+  });
+});
+
+describe('critical path: deviation mid-drive (brief §58)', () => {
+  it('re-routes from where the car is and rebuilds ETA, timeline and events — nothing stale survives', async () => {
+    await plan();
+    useAppStore.getState().setSimulationSpeed(60);
+    useAppStore.getState().startSimulation();
+    drive(40);
+    const before = useAppStore.getState();
+    const oldRoute = before.plan!.timed.route.id;
+    const oldPoints = new Set(before.derived.points.map((p) => p.id));
+    const oldEta = before.derived.arrivalMs;
+    expect(before.progress!.distanceAlongM).toBeGreaterThan(20_000);
+
+    simulateDeviation(); // 400 m off the road
+    await vi.waitFor(() => expect(useAppStore.getState().plan!.timed.route.id).not.toBe(oldRoute));
+    const after = useAppStore.getState();
+    expect(after.mode).toBe('simulating');
+    expect(after.plan!.timed.route.origin.name).toBe('Your location');
+    expect(after.progress!.distanceAlongM).toBe(0); // the drive continues on the new route
+    expect(after.derived.arrivalMs).not.toBe(oldEta);
+    expect(after.derived.points.some((p) => oldPoints.has(p.id))).toBe(false);
+    for (const e of after.derived.intelligence.events) expect(e.distanceAlongM).toBeLessThanOrEqual(after.plan!.timed.totalDistM);
+    expect(h.tts.spoken).toContain('Route updated.');
+
+    drive(10);
+    expect(useAppStore.getState().progress!.distanceAlongM).toBeGreaterThan(5000);
+  });
+
+  it('a reported incident ahead is announced as a report, and "next event" skips to it', async () => {
+    await plan();
+    useAppStore.getState().setSimulationSpeed(60);
+    useAppStore.getState().startSimulation();
+    drive(5);
+    simulateIncident();
+    expect(useAppStore.getState().simulatedData).toBe(true);
+    const inc = useAppStore.getState().derived.intelligence.events.find((e) => e.type === 'INCIDENT')!;
+    expect(inc.shortMessage).toBe('Unconfirmed report');
+    skipToNextEvent();
+    drive(4);
+    expect(h.tts.spoken.some((t) => /Accident reported ahead/.test(t))).toBe(true);
   });
 });

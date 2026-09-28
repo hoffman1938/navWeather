@@ -288,7 +288,15 @@ describe('simulated drive', () => {
     const s = useAppStore.getState();
     expect(s.sim.arrived).toBe(true);
     expect(s.progress!.remainingDistanceM).toBeCloseTo(0, 0);
-    expect(s.notice?.text).toMatch(/Arrived at Batumi/);
+    // Trip summary (memory only): distance, time vs plan, weather encountered.
+    const a = s.arrival!;
+    expect(a).toMatchObject({ destination: 'Batumi', simulated: true, reroutes: 0 });
+    expect(a.distanceM).toBeGreaterThan(0.97 * s.plan!.timed.totalDistM);
+    expect(Math.abs(a.delayS)).toBeLessThan(0.15 * s.plan!.timed.totalTimeS);
+    expect(a.conditions.length).toBeGreaterThan(0);
+    expect(a.conditions.reduce((n, c) => n + c.minutes, 0)).toBeGreaterThan(0.8 * (a.durationS / 60));
+    useAppStore.getState().dismissArrival();
+    expect(useAppStore.getState()).toMatchObject({ arrival: null, plan: null, mode: 'planning' });
   });
 });
 
@@ -321,7 +329,7 @@ describe('live GPS navigation', () => {
     await vi.waitFor(() => expect(useAppStore.getState().recalculating).toBe(false));
     await vi.waitFor(() => expect(useAppStore.getState().weatherStatus).toBe('ready'));
     s = useAppStore.getState();
-    expect(routingCalls.at(-1)!.origin.name).toBe('Current location');
+    expect(routingCalls.at(-1)!.origin.name).toBe('Your location');
     expect(s.plan!.timed.route.destination.name).toBe('Batumi');
     expect(s.plan!.timed.totalDistM).toBeLessThan(290_000);
     expect(s.derived.points.every((p) => p.weather)).toBe(true);
@@ -347,5 +355,25 @@ describe('live GPS navigation', () => {
     expect(s.mode).toBe('planning');
     expect(s.notice?.text).toMatch(/Location unavailable/);
     expect(s.plan).not.toBeNull();
+  });
+});
+
+describe('weather exposure per route option', () => {
+  it('counts minutes of thunderstorms, fog and gusts at the ETAs (for route comparison)', async () => {
+    // Thunderstorms west of 42.5°E, fog east of 44.5°E, gusts everywhere after 3 h.
+    weatherProvider.hourFn = (_lat, lon, hourMs) => {
+      const h = (hourMs - BASE) / H;
+      return { temperature: 15, code: lon < 42.5 ? 95 : lon > 44.5 ? 45 : 3, precipitation: lon < 42.5 ? 3 : 0, precipitationProbability: lon < 42.5 ? 80 : 5, windGusts: h >= 3 ? 80 : 20 };
+    };
+    await planTbilisiBatumi();
+    // (The fake router has no alternatives; comparisons need at least two options.)
+    const plan = useAppStore.getState().plan!;
+    useAppStore.setState({ routeOptions: [plan, plan] });
+    useAppStore.getState().rederive();
+    const ex = useAppStore.getState().derived.options[0].exposure;
+    expect(ex.storm).toBeGreaterThan(20);
+    expect(ex.fog).toBeGreaterThan(5);
+    expect(ex.wind).toBeGreaterThan(30);
+    expect(ex.snow).toBe(0);
   });
 });

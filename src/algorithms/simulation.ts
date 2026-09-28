@@ -34,9 +34,11 @@ export function advanceSimulation(
   realDtMs: number,
   speed: number,
 ): SimStep {
-  const simDtS = (Math.max(0, realDtMs) * speed) / 1000;
+  let simDtS = (Math.max(0, realDtMs) * speed) / 1000;
+  const factor = simulationSpeedFactor((state.nowMs + simDtS * 1000 - startMs) / 1000);
+  // Don't let the clock run past the moment of arrival (big steps / skips).
+  simDtS = Math.min(simDtS, Math.max(0, (timed.totalTimeS - state.modelTimeS) / factor));
   const nowMs = state.nowMs + simDtS * 1000;
-  const factor = simulationSpeedFactor((nowMs - startMs) / 1000);
   const modelTimeS = Math.min(timed.totalTimeS, state.modelTimeS + simDtS * factor);
   const distanceM = distanceAtTime(timed, modelTimeS);
   const { coordinate, index } = positionAtDistance(timed, distanceM);

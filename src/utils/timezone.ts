@@ -171,3 +171,9 @@ export function toDateTimeLocalValue(utcMs: number, timeZone: string): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
 }
+
+/** Short weekday in the UI language, e.g. "Mon" / "пн" / "ორშ". */
+export function formatWeekday(utcMs: number, timeZone: string, locale: string): string {
+  const tz = isValidTimeZone(timeZone) ? timeZone : 'UTC';
+  return formatter(tz, { weekday: 'short' }, locale).format(new Date(utcMs));
+}

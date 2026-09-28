@@ -118,3 +118,53 @@ export const SpeakerIcon = ({ size, className, muted }: P & { muted?: boolean })
     {muted ? <path d="M17 9l4 6M21 9l-4 6" /> : <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />}
   </svg>
 );
+export const SearchIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="M20 20l-4.2-4.2" />
+  </svg>
+);
+export const ShareIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 3v12M8 7l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" />
+  </svg>
+);
+export const DirectionsIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 2.5l9.5 9.5-9.5 9.5L2.5 12 12 2.5z" />
+    <path d="M9 14.5V12a1.5 1.5 0 0 1 1.5-1.5H15M13 8.5l2 2-2 2" />
+  </svg>
+);
+export const BackIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M15 5l-7 7 7 7" />
+  </svg>
+);
+export const LiveIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+    <path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8" />
+  </svg>
+);
+export const LocateFilledIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="12" r="4" fill="currentColor" />
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+  </svg>
+);
+export const HomeIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M4 11l8-7 8 7M6 9.5V20h4v-5h4v5h4V9.5" />
+  </svg>
+);
+export const WorkIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <rect x="3.5" y="7.5" width="17" height="12" rx="2" />
+    <path d="M9 7.5V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5v2M3.5 12.5h17" />
+  </svg>
+);
+export const StarIcon = ({ size, className, filled }: P & { filled?: boolean }) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" fill={filled ? 'currentColor' : 'none'} />
+  </svg>
+);

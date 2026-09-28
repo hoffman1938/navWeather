@@ -50,3 +50,20 @@ describe('range-based stop advice (user-entered only)', () => {
     expect(stop.voiceMessage).toBe('Consider charging within the next 140 kilometers.');
   });
 });
+
+describe('break reminders', () => {
+  it('about every 2 hours of driving on a long trip, low severity (never spoken over navigation)', () => {
+    const r = buildRouteIntelligence(input({}));
+    const breaks = r.events.filter((e) => e.type === 'REST_BREAK');
+    expect(timed.totalTimeS).toBeGreaterThan(4 * 3600);
+    expect(breaks.length).toBe(Math.floor((timed.totalTimeS - 1800) / 7200));
+    expect(breaks[0].estimatedMinutesFromCurrent).toBe(120);
+    expect(breaks.every((b) => b.severity === 'low')).toBe(true);
+  });
+
+  it('can be turned off, and passed breaks disappear', () => {
+    expect(buildRouteIntelligence(input({ breakReminders: false })).events.some((e) => e.type === 'REST_BREAK')).toBe(false);
+    const late = buildRouteIntelligence(input({ progressM: timed.totalDistM * 0.9 }));
+    expect(late.events.some((e) => e.type === 'REST_BREAK')).toBe(false);
+  });
+});

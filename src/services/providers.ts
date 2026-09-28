@@ -19,6 +19,7 @@ import {
 } from '../voice/providers';
 import { OSRMProvider } from './routing/OSRMProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
+import { NoIncidentProvider, type IncidentProvider } from './traffic/IncidentProvider';
 import { NoTrafficProvider, type TrafficProvider } from './traffic/TrafficProvider';
 import { OpenMeteoProvider } from './weather/OpenMeteoProvider';
 import type { WeatherProvider } from './weather/WeatherProvider';
@@ -36,6 +37,7 @@ export interface Providers {
   speedLimits: SpeedLimitProvider | null;
   elevation: ElevationProvider | null;
   traffic: TrafficProvider;
+  incidents: IncidentProvider;
   map: MapProvider;
   weather: WeatherService;
   tts: TextToSpeechProvider;
@@ -104,6 +106,7 @@ export function createProviders(cfg: AppConfig = config): Providers {
         : unknown('speed limit', p.speedLimits);
   // No free live-traffic source exists; the interface is ready for one.
   const traffic: TrafficProvider = p.traffic === 'none' ? new NoTrafficProvider() : unknown('traffic', p.traffic);
+  const incidents: IncidentProvider = p.incidents === 'none' ? new NoIncidentProvider() : unknown('incident', p.incidents);
   if (p.speech !== 'browser') unknown('speech', p.speech);
 
   return {
@@ -116,6 +119,7 @@ export function createProviders(cfg: AppConfig = config): Providers {
     speedLimits,
     elevation,
     traffic,
+    incidents,
     map,
     weather: new WeatherService(weatherProvider, {
       ttlMs: cfg.weather.cacheTtlMinutes * 60000,

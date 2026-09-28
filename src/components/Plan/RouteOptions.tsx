@@ -1,4 +1,5 @@
 import { formatDistance, formatDuration } from '../../i18n/format';
+import type { ExposureKind, RouteOptionSummary } from '../../state/derive';
 import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 
@@ -14,10 +15,14 @@ export function RouteOptions() {
   if (options.length < 2) return null;
   const fastest = options.reduce((a, b) => (b.durationS < a.durationS ? b : a));
   const wettest = options.reduce((a, b) => (b.heavyMinutes + b.wetMinutes > a.heavyMinutes + a.wetMinutes ? b : a));
-  // "Route B is 20 min longer but avoids the heaviest rain" — only when it's real.
-  const drier = options
-    .filter((o) => o.index !== fastest.index && o.hasWeather && fastest.hasWeather)
-    .find((o) => fastest.heavyMinutes - o.heavyMinutes >= 15 && o.durationS - fastest.durationS <= 45 * 60);
+  // "Route B is 20 min longer, with less heavy rain expected" — only when it's real.
+  let better: { o: RouteOptionSummary; kind: ExposureKind } | null = null;
+  for (const o of options) {
+    if (o.index === fastest.index || !o.hasWeather || !fastest.hasWeather || o.durationS - fastest.durationS > 45 * 60) continue;
+    for (const kind of SIGNIFICANT) {
+      if (fastest.exposure[kind] - o.exposure[kind] >= 15 && (!better || SIGNIFICANT.indexOf(kind) < SIGNIFICANT.indexOf(better.kind))) better = { o, kind };
+    }
+  }
   const name = (i: number) => (i === fastest.index ? m.ui.fastest : `${m.ui.alternative} ${i}`);
 
   return (
@@ -25,7 +30,7 @@ export function RouteOptions() {
       <ul className="rows" role="radiogroup" aria-label={m.ui.routes}>
         {options.map((o) => {
           const delta = o.durationS - fastest.durationS;
-          const exposure = o.hasWeather ? (o.wetMinutes >= 10 ? m.ui.wetterBy(o.wetMinutes) : m.ui.mostlyDry) : '';
+          const exposure = o.hasWeather ? exposureLine(o, m) : '';
           return (
             <li key={o.index}>
               <button
@@ -48,7 +53,22 @@ export function RouteOptions() {
           );
         })}
       </ul>
-      {drier ? <p className="ropts__hint">{m.ui.avoidsRain(name(drier.index), formatDuration(drier.durationS - fastest.durationS, m))}</p> : null}
+      {better ? (
+        <p className="ropts__hint">{m.ui.lessWeather(name(better.o.index), formatDuration(better.o.durationS - fastest.durationS, m), m.ui.exposure[better.kind])}</p>
+      ) : null}
     </section>
   );
+}
+
+/** Most significant first. Rain alone is listed only when nothing worse is expected. */
+const SIGNIFICANT: ExposureKind[] = ['storm', 'snow', 'heavy', 'fog', 'wind'];
+
+/** "Heavy rain 35 min · Fog 10 min", or the familiar rain/dry line. */
+function exposureLine(o: RouteOptionSummary, m: ReturnType<typeof useMessages>): string {
+  const top = SIGNIFICANT.filter((k) => o.exposure[k] >= 5)
+    .sort((a, b) => o.exposure[b] - o.exposure[a])
+    .slice(0, 2)
+    .map((k) => `${m.ui.exposure[k]} ${formatDuration(o.exposure[k] * 60, m)}`);
+  if (top.length) return top.join(' · ');
+  return o.wetMinutes >= 10 ? m.ui.wetterBy(o.wetMinutes) : m.ui.mostlyDry;
 }

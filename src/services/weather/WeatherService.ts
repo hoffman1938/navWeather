@@ -48,6 +48,8 @@ export interface ForecastLookup {
  */
 export class WeatherService {
   private cache: TtlCache<LocationForecast>;
+  /** Counters for development diagnostics (no locations recorded). */
+  readonly stats = { lookups: 0, cacheHits: 0, sharedInflight: 0, fetchedLocations: 0, httpRequests: 0, failures: 0, staleServed: 0, lastRequestMs: 0 };
   private inflight = new Map<string, { promise: Promise<LocationForecast>; signal?: AbortSignal }>();
   private now: () => number;
   /** Newest upstream model run we know of, and when we last asked. */
@@ -134,6 +136,7 @@ export class WeatherService {
     const forecasts = new Map<string, LocationForecast>();
     const staleKeys = new Set<string>();
     const missingKeys = new Set<string>();
+    this.stats.lookups += unique.size;
     const waits: Promise<void>[] = [];
     const toFetch: ForecastLocation[] = [];
     const adoptFailed: ForecastLocation[] = [];
@@ -143,10 +146,12 @@ export class WeatherService {
       const cached = options.force ? undefined : this.cache.get(loc.key);
       if (cached && covers(cached, needUntil)) {
         forecasts.set(loc.key, cached);
+        this.stats.cacheHits++;
         continue;
       }
       const pending = options.force ? undefined : this.inflight.get(loc.key);
       if (pending && !pending.signal?.aborted) {
+        this.stats.sharedInflight++;
         waits.push(
           pending.promise.then(
             (f) => void forecasts.set(loc.key, f),
@@ -167,6 +172,9 @@ export class WeatherService {
     for (let i = 0; i < toFetch.length; i += batchSize) {
       const batch = toFetch.slice(i, i + batchSize);
       requestCount++;
+      this.stats.httpRequests++;
+      this.stats.fetchedLocations += batch.length;
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : 0;
       const request = this.provider.getForecasts({
         locations: batch,
         forecastHours,
@@ -186,6 +194,7 @@ export class WeatherService {
         request.then(
           async (list) => {
             // Freshness is the service's concern: stamp with its own clock.
+            if (typeof performance !== 'undefined') this.stats.lastRequestMs = Math.round(performance.now() - startedAt);
             const receivedAt = this.now();
             const generatedAt = await generatedAtPromise;
             list.forEach((raw, j) => {
@@ -196,6 +205,7 @@ export class WeatherService {
           },
           (e: unknown) => {
             if (isAbortError(e)) throw e;
+            this.stats.failures++;
             error =
               e instanceof ProviderError
                 ? e
@@ -227,6 +237,7 @@ export class WeatherService {
       if (stale) {
         forecasts.set(loc.key, stale);
         staleKeys.add(loc.key);
+        this.stats.staleServed++;
       } else {
         missingKeys.add(loc.key);
       }

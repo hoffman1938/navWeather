@@ -40,6 +40,7 @@ export const config = {
     poi: str('VITE_POI_PROVIDER', 'overpass'),
     speedLimits: str('VITE_SPEED_LIMIT_PROVIDER', 'overpass'),
     traffic: str('VITE_TRAFFIC_PROVIDER', 'none'),
+    incidents: str('VITE_INCIDENT_PROVIDER', 'none'),
     speech: str('VITE_SPEECH_PROVIDER', 'browser'),
   },
   endpoints: {

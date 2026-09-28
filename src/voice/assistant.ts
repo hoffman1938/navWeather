@@ -77,8 +77,11 @@ export async function answer(text: string): Promise<string> {
       const last = getVoiceQueue().log.at(-1);
       return last?.text ?? A.notUnderstood;
     }
-    case 'traffic':
-      return A.trafficUnavailable;
+    case 'traffic': {
+      // Incidents come from an incident provider when one is configured; live flow data doesn't exist here.
+      const incident = s.derived.intelligence.events.find((e) => e.category === 'incident');
+      return incident ? incident.voiceMessage : A.trafficUnavailable;
+    }
     case 'avoid':
       // The demo OSRM server rejects every exclude flag; a provider that
       // declares `capabilities.avoid` can be wired to re-route here.
@@ -188,6 +191,10 @@ export async function answer(text: string): Promise<string> {
       const detourMin = best.detourS !== undefined ? Math.round(best.detourS / 60) : 0;
       return A.poiFound(categoryName, name, spokenDistance(best.aheadM, settings.units.distance, m), A.detour(detourMin));
     }
+
+    case 'recalculate':
+      s.recalculate();
+      return A.recalculating;
 
     case 'alternatives': {
       const n = s.mode === 'planning' ? s.routeOptions.length - 1 : 0;

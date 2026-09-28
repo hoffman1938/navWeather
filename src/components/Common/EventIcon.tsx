@@ -24,6 +24,7 @@ export function EventIcon({ icon, isDay = true, size = 24 }: { icon: IconKey; is
       {icon === 'speed' && <circle {...s} cx="12" cy="12" r="8" strokeWidth={3} />}
       {icon === 'fuel' && <path {...s} d="M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M4 20h11M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3M7 8h5" />}
       {icon === 'charging' && <path {...s} d="M13 3L5 14h6l-1 7 8-11h-6l1-7z" />}
+      {icon === 'rest' && <path {...s} d="M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8.5 3.5v2.5M12 3.5v2.5" />}
       {icon === 'flag' && <path {...s} d="M6 21V4M6 4h11l-2.5 4L17 12H6" />}
       {icon === 'stop' && <path {...s} d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z" />}
       {icon === 'poi' && <circle {...s} cx="12" cy="11" r="4" />}

@@ -5,3 +5,7 @@ dist
 .DS_Store
 coverage
 *.tsbuildinfo
+
+# Cloudflare local dev state and secrets
+.wrangler/
+.dev.vars*

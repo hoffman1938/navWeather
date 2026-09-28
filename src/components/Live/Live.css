@@ -1,0 +1,142 @@
+.live-brand {
+  position: absolute;
+  z-index: 20;
+  top: calc(var(--safe-top) + 12px);
+  left: calc(var(--safe-left) + 12px);
+  padding: 8px 12px;
+  border-radius: var(--r-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+.live-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 16px;
+}
+.live-head__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.live-head__text {
+  min-width: 0;
+}
+.live-head__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.live-status__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cloud-dark);
+}
+.live-status--live .live-status__dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent);
+}
+.live-status--warn .live-status__dot {
+  background: var(--sev-high);
+}
+.live-body {
+  display: grid;
+  gap: 12px;
+  padding: 4px 16px 12px;
+}
+.live-tag {
+  justify-self: start;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: var(--r-small);
+  background: var(--sev-high-soft);
+  color: var(--sev-high);
+  font-size: 13px;
+  font-weight: 700;
+}
+.live-trip__dest {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.live-trip__meta {
+  margin: 2px 0 0;
+  color: var(--text-2);
+}
+.live-wx {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+}
+.live-wx__text {
+  display: grid;
+}
+.live-wx__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.live-wx__value {
+  font-size: 15px;
+}
+.live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.live-actions a.btn {
+  text-decoration: none;
+}
+.live-until {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* The shared person on the map */
+.friend {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+.friend .vehicle__dot {
+  background: #0f9d58;
+}
+.friend.is-ended .vehicle__dot {
+  background: var(--cloud-dark);
+}
+.friend__label {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: var(--r-small);
+  background: var(--surface);
+  box-shadow: var(--shadow-marker);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}

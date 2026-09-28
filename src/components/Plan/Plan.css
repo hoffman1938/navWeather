@@ -9,6 +9,11 @@
 .plan-intro .btn {
   margin-left: -12px;
 }
+.plan-intro .plan-intro__hint {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-2);
+}
 .plan-status {
   display: flex;
   align-items: center;
@@ -284,5 +289,34 @@
 .attribution {
   margin: 0;
   font-size: 12px;
+  color: var(--text-3);
+}
+
+/* Data sources & freshness */
+.datasrc li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 14px;
+}
+.datasrc__name {
+  color: var(--text-2);
+  flex: none;
+}
+.datasrc__value {
+  text-align: right;
+}
+.datasrc__status {
+  font-weight: 600;
+}
+.datasrc__status--stale,
+.datasrc__status--simulated {
+  color: var(--sev-high);
+}
+.datasrc__status--unavailable {
+  color: var(--text-3);
+}
+.datasrc__detail {
   color: var(--text-3);
 }

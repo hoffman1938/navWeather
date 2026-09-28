@@ -1,7 +1,8 @@
+import type { RouteIncident } from '../algorithms/incidents';
 import { nextSpeedLimitChange, type SpeedLimitProfile } from '../algorithms/speedLimits';
-import { positionAtDistance, timeAtDistance } from '../algorithms/routeTiming';
+import { distanceAtTime, positionAtDistance, timeAtDistance } from '../algorithms/routeTiming';
 import type { Messages } from '../i18n/en';
-import { formatDistance, spokenDistance, speedValue, type UnitPrefs } from '../i18n/format';
+import { formatDistance, spokenDistance, spokenDuration, speedValue, type UnitPrefs } from '../i18n/format';
 import type { Maneuver } from '../navigation/maneuvers';
 import type { TimedRoute } from '../types/route';
 import type { RouteWeatherPoint } from '../types/weather';
@@ -34,6 +35,10 @@ export interface IntelligenceInput {
   speedLimits: SpeedLimitProfile | null;
   fuelRangeKm: number | null;
   vehicle?: 'fuel' | 'ev';
+  /** Incidents on the route (provider-normalized; may be unverified reports). */
+  incidents?: RouteIncident[];
+  /** Suggest a break about every 2 h of driving on long trips (default on). */
+  breakReminders?: boolean;
   /** Events from other providers (traffic, incidents…), already normalized. */
   extraEvents?: RouteEvent[];
   m: Messages;
@@ -48,6 +53,9 @@ export interface RouteIntelligence {
   /** Curated, short list for the "Ahead" view. */
   ahead: RouteEvent[];
 }
+
+/** Break reminder cadence on long drives (common road-safety guidance). */
+const BREAK_EVERY_S = 2 * 3600;
 
 export function referenceTime(clock: RouteClock): number {
   return clock.mode === 'planning' ? clock.departureMs : clock.nowMs;
@@ -181,6 +189,68 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
         ),
       );
     }
+  }
+
+  // Breaks on long drives: about every 2 h of driving, near a named place when one is close.
+  if (input.breakReminders !== false && timed.totalTimeS > 2.5 * 3600) {
+    for (let k = 1; k * BREAK_EVERY_S < timed.totalTimeS - 1800; k++) {
+      const d = distanceAtTime(timed, k * BREAK_EVERY_S);
+      if (d < progressM) continue;
+      const near = input.weatherPoints
+        .filter((p) => p.placeName && Math.abs(p.distanceFromStartKm * 1000 - d) < 15_000)
+        .sort((a, b) => Math.abs(a.distanceFromStartKm * 1000 - d) - Math.abs(b.distanceFromStartKm * 1000 - d))[0];
+      events.push(
+        routeEvent(
+          {
+            id: `BREAK@${k}`,
+            type: 'REST_BREAK',
+            category: 'rest',
+            severity: 'low',
+            title: m.alert.title.REST_BREAK,
+            shortMessage: near?.placeName ? m.ui.near(near.placeName) : '',
+            voiceMessage: m.alert.voice.restBreak(near?.placeName),
+            icon: 'rest',
+            source: 'drive-time',
+            confidence: 1,
+          },
+          timed,
+          d,
+          progressM,
+          clock,
+        ),
+      );
+    }
+  }
+
+  // Incidents: only ahead, only while still valid at the time we get there.
+  for (const inc of input.incidents ?? []) {
+    if (inc.distanceAlongM < progressM) continue;
+    const eta = arrivalAt(timed, inc.distanceAlongM, clock);
+    if (inc.expiresAt !== undefined && inc.expiresAt < eta) continue;
+    const what = m.alert.incident[inc.kind] ?? m.alert.title.INCIDENT;
+    const minutes = Math.max(0, (eta - referenceTime(clock)) / 60_000);
+    events.push(
+      routeEvent(
+        {
+          id: `INC@${inc.id}`,
+          type: 'INCIDENT',
+          category: 'incident',
+          severity: inc.severity,
+          title: what,
+          shortMessage: inc.verified ? inc.source : m.alert.unconfirmed,
+          voiceMessage: m.alert.voice.incident(what, spokenDuration(minutes * 60, m), !inc.verified),
+          icon: 'incident',
+          source: inc.source,
+          // Unconfirmed reports rank lower and are gated by the alert engine's confidence threshold.
+          confidence: inc.verified ? 0.9 : 0.55,
+        },
+        timed,
+        inc.distanceAlongM,
+        progressM,
+        clock,
+        inc.expiresAt !== undefined ? { expiresAt: Math.min(inc.expiresAt, eta + 30 * 60_000) } : {},
+      ),
+    );
   }
 
   events.push(...(input.extraEvents ?? []).filter((e) => e.distanceAlongM >= progressM));

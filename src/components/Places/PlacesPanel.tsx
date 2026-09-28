@@ -5,7 +5,7 @@ import { useAppStore } from '../../state/store';
 import { getProviders } from '../../services/providers';
 import './Places.css';
 
-const QUICK: PoiCategory[] = ['fuel', 'ev_charging', 'restaurant', 'cafe', 'hotel', 'parking', 'rest_area', 'pharmacy'];
+const QUICK: PoiCategory[] = ['fuel', 'ev_charging', 'restaurant', 'cafe', 'hotel', 'parking', 'rest_area', 'pharmacy', 'hospital'];
 
 /**
  * "Places along my route" — results are ahead of you, with the real detour

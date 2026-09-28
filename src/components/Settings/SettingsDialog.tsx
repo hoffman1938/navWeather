@@ -1,6 +1,7 @@
 import { LOCALES, type Locale } from '../../i18n';
 import { useMessages, useSettings, type Settings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
+import { useSavedPlaces } from '../../state/savedPlaces';
 import { Dialog } from '../Common/Dialog';
 import './Settings.css';
 
@@ -137,6 +138,7 @@ export function SettingsDialog() {
 
       <div className="set-group">
         <Switch label={S.speedWarnings} checked={s.speedWarnings} onChange={(speedWarnings) => up({ speedWarnings })} hint={m.ui.speedLimitNote} />
+        <Switch label={S.breakReminders} checked={s.breakReminders} onChange={(breakReminders) => up({ breakReminders })} hint={S.breakRemindersHint} />
         <Switch label={S.batterySaver} checked={s.batterySaver} onChange={(batterySaver) => up({ batterySaver })} hint={S.batterySaverHint} />
         <Select
           label={S.vehicle}
@@ -167,10 +169,46 @@ export function SettingsDialog() {
         </label>
       </div>
 
+      <SavedPlacesSettings />
+
       <p className="set-note">{S.privacy}</p>
       <button className="btn btn-primary set-done" onClick={close}>
         {S.done}
       </button>
     </Dialog>
+  );
+}
+
+function SavedPlacesSettings() {
+  const m = useMessages();
+  const S = m.settings;
+  const saved = useSavedPlaces((st) => st.saved);
+  const recents = useSavedPlaces((st) => st.recents.length);
+  const remember = useSavedPlaces((st) => st.rememberRecents);
+  const label = (slot: string, name: string) => (slot === 'home' ? `${m.explore.home} · ${name}` : slot === 'work' ? `${m.explore.work} · ${name}` : name);
+  return (
+    <div className="set-group">
+      <h3 className="label">{S.savedPlaces}</h3>
+      {saved.length ? (
+        <ul className="rows set-saved">
+          {saved.map((p) => (
+            <li key={`${p.slot}:${p.id}`}>
+              <span>{label(p.slot, p.name)}</span>
+              <button className="btn btn-quiet" onClick={() => useSavedPlaces.getState().remove(p.id, p.slot)}>
+                {S.remove}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="set-note">{S.noSaved}</p>
+      )}
+      <Switch label={S.rememberRecents} checked={remember} onChange={(on) => useSavedPlaces.getState().setRememberRecents(on)} hint={S.rememberRecentsHint} />
+      {recents ? (
+        <button className="btn btn-quiet set-clear" onClick={() => useSavedPlaces.getState().clearRecents()}>
+          {S.clearRecents}
+        </button>
+      ) : null}
+    </div>
   );
 }

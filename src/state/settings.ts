@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { detectLocale, getMessages, type Locale, type Messages } from '../i18n';
+import { detectLocale, getMessages, isLocaleLoaded, loadLocale, type Locale, type Messages } from '../i18n';
 import { defaultUnits, type UnitPrefs } from '../i18n/format';
 import type { AlertOutput, AlertTiming } from '../intelligence/driverAlerts';
 import type { WeatherAlertPrefs } from '../intelligence/weatherAlerts';
@@ -14,6 +14,7 @@ export interface Settings {
   alertTiming: AlertTiming;
   weatherAlerts: WeatherAlertPrefs;
   speedWarnings: boolean;
+  breakReminders: boolean;
   batterySaver: boolean;
   /** Declared by the user; decides fuel vs charging stop advice. */
   vehicle: 'fuel' | 'ev';
@@ -33,6 +34,7 @@ export function defaultSettings(): Settings {
     alertTiming: 'auto',
     weatherAlerts: { level: 'all', types: { rain: true, snow: true, fog: true, wind: true, temperature: true } },
     speedWarnings: true,
+    breakReminders: true,
     batterySaver: false,
     vehicle: 'fuel',
     fuelRangeKm: null,
@@ -78,6 +80,16 @@ interface SettingsStore extends Settings {
 export const useSettings = create<SettingsStore>()((set, get) => ({
   ...load(),
   update(patch) {
+    // Switch language only once its text has loaded (it arrives as a separate file).
+    if (patch.language && !isLocaleLoaded(patch.language)) {
+      const { language, ...rest } = patch;
+      if (Object.keys(rest).length) get().update(rest);
+      loadLocale(language).then(
+        () => get().update({ language }),
+        () => undefined, // offline and not cached: keep the current language
+      );
+      return;
+    }
     set(patch);
     const { update: _u, reset: _r, ...rest } = get();
     save(rest);
@@ -96,6 +108,11 @@ export function settingsSnapshot(): Settings {
 
 export function useMessages(): Messages {
   return getMessages(useSettings((s) => s.language));
+}
+
+/** Load the saved language's text before first render (English is built in). */
+export function loadInitialLocale(): Promise<void> {
+  return loadLocale(useSettings.getState().language).catch(() => undefined);
 }
 
 export function currentMessages(): Messages {

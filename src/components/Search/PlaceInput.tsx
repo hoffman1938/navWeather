@@ -4,14 +4,15 @@ import { isAbortError } from '../../services/http';
 import { getProviders } from '../../services/providers';
 import type { LngLat, Place } from '../../types/geo';
 import { useMessages } from '../../state/settings';
-import { LocateIcon, PinIcon } from '../Icons/Icons';
+import { quickPlaces, useSavedPlaces, type SavedSlot } from '../../state/savedPlaces';
+import { ClockIcon, HomeIcon, LocateIcon, PinIcon, SearchIcon, StarIcon, WorkIcon } from '../Icons/Icons';
 
 interface Props {
   label: string;
   value: string;
   place: Place | null;
   placeholder: string;
-  icon: 'origin' | 'destination' | 'stop';
+  icon: 'origin' | 'destination' | 'stop' | 'search';
   inputRef?: RefObject<HTMLInputElement | null>;
   onChangeText(text: string): void;
   onSelect(place: Place): void;
@@ -19,6 +20,8 @@ interface Props {
   onUseCurrentLocation?: () => void;
   near?: LngLat;
   autoFocus?: boolean;
+  /** Offer saved places and recent destinations while the field is empty. */
+  quick?: boolean;
 }
 
 /** Autocomplete input following the WAI-ARIA combobox pattern. */
@@ -68,9 +71,13 @@ export function PlaceInput(props: Props) {
     };
   }, [value, place, open]);
 
-  const showCurrent = !!onUseCurrentLocation && open && !place && value.trim().length === 0;
-  const options: ({ kind: 'place'; place: Place } | { kind: 'current' })[] = [
+  const empty = open && !place && value.trim().length === 0;
+  const showCurrent = !!onUseCurrentLocation && empty;
+  useSavedPlaces((st) => st.saved.length + st.recents.length); // re-render when saved places change
+  const quick = props.quick && empty ? quickPlaces() : [];
+  const options: ({ kind: 'place'; place: Place } | { kind: 'current' } | { kind: 'quick'; place: Place; slot: SavedSlot | 'recent' })[] = [
     ...(showCurrent ? [{ kind: 'current' as const }] : []),
+    ...quick.map((q) => ({ kind: 'quick' as const, place: q.place, slot: q.slot })),
     ...items.map((p) => ({ kind: 'place' as const, place: p })),
   ];
   const expanded = open && options.length > 0;
@@ -87,7 +94,13 @@ export function PlaceInput(props: Props) {
   return (
     <div className="place-input">
       <span className={`place-input__icon place-input__icon--${icon}`} aria-hidden="true">
-        {icon === 'destination' ? <PinIcon size={18} /> : <span className={`place-input__dot${icon === 'stop' ? ' is-stop' : ''}`} />}
+        {icon === 'destination' ? (
+          <PinIcon size={18} />
+        ) : icon === 'search' ? (
+          <SearchIcon size={18} />
+        ) : (
+          <span className={`place-input__dot${icon === 'stop' ? ' is-stop' : ''}`} />
+        )}
       </span>
       <label className="sr-only" htmlFor={id}>
         {label}
@@ -139,7 +152,7 @@ export function PlaceInput(props: Props) {
         <ul className="suggestions" id={listId} role="listbox" aria-label={m.ui.suggestions(label)}>
           {options.map((o, i) => (
             <li
-              key={o.kind === 'current' ? 'current' : o.place.id}
+              key={o.kind === 'current' ? 'current' : `${o.kind}:${o.place.id}`}
               id={`${listId}-${i}`}
               role="option"
               aria-selected={i === active}
@@ -154,6 +167,22 @@ export function PlaceInput(props: Props) {
                 <>
                   <LocateIcon size={18} className="suggestion__icon suggestion__icon--accent" />
                   <span className="suggestion__name">{m.ui.currentLocation}</span>
+                </>
+              ) : o.kind === 'quick' ? (
+                <>
+                  {o.slot === 'home' ? (
+                    <HomeIcon size={18} className="suggestion__icon suggestion__icon--accent" />
+                  ) : o.slot === 'work' ? (
+                    <WorkIcon size={18} className="suggestion__icon suggestion__icon--accent" />
+                  ) : o.slot === 'favorite' ? (
+                    <StarIcon size={18} filled className="suggestion__icon suggestion__icon--accent" />
+                  ) : (
+                    <ClockIcon size={18} className="suggestion__icon" />
+                  )}
+                  <span className="suggestion__text">
+                    <span className="suggestion__name">{o.slot === 'home' ? m.explore.home : o.slot === 'work' ? m.explore.work : o.place.name}</span>
+                    <span className="suggestion__label">{o.slot === 'home' || o.slot === 'work' ? o.place.name : o.place.label && o.place.label !== o.place.name ? o.place.label.replace(`${o.place.name}, `, '') : ''}</span>
+                  </span>
                 </>
               ) : (
                 <>

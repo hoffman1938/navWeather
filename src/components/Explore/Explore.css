@@ -1,0 +1,297 @@
+/* Place card (search result, dropped pin, shared place, "you") */
+.phead {
+  position: relative;
+  padding: 0 16px;
+}
+.phead__text {
+  min-width: 0;
+  padding-right: 44px;
+}
+.phead__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.phead__naming {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  color: var(--text-2);
+}
+.phead__meta {
+  margin: 2px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.phead__drive {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+.phead__drive--loading {
+  height: 20px;
+  color: var(--text-3);
+}
+.phead__close {
+  position: absolute;
+  top: -6px;
+  right: 8px;
+}
+.phead__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 10px 0 2px;
+}
+.phead__actions .btn-quiet {
+  padding: 0 10px;
+}
+
+.pw {
+  display: grid;
+  /* minmax(0,…): the long hourly row must scroll, not widen the sheet. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding: 4px 16px 8px;
+}
+.pw-status,
+.pw-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--text-2);
+}
+.pw-note {
+  padding: 0;
+  font-size: 14px;
+}
+.pw-now {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.pw-now__temp {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.pw-now__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.pw-now__cond {
+  font-weight: 600;
+}
+.pw-now__detail {
+  color: var(--text-2);
+  font-size: 14px;
+}
+.pw-arrive {
+  padding: 10px 12px;
+  border-radius: var(--r-control);
+  background: var(--accent-soft);
+}
+.pw-arrive .label {
+  color: var(--accent);
+}
+.pw-arrive__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.pw-arrive__temp {
+  font-size: 22px;
+  font-weight: 700;
+}
+.pw-arrive__text {
+  color: var(--text);
+  font-size: 15px;
+}
+.pw-hours__row {
+  display: flex;
+  gap: 4px;
+  margin: 6px -16px 0;
+  padding: 0 12px 4px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.pw-hours__row::-webkit-scrollbar {
+  display: none;
+}
+.pw-hour {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 54px;
+  padding: 6px 2px;
+  scroll-snap-align: start;
+}
+.pw-hour__time {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.pw-hour__temp {
+  font-weight: 600;
+}
+.pw-hour__precip {
+  min-height: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rain);
+}
+.pw-days {
+  margin-top: 4px;
+}
+.pw-day {
+  display: grid;
+  grid-template-columns: minmax(64px, 1fr) 32px 44px auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.pw-day__name {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.pw-day__precip {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rain);
+  text-align: right;
+}
+.pw-day__range {
+  white-space: nowrap;
+}
+.pw-day__sep {
+  color: var(--text-3);
+}
+
+/* Markers: dropped/selected place and "you" */
+.place-pin {
+  width: 30px;
+  height: 40px;
+  pointer-events: none;
+}
+.place-pin svg {
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+}
+.me-dot {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+/* Invisible 44 px hit area around the dot. */
+button.me-dot::after {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+.me-dot__core {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.me-dot__pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  opacity: 0;
+  animation: me-pulse 2.4s ease-out infinite;
+}
+.me-dot__cone {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -9px;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 22px solid color-mix(in srgb, var(--accent-fill) 45%, transparent);
+  transform-origin: 50% 100%;
+  display: none;
+}
+.me-dot.has-heading .me-dot__cone {
+  display: block;
+}
+.me-dot.is-stale .me-dot__core {
+  background: var(--cloud-dark);
+}
+.me-dot.is-stale .me-dot__pulse {
+  animation: none;
+}
+@keyframes me-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .me-dot__pulse {
+    animation: none;
+  }
+}
+
+/* Locate button (map, right column) */
+.fab--locate.is-on {
+  color: var(--accent);
+}
+.fab--locate.is-follow {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* Search bar in explore mode */
+.search__explore {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.search__explore .place-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.savemenu {
+  position: relative;
+  display: inline-block;
+}
+.savemenu__pop {
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: 220px;
+}
+.savemenu__pop .popover__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.savemenu__check {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 700;
+}

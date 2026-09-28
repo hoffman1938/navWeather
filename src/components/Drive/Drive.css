@@ -274,6 +274,10 @@
   background: var(--accent-fill);
   color: var(--on-accent);
 }
+.roundbtn--on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .speedmenu {
   position: relative;
 }
@@ -357,4 +361,72 @@
 .drive-extra {
   display: grid;
   gap: 16px;
+}
+
+/* Arrival: trip summary */
+.arrive-head {
+  display: grid;
+  gap: 6px;
+  padding: 0 16px;
+}
+.arrive-head__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+.arrive {
+  display: grid;
+  gap: 14px;
+  padding: 4px 16px 12px;
+}
+.arrive__facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  align-items: center;
+}
+.arrive__facts li > span:first-child {
+  color: var(--text-2);
+}
+.arrive__wx {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.arrive__wx li {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.arrive__min,
+.arrive__temps,
+.arrive__na {
+  color: var(--text-2);
+}
+.arrive__temps,
+.arrive__na {
+  margin: 6px 0 0;
+}
+.arrive__now {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.arrive__now .label {
+  display: block;
+}
+.arrive__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.arrive__note {
+  font-size: 13px;
+  color: var(--text-3);
 }

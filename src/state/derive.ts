@@ -1,3 +1,4 @@
+import type { RouteIncident } from '../algorithms/incidents';
 import { buildCurrentPoint, buildRouteWeatherPoints, reconcilePoints } from '../algorithms/routeWeather';
 import { computeArrivals } from '../algorithms/routeTiming';
 import { buildTimelineItems, type TimelineItem } from '../algorithms/timeline';
@@ -27,13 +28,16 @@ import type {
   WeatherRouteSegment,
 } from '../types/weather';
 
+export type ExposureKind = 'heavy' | 'storm' | 'snow' | 'fog' | 'wind' | 'rain';
+
 export interface RouteOptionSummary {
   index: number;
   distanceM: number;
   durationS: number;
-  /** Minutes of the drive expected in rain / heavy rain (at the ETAs). */
+  /** Minutes of the drive expected in each condition (at the ETAs). */
   wetMinutes: number;
   heavyMinutes: number;
+  exposure: Record<ExposureKind, number>;
   hasWeather: boolean;
   classes: string[];
 }
@@ -95,6 +99,8 @@ export interface DeriveInput {
   speedLimits: SpeedLimitProfile | null;
   fuelRangeKm: number | null;
   vehicle?: 'fuel' | 'ev';
+  incidents?: RouteIncident[];
+  breakReminders?: boolean;
   extraEvents: RouteEvent[];
   previous: Derived;
 }
@@ -164,6 +170,8 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     speedLimits: input.speedLimits,
     fuelRangeKm: input.fuelRangeKm,
     vehicle: input.vehicle,
+    incidents: input.incidents,
+    breakReminders: input.breakReminders,
     extraEvents: input.extraEvents,
     m,
     units,
@@ -217,6 +225,7 @@ function summarizeOption(o: PlannedRoute, index: number, input: DeriveInput): Ro
   let wet = 0;
   let heavy = 0;
   let has = false;
+  const ex: Record<ExposureKind, number> = { heavy: 0, storm: 0, snow: 0, fog: 0, wind: 0, rain: 0 };
   const s = o.samples;
   for (let i = 0; i < s.length; i++) {
     const f = input.forecastFor(s[i]);
@@ -227,7 +236,14 @@ function summarizeOption(o: PlannedRoute, index: number, input: DeriveInput): Ro
     const prev = s[i - 1]?.travelTimeS ?? s[i].travelTimeS;
     const span = (next - prev) / 2 / 60;
     if (isPrecipitating(w.condition)) wet += span;
-    if (w.condition === 'HEAVY_RAIN' || w.condition === 'THUNDERSTORM' || (w.precipitation ?? 0) >= 4) heavy += span;
+    const isHeavy = w.condition === 'HEAVY_RAIN' || w.condition === 'THUNDERSTORM' || (w.precipitation ?? 0) >= 4;
+    if (isHeavy) heavy += span;
+    if (w.condition === 'THUNDERSTORM') ex.storm += span;
+    else if (w.condition === 'SNOW' || w.condition === 'SLEET') ex.snow += span;
+    else if (isHeavy) ex.heavy += span;
+    else if (w.condition === 'RAIN') ex.rain += span;
+    if (w.condition === 'FOG' || (w.visibility !== undefined && w.visibility < 1000)) ex.fog += span;
+    if ((w.windGusts ?? 0) >= 70) ex.wind += span;
   }
   const classes = [...new Set(o.timed.route.legs.flatMap((l) => l.steps.flatMap((st) => st.classes ?? [])))];
   return {
@@ -236,6 +252,7 @@ function summarizeOption(o: PlannedRoute, index: number, input: DeriveInput): Ro
     durationS: o.timed.totalTimeS,
     wetMinutes: Math.round(wet),
     heavyMinutes: Math.round(heavy),
+    exposure: Object.fromEntries(Object.entries(ex).map(([k, v]) => [k, Math.round(v)])) as Record<ExposureKind, number>,
     hasWeather: has,
     classes,
   };

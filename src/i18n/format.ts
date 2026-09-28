@@ -135,3 +135,11 @@ export function formatAgo(sinceMs: number, nowMs: number, m: Messages): string {
 export function countOf(n: number, forms: keyof Messages['plural'], m: Messages): string {
   return `${num(n, m.locale)} ${plural(n, m.plural[forms], m.locale)}`;
 }
+
+/**
+ * Condition text in the UI language. The provider's finer wording
+ * ("Light drizzle", "Overcast") is English-only, so it is used for English.
+ */
+export function conditionText(w: { condition: keyof Messages['weather']['condition']; description?: string }, m: Messages): string {
+  return m.locale === 'en' && w.description ? w.description : m.weather.condition[w.condition];
+}

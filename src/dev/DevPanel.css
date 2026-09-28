@@ -1,0 +1,79 @@
+.devtab {
+  position: absolute;
+  z-index: 60;
+  left: 0;
+  top: 50%;
+  padding: 6px 4px;
+  border-radius: 0 6px 6px 0;
+  background: #222;
+  color: #9f9;
+  font: 11px/1 ui-monospace, Menlo, monospace;
+  writing-mode: vertical-rl;
+  opacity: 0.6;
+}
+.devpanel {
+  position: absolute;
+  z-index: 60;
+  left: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: min(360px, calc(100vw - 16px));
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(12, 14, 18, 0.94);
+  color: #d6dde6;
+  font: 11px/1.45 ui-monospace, Menlo, monospace;
+}
+.devpanel header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.devpanel header button {
+  margin-left: auto;
+  color: inherit;
+  font-size: 18px;
+}
+.devpanel__mode {
+  color: #9f9;
+}
+.devpanel h4 {
+  margin: 10px 0 4px;
+  color: #8ab4ff;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.devpanel dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 1px 8px;
+  margin: 0;
+}
+.devpanel dt {
+  color: #8894a3;
+}
+.devpanel dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.devpanel ol {
+  margin: 0;
+  padding-left: 16px;
+}
+.devpanel__events span:first-child {
+  color: #ffd479;
+}
+.devpanel__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.devpanel__btns button {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #2a3342;
+  color: #e6edf5;
+  font: inherit;
+}

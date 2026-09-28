@@ -1,0 +1,60 @@
+import { MAX_BODY_BYTES, sanitizeCreate, SHARE_ID_RE } from '../src/share/protocol';
+import { json, randomToken, readJson, sha256Hex } from './http';
+import { LiveShare } from './liveShare';
+
+export { LiveShare };
+
+export interface Env {
+  ASSETS: Fetcher;
+  LIVE_SHARE: DurableObjectNamespace<LiveShare>;
+  /** Workers rate-limiting binding (wrangler.toml [[ratelimits]]); optional so the relay still runs without it. */
+  CREATE_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+}
+
+/**
+ * navWeather on Cloudflare: static app (assets) + the live-location relay.
+ *
+ *   POST   /api/share              create a share → { id, key, expiresAt }
+ *   GET    /api/share/:id          latest snapshot (viewers; polling fallback)
+ *   GET    /api/share/:id/ws       WebSocket stream of snapshots (viewers)
+ *   PUT    /api/share/:id          position update   (Authorization: Bearer key)
+ *   DELETE /api/share/:id          stop sharing      (Authorization: Bearer key)
+ */
+export default {
+  async fetch(request, env): Promise<Response> {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+
+    // CSRF: browsers label cross-site requests; only same-origin pages may write.
+    const site = request.headers.get('Sec-Fetch-Site');
+    if (request.method !== 'GET' && site && site !== 'same-origin' && site !== 'none') return json({ error: 'forbidden' }, 403);
+
+    if (url.pathname === '/api/share') {
+      if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
+      // JSON only: cross-site pages would need a CORS preflight, which this API never grants.
+      if (!(request.headers.get('content-type') ?? '').startsWith('application/json')) return json({ error: 'unsupported-media-type' }, 415);
+      const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
+      if (env.CREATE_LIMITER && !(await env.CREATE_LIMITER.limit({ key: ip })).success) return json({ error: 'too-many-requests' }, 429);
+      const body = await readJson(request, 2_000);
+      const opts = body === undefined ? null : sanitizeCreate(body, Date.now());
+      if (!opts) return json({ error: 'bad-request' }, 400);
+      const id = randomToken(16); // 128-bit capability; 22 chars
+      const key = randomToken(32); // sharer secret; only its hash is stored
+      const stub = env.LIVE_SHARE.get(env.LIVE_SHARE.idFromName(id));
+      const res = await stub.fetch('https://live-share/init', {
+        method: 'POST',
+        body: JSON.stringify({ keyHash: await sha256Hex(key), startedAt: Date.now(), expiresAt: opts.expiresAt, name: opts.name }),
+      });
+      if (!res.ok) return json({ error: 'unavailable' }, 503);
+      return json({ id, key, expiresAt: opts.expiresAt }, 201);
+    }
+
+    const m = /^\/api\/share\/([^/]+)(\/ws)?$/.exec(url.pathname);
+    if (!m || !SHARE_ID_RE.test(m[1])) return json({ error: 'not-found' }, 404);
+    if (!m[2] && request.method === 'PUT' && Number(request.headers.get('content-length') ?? '0') > MAX_BODY_BYTES) {
+      return json({ error: 'too-large' }, 413);
+    }
+    const stub = env.LIVE_SHARE.get(env.LIVE_SHARE.idFromName(m[1]));
+    return stub.fetch(new Request(`https://live-share${m[2] ? '/ws' : '/'}`, request));
+  },
+} satisfies ExportedHandler<Env>;

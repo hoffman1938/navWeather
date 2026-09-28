@@ -1,14 +1,16 @@
-import { formatAgo, formatDistance, formatDuration, formatSpeed, formatTemp } from '../../i18n/format';
+import { conditionText, formatAgo, formatDistance, formatDuration, formatSpeed, formatTemp } from '../../i18n/format';
 import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { deviceTimeZone, formatLocalDate, formatLocalTime, formatUtcOffset } from '../../utils/timezone';
 import { BottomSheet } from '../BottomSheet/BottomSheet';
 import { EventIcon } from '../Common/EventIcon';
-import { NavigateIcon, PlayIcon, RefreshIcon } from '../Icons/Icons';
+import { useLiveShare } from '../../share/liveShare';
+import { LiveIcon, NavigateIcon, PlayIcon, RefreshIcon } from '../Icons/Icons';
 import { PlacesPanel } from '../Places/PlacesPanel';
 import { TimeScrubber } from '../TimeScrubber/TimeScrubber';
 import { WeatherIcon } from '../WeatherIcon/WeatherIcon';
 import { WeatherStrip } from '../WeatherStrip/WeatherStrip';
+import { DataSources } from './DataSources';
 import { DepartureSelector } from './DepartureSelector';
 import { RouteOptions } from './RouteOptions';
 import './Plan.css';
@@ -68,11 +70,16 @@ export function PlanSheet() {
           <TimeScrubber />
           <AlongTheWay />
           <PlacesPanel />
+          <DataSources />
           <p className="attribution">{m.ui.attribution}</p>
         </div>
       }
     />
   );
+}
+
+function coarsePointer(): boolean {
+  return typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 }
 
 function Intro() {
@@ -86,6 +93,7 @@ function Intro() {
   return (
     <div className="plan-intro">
       <p>{m.ui.tagline}</p>
+      <p className="plan-intro__hint">{coarsePointer() ? m.explore.pinHintTouch : m.explore.pinHintMouse}</p>
       <button className="btn btn-quiet" onClick={tryDemo}>
         {m.ui.tryDemo}
       </button>
@@ -119,6 +127,9 @@ function RouteHeader() {
           <PlayIcon size={14} />
           {m.ui.simulate}
         </button>
+        <button className="icon-btn" onClick={() => useLiveShare.getState().openDialog()} aria-label={m.share.button}>
+          <LiveIcon size={20} />
+        </button>
       </div>
     </div>
   );
@@ -132,6 +143,7 @@ function WeatherHeadline() {
   const updatedAt = useAppStore((s) => s.weatherUpdatedAt);
   const stale = useAppStore((s) => s.weatherStale);
   const online = useAppStore((s) => s.online);
+  const simulatedData = useAppStore((s) => s.simulatedData);
   const loading = status === 'loading';
   const noData = !summary || summary.tone === 'unknown';
   const old = updatedAt !== null && Date.now() - updatedAt > 20 * 60000;
@@ -154,6 +166,7 @@ function WeatherHeadline() {
               {summary.detail}
               {updated ? ` · ${updated}` : ''}
               {!online ? ` · ${m.ui.offline}` : ''}
+              {simulatedData ? ` · ${m.ui.simulatedData}` : ''}
             </p>
           ) : null}
         </div>
@@ -238,7 +251,7 @@ function PointDetails() {
   const D = m.detail;
   const rows: [string, string][] = [];
   if (w) {
-    rows.push([w.description ?? m.weather.condition[w.condition], `${formatTemp(w.temperature, units.temperature)}${w.feelsLike !== undefined ? ` · ${D.feelsLike(formatTemp(w.feelsLike, units.temperature))}` : ''}`]);
+    rows.push([conditionText(w, m), `${formatTemp(w.temperature, units.temperature)}${w.feelsLike !== undefined ? ` · ${D.feelsLike(formatTemp(w.feelsLike, units.temperature))}` : ''}`]);
     if (w.precipitationProbability !== undefined) {
       rows.push([D.precipitation, `${Math.round(w.precipitationProbability / 5) * 5}%${w.precipitation ? ` · ${w.precipitation} mm` : ''}`]);
     }

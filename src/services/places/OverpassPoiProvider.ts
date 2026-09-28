@@ -19,6 +19,7 @@ const FILTERS: Record<PoiCategory, string[]> = {
   car_repair: ['["shop"~"^(car_repair|tyres)$"]'],
   attraction: ['["tourism"~"^(attraction|viewpoint)$"]'],
   toilets: ['["amenity"="toilets"]'],
+  hospital: ['["amenity"="hospital"]'],
 };
 
 interface OverpassElement {

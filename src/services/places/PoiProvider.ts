@@ -14,7 +14,8 @@ export type PoiCategory =
   | 'car_wash'
   | 'car_repair'
   | 'attraction'
-  | 'toilets';
+  | 'toilets'
+  | 'hospital';
 
 export interface Poi {
   id: string;

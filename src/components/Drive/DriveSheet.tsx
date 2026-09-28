@@ -6,8 +6,10 @@ import { useAppStore } from '../../state/store';
 import { formatLocalTime } from '../../utils/timezone';
 import { BottomSheet } from '../BottomSheet/BottomSheet';
 import { EventIcon } from '../Common/EventIcon';
-import { CloseIcon, PauseIcon, PlayIcon } from '../Icons/Icons';
+import { useLiveShare } from '../../share/liveShare';
+import { CloseIcon, LiveIcon, PauseIcon, PlayIcon } from '../Icons/Icons';
 import { PlacesPanel } from '../Places/PlacesPanel';
+import { DataSources } from '../Plan/DataSources';
 import { TimeScrubber } from '../TimeScrubber/TimeScrubber';
 import { WeatherStrip } from '../WeatherStrip/WeatherStrip';
 import { AheadList } from './AheadList';
@@ -28,6 +30,7 @@ export function DriveSheet() {
           <WeatherStrip />
           <TimeScrubber />
           <PlacesPanel />
+          <DataSources />
         </div>
       }
     />
@@ -46,6 +49,7 @@ function EtaBar() {
   const originTz = useAppStore((s) => s.derived.points[0]?.timezone ?? 'UTC');
   const next = useAppStore((s) => s.derived.intelligence.ahead.find((e) => e.type !== 'DESTINATION'));
   const simulating = mode === 'simulating';
+  const simulatedData = useAppStore((s) => s.simulatedData);
 
   return (
     <div className="etabar">
@@ -58,11 +62,15 @@ function EtaBar() {
           <span>{remainingMin !== null ? formatDuration(remainingMin * 60, m) : m.ui.waitingForLocation}</span>
           {remainingM !== null ? <span className="etabar__cap">{formatDistance(remainingM, units, m)}</span> : null}
         </div>
-        <div className="etabar__controls">{simulating ? <SimControls /> : <EndButton />}</div>
+        <div className="etabar__controls">
+          <ShareTripButton />
+          {simulating ? <SimControls /> : <EndButton />}
+        </div>
       </div>
       {simulating && simClockMin !== null ? (
         <p className="etabar__sim">
           {m.ui.simulated} · <span className="tabular">{formatLocalTime(simClockMin * 60000, originTz)}</span>
+          {simulatedData ? ` · ${m.ui.simulatedData}` : ''}
         </p>
       ) : null}
       {next ? (
@@ -75,6 +83,22 @@ function EtaBar() {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** Share where I am and where I'm going (live). */
+function ShareTripButton() {
+  const m = useMessages();
+  const active = useLiveShare((s) => s.status === 'active');
+  return (
+    <button
+      className={`roundbtn${active ? ' roundbtn--on' : ''}`}
+      onClick={() => useLiveShare.getState().openDialog()}
+      aria-label={active ? m.share.active : m.share.button}
+      aria-pressed={active}
+    >
+      <LiveIcon size={20} />
+    </button>
   );
 }
 

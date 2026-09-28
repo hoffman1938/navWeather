@@ -45,3 +45,15 @@ describe('navigation command parser', () => {
     expect(parseCommand('purple elephants').type).toBe('unknown');
   });
 });
+
+describe('route and safety commands', () => {
+  it('recalculate', () => {
+    for (const u of ['Recalculate route', 'reroute', 'update my route', 'Пересчитай маршрут', 'გადაითვალე მარშრუტი']) {
+      expect(parseCommand(u).type).toBe('recalculate');
+    }
+  });
+  it('find a hospital', () => {
+    expect(parseCommand('Find a hospital')).toMatchObject({ type: 'find_poi', category: 'hospital' });
+    expect(parseCommand('Где ближайшая больница?')).toMatchObject({ type: 'find_poi', category: 'hospital' });
+  });
+});

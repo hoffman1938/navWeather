@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { getProviders } from '../../services/providers';
+import { useExplore } from '../../state/explore';
 import { useLayoutStore } from '../../state/layout';
 import { useMessages } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { useElementSize } from '../../hooks/useElementSize';
-import { getCurrentPosition } from '../../hooks/useGeolocation';
-import { CloseIcon, EditIcon, SettingsIcon, SwapIcon } from '../Icons/Icons';
+import { BackIcon, CloseIcon, DirectionsIcon, EditIcon, SettingsIcon, SwapIcon } from '../Icons/Icons';
 import { PlaceInput } from './PlaceInput';
 import './Search.css';
 
@@ -22,8 +21,10 @@ export function SearchPanel() {
     return r ? [r.origin.name, ...(r.waypoints ?? []).map((w) => w.name), r.destination.name].join(' → ') : '';
   });
   const mode = useAppStore((s) => s.mode);
+  const directionsOpen = useExplore((s) => s.directionsOpen);
+  const query = useExplore((s) => s.query);
+  const near = useExplore((s) => s.myLocation?.coordinate);
   const [editing, setEditing] = useState(!hasPlan);
-  const [locating, setLocating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const firstField = useRef<HTMLInputElement>(null);
@@ -45,25 +46,45 @@ export function SearchPanel() {
     void s.calculateRoute();
   };
 
-  const useCurrent = async () => {
-    setLocating(true);
-    try {
-      const coordinate = await getCurrentPosition();
-      let name = m.ui.currentLocation;
-      try {
-        name = (await getProviders().geocoding.reverse(coordinate, { language: m.locale }))?.name ?? name;
-      } catch {
-        /* keep generic name */
-      }
-      useAppStore.getState().setOriginPlace({ id: `here:${coordinate.join(',')}`, name, label: m.ui.currentLocation, coordinate });
-    } catch {
-      useAppStore.getState().showNotice('warning', m.ui.locationUnavailable);
-    } finally {
-      setLocating(false);
-    }
-  };
+  const useCurrent = () => useExplore.getState().useMyLocationAsOrigin();
+  const openSettings = () => useAppStore.getState().setSettingsOpen(true);
 
   if (mode !== 'planning') return <div ref={ref} className="search search--hidden" />;
+
+  // Explore: one search field, like any map app. Directions are one tap away.
+  if (!hasPlan && !directionsOpen && routeStatus !== 'error' && !busy) {
+    const ex = useExplore.getState();
+    return (
+      <div ref={ref} className="search" role="search">
+        <form
+          className="search__card search__explore"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void ex.searchSubmit(query);
+          }}
+        >
+          <PlaceInput
+            label={m.explore.search}
+            icon="search"
+            placeholder={m.explore.search}
+            value={query}
+            place={null}
+            near={near}
+            onChangeText={(t) => ex.setQuery(t)}
+            onSelect={(p) => ex.selectPlace(p, 'search')}
+            onSubmit={() => void ex.searchSubmit(useExplore.getState().query)}
+            quick
+          />
+          <button type="button" className="icon-btn" onClick={() => ex.openDirections(true)} aria-label={m.explore.directions}>
+            <DirectionsIcon size={22} />
+          </button>
+          <button type="button" className="icon-btn" onClick={openSettings} aria-label={m.ui.settings}>
+            <SettingsIcon size={20} />
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   if (!editing && hasPlan) {
     return (
@@ -72,8 +93,18 @@ export function SearchPanel() {
           <span className="routeline__title">{title}</span>
           <EditIcon size={16} />
         </button>
-        <button className="icon-btn search__settings" onClick={() => useAppStore.getState().setSettingsOpen(true)} aria-label={m.ui.settings}>
+        <button className="icon-btn search__settings" onClick={openSettings} aria-label={m.ui.settings}>
           <SettingsIcon size={20} />
+        </button>
+        <button
+          className="icon-btn search__settings"
+          onClick={() => {
+            useAppStore.getState().clearRoute();
+            useExplore.getState().openDirections(false);
+          }}
+          aria-label={m.ui.close}
+        >
+          <CloseIcon size={20} />
         </button>
       </div>
     );
@@ -93,13 +124,14 @@ export function SearchPanel() {
             inputRef={firstField}
             label={m.ui.from}
             icon="origin"
-            placeholder={locating ? m.ui.locating : m.ui.fromPlaceholder}
+            placeholder={m.ui.fromPlaceholder}
             value={origin.text}
             place={origin.place}
             onChangeText={(t) => useAppStore.getState().setOriginText(t)}
             onSelect={(p) => useAppStore.getState().setOriginPlace(p)}
             onSubmit={submit}
             onUseCurrentLocation={useCurrent}
+            quick
             autoFocus={!hasPlan && typeof window !== 'undefined' && window.innerWidth >= 900}
           />
           {waypoints.map((w, i) => (
@@ -110,7 +142,7 @@ export function SearchPanel() {
                 placeholder={m.ui.stopPlaceholder}
                 value={w.text}
                 place={w.place}
-                near={origin.place?.coordinate}
+                near={origin.place?.kind === 'here' ? near : origin.place?.coordinate}
                 onChangeText={(t) => useAppStore.getState().setWaypointText(i, t)}
                 onSelect={(p) => useAppStore.getState().setWaypointPlace(i, p)}
                 onSubmit={submit}
@@ -126,10 +158,11 @@ export function SearchPanel() {
             placeholder={m.ui.toPlaceholder}
             value={destination.text}
             place={destination.place}
-            near={origin.place?.coordinate}
+            near={origin.place?.kind === 'here' ? near : origin.place?.coordinate}
             onChangeText={(t) => useAppStore.getState().setDestinationText(t)}
             onSelect={(p) => useAppStore.getState().setDestinationPlace(p)}
             onSubmit={submit}
+            quick
           />
           <button type="button" className="icon-btn search__swap" onClick={() => useAppStore.getState().swapPlaces()} aria-label={m.ui.swap}>
             <SwapIcon size={18} />
@@ -141,6 +174,11 @@ export function SearchPanel() {
           </p>
         ) : null}
         <div className="search__actions">
+          {!hasPlan ? (
+            <button type="button" className="icon-btn" onClick={() => useExplore.getState().openDirections(false)} aria-label={m.explore.back}>
+              <BackIcon size={20} />
+            </button>
+          ) : null}
           {waypoints.length < 3 ? (
             <button type="button" className="btn btn-quiet" onClick={() => useAppStore.getState().addWaypoint()}>
               + {m.ui.addStop}
@@ -160,7 +198,7 @@ export function SearchPanel() {
               {m.ui.cancel}
             </button>
           ) : (
-            <button type="button" className="icon-btn" onClick={() => useAppStore.getState().setSettingsOpen(true)} aria-label={m.ui.settings}>
+            <button type="button" className="icon-btn" onClick={openSettings} aria-label={m.ui.settings}>
               <SettingsIcon size={20} />
             </button>
           )}
