@@ -149,6 +149,7 @@ export const en = {
   },
 
   alert: {
+    clocks: (forward: boolean, hours: string, offset: string) => `Clocks go ${forward ? 'forward' : 'back'} ${hours} h · ${offset}`,
     incident: {
       accident: 'Accident',
       closure: 'Road closed',
@@ -173,6 +174,9 @@ export const en = {
       FUEL_STOP: 'Fuel stop',
       CHARGE_STOP: 'Charging stop',
       REST_BREAK: 'Break',
+      SUN_GLARE: 'Low sun ahead',
+      TIMEZONE_CHANGE: 'Time zone change',
+      SPEED_CAMERA: 'Speed camera',
       DESTINATION: 'Destination',
       STOP: 'Stop',
       POI: 'Place',
@@ -212,6 +216,8 @@ export const en = {
       fuelStop: (name: string, distance: string) => `Consider a fuel stop: ${name}, ${distance} ahead.`,
       chargeStop: (distance: string) => `Consider charging within the next ${distance}.`,
       restBreak: (place?: string) => `You'll have been driving for about 2 hours${place ? ` near ${place}` : ''} — a good time for a break.`,
+      sunGlare: (when: string, place?: string) => `Low sun ahead in ${when}${place ? `, near ${place}` : ''} — glare is likely.`,
+      speedCamera: (limit?: string) => (limit ? `Speed camera ahead. Limit ${limit}.` : 'Speed camera ahead.'),
     },
   },
 
@@ -338,6 +344,7 @@ export const en = {
     restart: 'Restart',
     speed: (x: number) => `Simulation speed ${x}×`,
     recenter: 'Recenter',
+    northUp: 'Point the map north',
     overview: 'Show whole route',
     arrive: (time: string) => `Arrive ${time}`,
     arrival: 'Arrival',
@@ -421,6 +428,7 @@ export const en = {
     enterPlace: 'Enter a place',
     placesLimited: 'Place names are limited right now — weather is unaffected',
     then: 'Then',
+    continueOn: (road?: string) => (road ? `Continue on ${road}` : 'Continue straight'),
     toward: (d: string) => `toward ${d}`,
     voice: 'Voice assistant',
     voiceOn: 'Voice guidance on',
@@ -483,6 +491,8 @@ export const en = {
     speedWarnings: 'Speed limit warnings',
     breakReminders: 'Break reminders',
     breakRemindersHint: 'On long drives, suggest a break about every 2 hours.',
+    speedCameras: 'Speed camera alerts',
+    speedCamerasHint: 'Only where using them is legal. From OpenStreetMap — may be incomplete.',
     batterySaver: 'Battery saver',
     batterySaverHint: 'Fewer map animations and position updates while it is safe to skip them.',
     vehicle: 'Vehicle',
@@ -554,6 +564,7 @@ export const en = {
 
   share: {
     button: 'Share live location',
+    tripButton: 'Share trip progress',
     title: 'Share your live location',
     body: "People with the link see where you are and — when you have a route — where you're going and when you'll arrive. They don't need an account.",
     name: 'Your name (optional)',
@@ -636,6 +647,29 @@ export const en = {
     noProvider: 'no provider configured',
     osm: 'OpenStreetMap, may be incomplete — signs take precedence',
     loading: 'loading',
+  },
+  depart: {
+    title: 'When to leave',
+    suggest: (time: string, less: string) => `Leaving at ${time}: ${less}.`,
+    lessRain: (d: string) => `about ${d} less rain`,
+    lessSevere: (d: string) => `about ${d} less heavy weather`,
+    use: (time: string) => `Leave at ${time}`,
+    currentBest: 'Your departure time is the best in the next 12 hours.',
+    similar: 'The weather on the way is about the same whenever you leave in the next 12 hours.',
+    legendRain: 'Rain',
+    legendSevere: 'Heavy rain, storms, snow',
+    bar: (time: string, wet: string) => `Leave at ${time}: about ${wet} in rain`,
+    selected: 'selected',
+  },
+  air: {
+    title: 'Air quality',
+    here: 'Weather at the map centre',
+    levels: { good: 'Good', fair: 'Fair', moderate: 'Moderate', poor: 'Poor', veryPoor: 'Very poor', extremelyPoor: 'Extremely poor' } as Record<string, string>,
+  },
+  parking: {
+    title: 'Parked car',
+    save: 'Save parking spot',
+    saved: 'Parking spot saved',
   },
 };
 

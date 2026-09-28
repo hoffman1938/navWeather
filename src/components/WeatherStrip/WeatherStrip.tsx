@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef } from 'react';
 import type { TimelineItem } from '../../algorithms/timeline';
-import { formatDuration, formatTemp, formatSpeed } from '../../i18n/format';
+import { formatDurationCompact, formatTemp, formatSpeed } from '../../i18n/format';
 import type { Messages } from '../../i18n/en';
 import { useReducedMotion } from '../../hooks/useMediaQuery';
 import { useMessages, useSettings } from '../../state/settings';
@@ -124,7 +124,7 @@ const Column = memo(function Column({ point, navigating, selected, highlighted, 
   const primary = isCurrent
     ? m.time.now
     : navigating
-      ? `+${formatDuration(point.estimatedTravelMinutes * 60, m)}`
+      ? `+${formatDurationCompact(point.estimatedTravelMinutes * 60, m)}`
       : point.localTime;
   const otherTz = point.timezone !== originTz ? formatUtcOffset(point.arrivalMs, point.timezone) : null;
   const conf = point.confidence === 'medium' ? m.ui.lessCertainTag : point.confidence === 'low' ? m.ui.lowConfidenceTag : null;

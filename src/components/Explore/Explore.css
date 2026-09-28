@@ -295,3 +295,79 @@ button.me-dot::after {
   color: var(--accent);
   font-weight: 700;
 }
+
+/* Weather + air quality at the map centre (explore) */
+.wxchip {
+  position: absolute;
+  z-index: 14;
+  /* Below the map attribution line on phones. */
+  top: calc(var(--inset-top, 64px) + 40px);
+  left: calc(var(--safe-left) + 12px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px 0 8px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  font-size: 14px;
+}
+.wxchip__temp {
+  font-weight: 700;
+}
+.wxchip__aqi {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.wxchip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+/* EEA European AQI colours (the level is also written out for screen readers). */
+.aqi--good { background: #50c878; }
+.aqi--fair { background: #9ad04c; }
+.aqi--moderate { background: #f0c330; }
+.aqi--poor { background: #f08a24; }
+.aqi--veryPoor { background: #d9372b; }
+.aqi--extremelyPoor { background: #7d2181; }
+@media (min-width: 1024px) and (min-height: 560px) {
+  /* Beside the side panel, over the map. */
+  .wxchip {
+    top: 16px;
+    left: calc(var(--inset-left, 416px) + 16px);
+  }
+}
+.pw-air {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.parking-pin {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: #1a5fd0;
+  border: 2px solid #fff;
+  box-shadow: var(--shadow-marker);
+  color: #fff;
+  font: 800 15px/1 var(--font);
+  cursor: pointer;
+}
+.parking-pin::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}

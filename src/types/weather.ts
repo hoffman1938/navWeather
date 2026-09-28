@@ -164,6 +164,8 @@ export interface RouteWeatherSummary {
   tone: 'dry' | 'wet' | 'wintry' | 'severe' | 'unknown';
   minTemperature?: number;
   maxTemperature?: number;
+  /** The condition the headline talks about (for its icon). */
+  headlineCondition?: WeatherCondition;
   /** Short per-stretch lines, e.g. "Rain likely near Khashuri". */
   highlights: { condition: WeatherCondition; text: string; isDay: boolean }[];
 }

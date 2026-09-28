@@ -1,4 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { coordsLabel } from '../../state/explore';
+import { useSavedPlaces } from '../../state/savedPlaces';
+import { ParkingIcon } from '../Icons/Icons';
 import { conditionText, formatDistance, formatDuration, formatTemp } from '../../i18n/format';
 import { useLayoutStore } from '../../state/layout';
 import { useMessages, useSettings } from '../../state/settings';
@@ -11,6 +14,7 @@ export function ArrivalSheet() {
   const m = useMessages();
   const units = useSettings((s) => s.units);
   const a = useAppStore((s) => s.arrival);
+  const [parked, setParked] = useState(false);
   // Nothing sits at the top of the screen on arrival (the driving banner is gone).
   useEffect(() => useLayoutStore.getState().setInsets({ top: 0 }), []);
   if (!a) return null;
@@ -84,6 +88,21 @@ export function ArrivalSheet() {
           <div className="arrive__actions">
             <button className="btn btn-primary" onClick={() => useAppStore.getState().dismissArrival()}>
               {A.done}
+            </button>
+            <button
+              className="btn btn-quiet"
+              disabled={parked}
+              onClick={() => {
+                // Where the car is now (GPS or the simulated vehicle), else the destination.
+                const s = useAppStore.getState();
+                const c = s.vehicle?.coordinate ?? s.plan?.timed.route.destination.coordinate;
+                if (!c) return;
+                useSavedPlaces.getState().save({ id: `parking:${Date.now()}`, name: m.parking.title, label: `${a.destination} · ${coordsLabel(c)}`, coordinate: c, kind: 'parking' }, 'parking');
+                setParked(true);
+              }}
+            >
+              <ParkingIcon size={18} />
+              {parked ? m.parking.saved : m.parking.save}
             </button>
             <span className="arrive__note">{A.notSaved}</span>
           </div>

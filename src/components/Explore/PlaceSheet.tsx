@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { dailySummary, nextHours } from '../../algorithms/placeForecast';
 import { matchForecastToTime } from '../../algorithms/weatherMatching';
 import { conditionText, formatDistance, formatDuration, formatSpeed, formatTemp } from '../../i18n/format';
+import { aqiLevel } from '../../services/air/AirQualityProvider';
 import { useLiveShare } from '../../share/liveShare';
 import { useExplore } from '../../state/explore';
 import { useSavedPlaces, type SavedSlot } from '../../state/savedPlaces';
@@ -19,7 +20,13 @@ import './Explore.css';
 export function PlaceSheet() {
   const sheet = useExplore((s) => s.cardSheet);
   const name = useExplore((s) => s.card?.place.name ?? '');
+  const placeId = useExplore((s) => s.card?.place.id);
   const m = useMessages();
+  // A card opened from search: close the suggestion list (it would cover the card).
+  useEffect(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (el?.closest('.search')) el.blur();
+  }, [placeId]);
   return (
     <BottomSheet
       state={sheet}
@@ -177,6 +184,12 @@ function PlaceWeather() {
           <span className="pw-now__detail">{detailLine(now, m, units)}</span>
         </span>
       </section>
+      {card.air !== null ? (
+        <p className="pw-air">
+          <span className={`wxchip__dot aqi--${aqiLevel(card.air)}`} aria-hidden="true" />
+          {m.air.title}: {m.air.levels[aqiLevel(card.air)]} · AQI {card.air}
+        </p>
+      ) : null}
       {arrivalMs ? (
         arrival ? (
           <section className="pw-arrive">

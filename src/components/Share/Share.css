@@ -172,7 +172,7 @@
 @media (min-width: 900px) {
   .share-pill {
     top: 12px;
-    left: 50%;
+    left: calc(50% + var(--inset-left, 0px) / 2);
     transform: translateX(-50%);
   }
 }

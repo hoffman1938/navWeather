@@ -5,7 +5,7 @@ import { getProviders } from '../../services/providers';
 import type { LngLat, Place } from '../../types/geo';
 import { useMessages } from '../../state/settings';
 import { quickPlaces, useSavedPlaces, type SavedSlot } from '../../state/savedPlaces';
-import { ClockIcon, HomeIcon, LocateIcon, PinIcon, SearchIcon, StarIcon, WorkIcon } from '../Icons/Icons';
+import { ClockIcon, HomeIcon, LocateIcon, ParkingIcon, PinIcon, SearchIcon, StarIcon, WorkIcon } from '../Icons/Icons';
 
 interface Props {
   label: string;
@@ -170,7 +170,9 @@ export function PlaceInput(props: Props) {
                 </>
               ) : o.kind === 'quick' ? (
                 <>
-                  {o.slot === 'home' ? (
+                  {o.slot === 'parking' ? (
+                    <ParkingIcon size={18} className="suggestion__icon suggestion__icon--accent" />
+                  ) : o.slot === 'home' ? (
                     <HomeIcon size={18} className="suggestion__icon suggestion__icon--accent" />
                   ) : o.slot === 'work' ? (
                     <WorkIcon size={18} className="suggestion__icon suggestion__icon--accent" />
@@ -180,8 +182,18 @@ export function PlaceInput(props: Props) {
                     <ClockIcon size={18} className="suggestion__icon" />
                   )}
                   <span className="suggestion__text">
-                    <span className="suggestion__name">{o.slot === 'home' ? m.explore.home : o.slot === 'work' ? m.explore.work : o.place.name}</span>
-                    <span className="suggestion__label">{o.slot === 'home' || o.slot === 'work' ? o.place.name : o.place.label && o.place.label !== o.place.name ? o.place.label.replace(`${o.place.name}, `, '') : ''}</span>
+                    <span className="suggestion__name">
+                      {o.slot === 'home' ? m.explore.home : o.slot === 'work' ? m.explore.work : o.slot === 'parking' ? m.parking.title : o.place.name}
+                    </span>
+                    <span className="suggestion__label">
+                      {o.slot === 'home' || o.slot === 'work'
+                        ? o.place.name
+                        : o.slot === 'parking'
+                          ? o.place.label
+                          : o.place.label && o.place.label !== o.place.name
+                            ? o.place.label.replace(`${o.place.name}, `, '')
+                            : ''}
+                    </span>
                   </span>
                 </>
               ) : (

@@ -23,6 +23,9 @@ export type RouteEventType =
   | 'FUEL_STOP'
   | 'CHARGE_STOP'
   | 'REST_BREAK'
+  | 'SUN_GLARE'
+  | 'TIMEZONE_CHANGE'
+  | 'SPEED_CAMERA'
   | 'DESTINATION'
   | 'STOP'
   | 'POI'
@@ -38,6 +41,7 @@ export type EventCategory =
   | 'fuel'
   | 'charging'
   | 'rest'
+  | 'time'
   | 'destination'
   | 'stop';
 
@@ -56,6 +60,9 @@ export type EventIcon =
   | 'fuel'
   | 'charging'
   | 'rest'
+  | 'glare'
+  | 'clock'
+  | 'camera'
   | 'flag'
   | 'stop'
   | 'poi'

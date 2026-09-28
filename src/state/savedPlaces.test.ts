@@ -44,3 +44,14 @@ describe('saved places and recents (this device only)', () => {
     expect(quickPlaces().map((q) => `${q.slot}:${q.place.name}`)).toEqual(['work:Tbilisi', 'favorite:Batumi', 'recent:Gori']);
   });
 });
+
+describe('parking spot', () => {
+  it('one spot at a time, offered first in suggestions', () => {
+    const s = useSavedPlaces.getState();
+    s.save(batumi, 'favorite');
+    s.save({ ...gori, kind: 'parking' }, 'parking');
+    s.save({ ...tbilisi, kind: 'parking' }, 'parking');
+    expect(useSavedPlaces.getState().saved.filter((p) => p.slot === 'parking').map((p) => p.name)).toEqual(['Tbilisi']);
+    expect(quickPlaces()[0]).toMatchObject({ slot: 'parking' });
+  });
+});

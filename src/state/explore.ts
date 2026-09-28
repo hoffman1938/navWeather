@@ -22,6 +22,8 @@ export interface PlaceCard {
   source: 'search' | 'pin' | 'link' | 'me';
   naming: boolean;
   weather: { status: 'loading' | 'ready' | 'error'; forecast: LocationForecast | null };
+  /** European AQI where available. */
+  air: number | null;
   /** Drive from the user's position (only when a recent fix exists). */
   drive: { status: 'loading' | 'ready' | 'error'; durationS?: number; distanceM?: number; arrivalMs?: number } | null;
 }
@@ -38,6 +40,8 @@ export interface ExploreState {
   query: string;
   card: PlaceCard | null;
   cardSheet: SheetState;
+  /** Visible map centre (explore mode) — for the weather chip. */
+  view: { center: LngLat; zoom: number } | null;
   /** Place being shared as a link (dialog open). */
   sharePlace: Place | null;
 
@@ -51,6 +55,7 @@ export interface ExploreState {
   dropPin(coordinate: LngLat): void;
   closeCard(): void;
   setCardSheet(s: SheetState): void;
+  setView(view: { center: LngLat; zoom: number }): void;
   /** Card for the user's own position (tap on the blue dot). */
   showMe(): void;
   openSharePlace(place: Place): void;
@@ -105,6 +110,7 @@ export const useExplore = create<ExploreState>()(
     query: '',
     card: null,
     cardSheet: 'default',
+    view: null,
     sharePlace: null,
 
     locateMe() {
@@ -166,13 +172,14 @@ export const useExplore = create<ExploreState>()(
       const ctrl = new AbortController();
       cardAbort = ctrl;
       set({
-        card: { place, source, naming: source === 'pin', weather: { status: 'loading', forecast: null }, drive: null },
+        card: { place, source, naming: source === 'pin', weather: { status: 'loading', forecast: null }, air: null, drive: null },
         cardSheet: 'default',
         query: source === 'search' ? place.name : '',
         followMe: false,
       });
       syncUrl(source === 'pin' || source === 'me' ? null : place);
       void loadCardWeather(place, ctrl.signal);
+      void loadCardAir(place, ctrl.signal);
       void loadCardDrive(place, ctrl.signal);
       if (source === 'pin') void nameCardPlace(place, ctrl.signal);
     },
@@ -190,6 +197,7 @@ export const useExplore = create<ExploreState>()(
       syncUrl(null);
     },
     setCardSheet: (cardSheet) => set({ cardSheet }),
+    setView: (view) => set({ view }),
     showMe() {
       const fix = get().myLocation;
       if (!fix) return;
@@ -238,6 +246,17 @@ async function loadCardWeather(place: Place, signal: AbortSignal) {
     patchCard(place, { weather: { status: forecast ? 'ready' : 'error', forecast } });
   } catch (e) {
     if (!isAbortError(e)) patchCard(place, { weather: { status: 'error', forecast: null } });
+  }
+}
+
+async function loadCardAir(place: Place, signal: AbortSignal) {
+  const air = getProviders().air;
+  if (!air) return;
+  try {
+    const q = await air.current(place.coordinate, signal);
+    if (!signal.aborted && q) patchCard(place, { air: q.europeanAqi });
+  } catch {
+    /* optional */
   }
 }
 

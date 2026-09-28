@@ -168,3 +168,9 @@ export const StarIcon = ({ size, className, filled }: P & { filled?: boolean }) 
     <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" fill={filled ? 'currentColor' : 'none'} />
   </svg>
 );
+export const ParkingIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3" />
+  </svg>
+);

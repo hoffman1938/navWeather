@@ -5,6 +5,7 @@ import { DriveSheet } from './components/Drive/DriveSheet';
 import { ManeuverBanner } from './components/Drive/ManeuverBanner';
 import { SpeedSign } from './components/Drive/SpeedSign';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
+import { MapWeatherChip } from './components/Explore/MapWeatherChip';
 import { PlaceSheet } from './components/Explore/PlaceSheet';
 import { LiveView } from './components/Live/LiveView';
 import { LocateButton } from './components/Map/LocateButton';
@@ -68,6 +69,7 @@ function MainApp() {
       {driving && !arrived ? <DriveTop /> : arrived ? null : <SearchPanel />}
       {driving && !arrived ? <SpeedSign /> : null}
       <VoiceControls />
+      {!driving ? <MapWeatherChip /> : null}
       <ShareStatus />
       <Notice />
       {arrived ? <ArrivalSheet /> : driving ? <DriveSheet /> : hasCard ? <PlaceSheet /> : <PlanSheet />}
@@ -171,7 +173,13 @@ function useInsetVars() {
     const st = document.documentElement.style;
     st.setProperty('--inset-bottom', `${insets.bottom}px`);
     st.setProperty('--inset-top', `${insets.top}px`);
-  }, [insets.bottom, insets.top]);
+    st.setProperty('--inset-left', `${insets.left}px`);
+  }, [insets.bottom, insets.top, insets.left]);
+  // Floating map buttons step aside while a sheet covers the map.
+  const covers = useLayoutStore((s) => s.sheetCovers);
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-sheet-covers', covers);
+  }, [covers]);
 }
 
 /** Name the few visible points that have no settlement nearby (lazy reverse geocoding). */

@@ -3,7 +3,8 @@ import { getProviders } from '../../services/providers';
 import { useMessages, useSettings } from '../../state/settings';
 import { getVoiceQueue, useAppStore } from '../../state/store';
 import { listenAndAnswer } from '../../voice/assistant';
-import { MicIcon, SpeakerIcon } from '../Icons/Icons';
+import { useLiveShare } from '../../share/liveShare';
+import { LiveIcon, MicIcon, SpeakerIcon } from '../Icons/Icons';
 import { LocateButton } from '../Map/LocateButton';
 import './Voice.css';
 
@@ -19,6 +20,8 @@ export function VoiceControls() {
   const transcript = useAppStore((s) => s.assistant.transcript);
   const reply = useAppStore((s) => s.assistant.reply);
   const voiceOn = useSettings((s) => s.voice);
+  const sharing = useLiveShare((s) => s.status === 'active');
+  const arrived = useAppStore((s) => s.arrival !== null);
   const stop = useRef<(() => void) | null>(null);
   const [showReply, setShowReply] = useState(false);
 
@@ -29,6 +32,16 @@ export function VoiceControls() {
     return () => window.clearTimeout(t);
   }, [reply]);
 
+  // Trip over: only a running share still needs a control.
+  if (arrived) {
+    return sharing ? (
+      <div className="voice">
+        <button className="fab fab--on" onClick={() => useLiveShare.getState().openDialog()} aria-label={m.share.active} title={m.share.active}>
+          <LiveIcon size={22} />
+        </button>
+      </div>
+    ) : null;
+  }
   if (!hasPlan) {
     return (
       <div className="voice">
@@ -64,6 +77,14 @@ export function VoiceControls() {
         </p>
       ) : null}
       {!driving ? <LocateButton /> : null}
+      <button
+        className={`fab${sharing ? ' fab--on' : ''}`}
+        onClick={() => useLiveShare.getState().openDialog()}
+        aria-label={sharing ? m.share.active : m.share.tripButton}
+        title={sharing ? m.share.active : m.share.tripButton}
+      >
+        <LiveIcon size={22} />
+      </button>
       <div className="voice__buttons">
         {driving ? (
           <button className="fab" onClick={toggleVoice} aria-pressed={!voiceOn} aria-label={voiceOn ? m.ui.mute : m.ui.unmute}>

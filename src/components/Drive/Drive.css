@@ -430,3 +430,14 @@
   font-size: 13px;
   color: var(--text-3);
 }
+.mbanner__then--far {
+  align-items: flex-start;
+}
+.mbanner__then--far svg {
+  flex: none;
+}
+.mbanner__thenText {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.3;
+}

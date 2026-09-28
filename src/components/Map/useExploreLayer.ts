@@ -1,6 +1,7 @@
 import { Marker, type Map as MLMap, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl';
 import { useEffect, type RefObject } from 'react';
 import { useExplore } from '../../state/explore';
+import { useSavedPlaces } from '../../state/savedPlaces';
 import { currentMessages } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import type { LngLat } from '../../types/geo';
@@ -146,6 +147,41 @@ export function useExploreLayer(mapRef: RefObject<MLMap | null>, styleVersion: n
       pin?.remove();
     };
   }, [mapRef, ready, opts.viewer, opts.reduced]);
+
+  // ---- Where I parked (saved on this device) ----------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || opts.viewer) return;
+    let marker: Marker | null = null;
+    const render = () => {
+      const spot = useSavedPlaces.getState().saved.find((s) => s.slot === 'parking');
+      if (!spot) {
+        marker?.remove();
+        marker = null;
+        return;
+      }
+      if (!marker) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'parking-pin';
+        el.textContent = 'P';
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cur = useSavedPlaces.getState().saved.find((s) => s.slot === 'parking');
+          if (cur) useExplore.getState().selectPlace(cur, 'search');
+        });
+        marker = new Marker({ element: el }).setLngLat(spot.coordinate).addTo(map);
+      }
+      marker.getElement().setAttribute('aria-label', spot.name);
+      marker.setLngLat(spot.coordinate);
+    };
+    render();
+    const unsub = useSavedPlaces.subscribe(render);
+    return () => {
+      unsub();
+      marker?.remove();
+    };
+  }, [mapRef, ready, opts.viewer]);
 
   // ---- Dropping pins --------------------------------------------------------
   useEffect(() => {

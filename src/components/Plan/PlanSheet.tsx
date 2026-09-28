@@ -4,13 +4,13 @@ import { useAppStore } from '../../state/store';
 import { deviceTimeZone, formatLocalDate, formatLocalTime, formatUtcOffset } from '../../utils/timezone';
 import { BottomSheet } from '../BottomSheet/BottomSheet';
 import { EventIcon } from '../Common/EventIcon';
-import { useLiveShare } from '../../share/liveShare';
-import { LiveIcon, NavigateIcon, PlayIcon, RefreshIcon } from '../Icons/Icons';
+import { NavigateIcon, PlayIcon, RefreshIcon } from '../Icons/Icons';
 import { PlacesPanel } from '../Places/PlacesPanel';
 import { TimeScrubber } from '../TimeScrubber/TimeScrubber';
 import { WeatherIcon } from '../WeatherIcon/WeatherIcon';
 import { WeatherStrip } from '../WeatherStrip/WeatherStrip';
 import { DataSources } from './DataSources';
+import { DepartureChart, DepartureTip } from './DeparturePlanner';
 import { DepartureSelector } from './DepartureSelector';
 import { RouteOptions } from './RouteOptions';
 import './Plan.css';
@@ -60,11 +60,13 @@ export function PlanSheet() {
         <>
           <RouteOptions />
           <WeatherHeadline />
+          <DepartureTip />
           <WeatherStrip />
         </>
       }
       extra={
         <div className="plan-extra">
+          <DepartureChart />
           <HeadsUp />
           <PointDetails />
           <TimeScrubber />
@@ -127,9 +129,6 @@ function RouteHeader() {
           <PlayIcon size={14} />
           {m.ui.simulate}
         </button>
-        <button className="icon-btn" onClick={() => useLiveShare.getState().openDialog()} aria-label={m.share.button}>
-          <LiveIcon size={20} />
-        </button>
       </div>
     </div>
   );
@@ -156,7 +155,7 @@ function WeatherHeadline() {
   return (
     <section className="whead">
       <div className="whead__row">
-        {lead && !noData ? <WeatherIcon condition={lead.condition} isDay={lead.isDay} size={32} /> : null}
+        {lead && !noData ? <WeatherIcon condition={summary!.headlineCondition ?? lead.condition} isDay={lead.isDay} size={32} /> : null}
         <div className="whead__text">
           <h3 className="whead__headline">
             {noData ? (loading ? m.ui.stage.weather : (error ?? m.weather.summary.unavailable)) : summary!.headline}
@@ -187,7 +186,7 @@ function WeatherHeadline() {
 function HeadsUp() {
   const m = useMessages();
   const events = useAppStore((s) => s.derived.intelligence.events);
-  const notable = events.filter((e) => e.category === 'weather' && e.severity !== 'low').slice(0, 6);
+  const notable = events.filter((e) => (e.category === 'weather' && e.severity !== 'low') || e.type === 'TIMEZONE_CHANGE').slice(0, 6);
   if (!notable.length) return null;
   return (
     <section>

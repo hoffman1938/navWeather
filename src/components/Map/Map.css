@@ -24,7 +24,8 @@
 .map-controls {
   position: absolute;
   z-index: 12;
-  left: 50%;
+  /* Centred on the visible map (a side panel takes the left). */
+  left: calc(50% + var(--inset-left, 0px) / 2);
   transform: translateX(-50%);
   bottom: calc(var(--inset-bottom, 200px) + 12px);
   display: flex;
@@ -82,7 +83,27 @@
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .map-controls {
-    left: calc(min(380px, 46vw) + 50%);
     bottom: calc(var(--safe-bottom) + 12px);
+  }
+}
+
+/* Compass (only while rotated or tilted) */
+.compass {
+  position: absolute;
+  z-index: 12;
+  top: calc(var(--inset-top, 64px) + 44px);
+  right: calc(var(--safe-right) + 12px);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-float);
+}
+@media (min-width: 900px) {
+  .compass {
+    top: 52px;
   }
 }

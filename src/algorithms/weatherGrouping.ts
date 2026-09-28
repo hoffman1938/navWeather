@@ -256,6 +256,7 @@ export function summarizeRouteWeather(
 
   let headline: string;
   let tone: RouteWeatherSummary['tone'];
+  let headlineCondition: WeatherCondition | undefined;
   const storm = find('thunderstorm');
   const wintry = find('snow', 'sleet');
   const wetGroups = groups.filter((g) => ['rain', 'heavy-rain', 'thunderstorm', 'snow', 'sleet'].includes(g.groupClass));
@@ -266,19 +267,21 @@ export function summarizeRouteWeather(
   if (storm) {
     headline = S.storms(near(storm));
     tone = 'severe';
+    headlineCondition = storm.condition;
   } else if (wintry) {
     headline = wintry.groupClass === 'snow' ? S.snow(near(wintry)) : S.freezing(near(wintry));
     tone = 'wintry';
+    headlineCondition = wintry.condition;
   } else if (wetGroups.length > 0) {
     tone = 'wet';
+    const g = wetGroups[0];
+    headlineCondition = g.condition;
     if (wetShare >= 0.5) headline = S.rainMuch;
-    else {
-      const g = wetGroups[0];
-      headline = S.group(g.label, near(g));
-    }
+    else headline = S.group(g.label, near(g));
   } else if (fog) {
     headline = S.fog(near(fog));
     tone = 'wet';
+    headlineCondition = fog.condition;
   } else {
     tone = 'dry';
     headline = groups.every((g) => g.groupClass === 'clear') ? S.clearDry : S.mostlyDry;
@@ -306,7 +309,7 @@ export function summarizeRouteWeather(
     return { condition: g.condition, text: phrase(g), isDay: rep?.weather.isDay ?? true };
   });
 
-  return { headline, detail, tone, minTemperature: minT, maxTemperature: maxT, highlights };
+  return { headline, detail, tone, minTemperature: minT, maxTemperature: maxT, highlights, headlineCondition: headlineCondition ?? highlights[0]?.condition };
 }
 
 /**

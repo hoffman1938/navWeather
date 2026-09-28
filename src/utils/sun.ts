@@ -12,6 +12,11 @@ function julianCentury(utcMs: number): number {
 
 /** Solar elevation angle in degrees at a place and instant. */
 export function solarElevationDeg(lat: number, lon: number, utcMs: number): number {
+  return solarPosition(lat, lon, utcMs).elevationDeg;
+}
+
+/** Sun elevation above the horizon and azimuth (degrees clockwise from north). */
+export function solarPosition(lat: number, lon: number, utcMs: number): { elevationDeg: number; azimuthDeg: number } {
   const T = julianCentury(utcMs);
   const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
   const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
@@ -44,7 +49,16 @@ export function solarElevationDeg(lat: number, lon: number, utcMs: number): numb
   const cosZenith =
     Math.sin(lat * DEG) * Math.sin(decl) + Math.cos(lat * DEG) * Math.cos(decl) * Math.cos(hourAngle * DEG);
   const zenith = Math.acos(Math.max(-1, Math.min(1, cosZenith))) / DEG;
-  return 90 - zenith;
+  // NOAA azimuth.
+  const azDenom = Math.cos(lat * DEG) * Math.sin(zenith * DEG);
+  let azimuth: number;
+  if (Math.abs(azDenom) > 0.001) {
+    const azRad = Math.max(-1, Math.min(1, (Math.sin(lat * DEG) * Math.cos(zenith * DEG) - Math.sin(decl)) / azDenom));
+    azimuth = 180 - Math.acos(azRad) / DEG;
+    if (hourAngle > 0) azimuth = -azimuth;
+  } else azimuth = lat > 0 ? 180 : 0;
+  if (azimuth < 0) azimuth += 360;
+  return { elevationDeg: 90 - zenith, azimuthDeg: azimuth % 360 };
 }
 
 /** Sun above the horizon (accounting for refraction and the solar disc). */

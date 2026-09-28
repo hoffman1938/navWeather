@@ -1,3 +1,4 @@
+import { localizeScript } from '../../i18n/script';
 import type { LngLat, Place } from '../../types/geo';
 import { fetchJson } from '../http';
 import type { AutocompleteProvider, GeocodeOptions, GeocodingProvider } from './GeocodingProvider';
@@ -7,6 +8,7 @@ interface PhotonFeature {
   properties: {
     osm_id?: number;
     osm_type?: string;
+    osm_key?: string;
     osm_value?: string;
     type?: string;
     name?: string;
@@ -54,7 +56,7 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
     for (const f of data.features ?? []) {
       const [lon, lat] = f.geometry?.coordinates ?? [];
       if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
-      const p = toPlace(f);
+      const p = toPlace(f, lang);
       const dedupe = `${p.name}|${p.label}`;
       if (seen.has(dedupe)) continue;
       seen.add(dedupe);
@@ -75,7 +77,7 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
     const params = new URLSearchParams({
       lon: lon.toFixed(5),
       lat: lat.toFixed(5),
-      limit: '1',
+      limit: '3',
       radius: '15',
     });
     params.append('layer', 'city');
@@ -88,9 +90,11 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
       signal: options.signal,
       timeoutMs: 8000,
     });
-    const f = data.features?.[0];
+    // Settlements only: the "locality" layer also holds named unpopulated
+    // spots (industrial sites, farms) that make poor "near …" labels.
+    const f = data.features?.find((x) => x.properties?.osm_key === 'place' && SETTLEMENTS.has(x.properties.osm_value ?? ''));
     const valid = f && Number.isFinite(f.geometry?.coordinates?.[0]) && Number.isFinite(f.geometry?.coordinates?.[1]);
-    const place = valid ? toPlace(f) : null;
+    const place = valid ? toPlace(f, lang) : null;
     this.reverseCache.set(key, place);
     return place;
   }
@@ -100,7 +104,9 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
   }
 }
 
-function toPlace(f: PhotonFeature): Place {
+const SETTLEMENTS = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'quarter', 'neighbourhood', 'borough']);
+
+function toPlace(f: PhotonFeature, lang: string): Place {
   const p = f.properties;
   const street = p.street ? `${p.street}${p.housenumber ? ` ${p.housenumber}` : ''}` : undefined;
   const name = p.name ?? street ?? p.city ?? 'Unnamed place';
@@ -109,8 +115,8 @@ function toPlace(f: PhotonFeature): Place {
   const label = context.length ? `${name}, ${context.join(', ')}` : name;
   return {
     id: `photon:${p.osm_type ?? ''}${p.osm_id ?? `${f.geometry.coordinates.join(',')}`}`,
-    name,
-    label,
+    name: localizeScript(name, lang),
+    label: localizeScript(label, lang),
     coordinate: f.geometry.coordinates,
     kind: p.type ?? p.osm_value,
   };

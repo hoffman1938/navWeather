@@ -1,3 +1,4 @@
+import { localizeScript } from '../../i18n/script';
 import type { LngLat } from '../../types/geo';
 import { cumulativeDistances } from '../../utils/distance';
 import { overpassQuery } from '../overpass';
@@ -99,7 +100,7 @@ function parsePois(elements: OverpassElement[], category: PoiCategory, language:
     out.push({
       id,
       category,
-      name: t[`name:${language}`] ?? t['name:en'] ?? t.name ?? undefined,
+      name: t[`name:${language}`] ?? t['name:en'] ?? (t.name ? localizeScript(t.name, language) : undefined),
       brand: t.brand ?? t.operator ?? undefined,
       coordinate: [lon, lat],
       openingHours: t.opening_hours,

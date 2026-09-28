@@ -26,7 +26,7 @@ export function addRouteLayers(map: MLMap) {
   const beforeId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
   // lineMetrics → line-progress, so the driven part is a gradient stop, not a re-uploaded line.
   if (!map.getSource('route')) map.addSource('route', { type: 'geojson', data: EMPTY_FC, lineMetrics: true });
-  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy']) {
+  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy', 'cameras']) {
     if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: EMPTY_FC });
   }
   const lineLayout = { 'line-join': 'round', 'line-cap': 'round' } as const;
@@ -140,6 +140,18 @@ export function addRouteLayers(map: MLMap) {
       'circle-color': route,
       'circle-stroke-color': surface,
       'circle-stroke-width': 2.5,
+    },
+  });
+  map.addLayer({
+    id: 'cameras',
+    type: 'circle',
+    source: 'cameras',
+    minzoom: 9,
+    paint: {
+      'circle-radius': 5,
+      'circle-color': cssVar('--text', '#111418'),
+      'circle-stroke-color': surface,
+      'circle-stroke-width': 2,
     },
   });
   map.addLayer({

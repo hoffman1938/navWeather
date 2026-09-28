@@ -7,6 +7,12 @@ carriageways, false arrivals, forecast-hour semantics, flip-flopping events,
 store races, `derive()` cost, re-uploaded polylines, card-heavy UI, contrast,
 i18n, CSP). This document records round 3 and the resulting state.
 
+> Round 4 (competitor study, design audit, P1 features) is documented in
+> [PLAN.md](PLAN.md) (Russian): side-panel desktop layout, 20 UX/UI fixes,
+> transliteration and Georgian grammar, best time to leave, weather + AQI
+> chip, compass, low-sun glare, time-zone changes, speed cameras (opt-in),
+> parking spot.
+
 ## Round 3 — findings (and fixes)
 
 **Reported by the user**

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { dueCamera, snapCamerasToRoute, type RouteCamera } from '../algorithms/cameras';
 import { snapIncidentsToRoute, type RouteIncident } from '../algorithms/incidents';
 import { initialDeviationState, updateDeviation } from '../algorithms/routeDeviation';
 import { createProgressTracker, edgeSpeedMps, hasArrived } from '../algorithms/routeProgress';
@@ -7,7 +8,7 @@ import { diffForecast } from '../algorithms/routeWeather';
 import { advanceSimulation, simProgress } from '../algorithms/simulation';
 import { matchSpeedLimits, speedLimitAt, updateSpeeding, type SpeedLimitProfile } from '../algorithms/speedLimits';
 import { config } from '../config';
-import { countOf, spokenDuration } from '../i18n/format';
+import { countOf, speedValue, spokenDuration } from '../i18n/format';
 import {
   acknowledge,
   evaluateDriverAlerts,
@@ -138,6 +139,8 @@ export interface AppState {
   speedLimits: SpeedLimitProfile | null;
   /** Incidents on the current route (empty without an incident provider). */
   incidents: RouteIncident[];
+  /** Mapped speed cameras on the route (only when enabled in Settings). */
+  speedCameras: RouteCamera[];
 
   forecasts: Map<string, LocationForecast>;
   /** Dev tools injected simulated weather/incidents — the UI labels it. */
@@ -251,6 +254,7 @@ let lastRecalcAt = 0;
 let noticeSeq = 0;
 const namingAttempted = new Set<string>();
 const spokenManeuvers = new Set<string>();
+const spokenCameras = new Set<string>();
 let voiceQueue: VoiceQueue | null = null;
 let trip: TripTracker | null = null;
 
@@ -361,6 +365,7 @@ function derive(s: AppState): Derived {
     vehicle: settings.vehicle,
     incidents: s.incidents,
     breakReminders: settings.breakReminders,
+    speedCameras: settings.speedCameras ? s.speedCameras : [],
     extraEvents: [],
     previous: s.derived,
   });
@@ -400,6 +405,7 @@ export const useAppStore = create<AppState>()(
     selectedOption: 0,
     speedLimits: null,
     incidents: [],
+    speedCameras: [],
     forecasts: new Map(),
     simulatedData: false,
     weatherStatus: 'idle',
@@ -496,11 +502,13 @@ export const useAppStore = create<AppState>()(
         tracker = null;
         namingAttempted.clear();
         spokenManeuvers.clear();
+    spokenCameras.clear();
         set({
           plan: primary,
           routeOptions: [primary, ...alternatives],
           selectedOption: 0,
           speedLimits: null,
+          speedCameras: [],
           routeStatus: 'ready',
           clockMs: Date.now(),
           selectedPointId: null,
@@ -800,6 +808,7 @@ export const useAppStore = create<AppState>()(
       if (!s.plan) return;
       tracker = createProgressTracker(s.plan.timed);
       spokenManeuvers.clear();
+    spokenCameras.clear();
       startTrip(s.plan.timed.totalTimeS, Date.now(), false);
       set({
         arrival: null,
@@ -930,6 +939,7 @@ export const useAppStore = create<AppState>()(
       getVoiceQueue();
       getProviders().tts.unlock();
       spokenManeuvers.clear();
+    spokenCameras.clear();
       const startMs = departureMsOf({ ...s, clockMs: Date.now() });
       const first = advanceSimulation(s.plan.timed, { nowMs: startMs, modelTimeS: 0 }, startMs, 0, 1);
       startTrip(s.plan.timed.totalTimeS, startMs, true);
@@ -1121,6 +1131,16 @@ function loadSpeedLimits() {
   if (!provider || !timed || !useSettings.getState().speedWarnings || speedLimitsFor === timed) return;
   speedLimitsFor = timed;
   const signal = planTasks?.signal ?? newPlanTasks();
+  if (useSettings.getState().speedCameras && provider.getSpeedCameras) {
+    provider
+      .getSpeedCameras(timed.route.geometry, signal)
+      .then((cams) => {
+        if (signal.aborted || useAppStore.getState().plan?.timed !== timed) return;
+        useAppStore.setState({ speedCameras: snapCamerasToRoute(cams, timed) });
+        useAppStore.getState().rederive();
+      })
+      .catch(() => undefined);
+  }
   provider
     .getSpeedLimits(timed.route.geometry, signal)
     .then((ways) => {
@@ -1189,6 +1209,16 @@ function onProgress(vehicle: VehicleState, progress: RouteProgress, speedMps: nu
     queue.holdBelowPriority(null);
   }
 
+  // 3b. Speed cameras (if enabled): once, ~600 m / 25 s before.
+  if (settings.speedCameras && s.speedCameras.length && simSpeed <= 10) {
+    const cam = dueCamera(s.speedCameras, progress.distanceAlongM, speedMps ?? 14, spokenCameras);
+    if (cam) {
+      spokenCameras.add(cam.id);
+      const limit = cam.kmh ? `${speedValue(cam.kmh, settings.units.distance)} ${settings.units.distance === 'imperial' ? m.units.mph : m.units.kmh}` : undefined;
+      queue.enqueue({ id: `cam:${cam.id}`, text: m.alert.voice.speedCamera(limit), priority: 2, expiresAt: Date.now() + 20_000 / simSpeed, interruptible: true });
+    }
+  }
+
   // 4. Weather + route events: throttled (≤1/s real time, or every 30 s of simulated time).
   const due = performance.now() - lastDeriveAt > 1000 || progress.nowMs - lastDeriveSimMs >= 30_000;
   if (!due) return;
@@ -1246,6 +1276,7 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
     if (ctrl.signal.aborted || cur.mode === 'planning') return;
     tracker = createProgressTracker(plan.timed);
     spokenManeuvers.clear();
+    spokenCameras.clear();
     // A simulated drive restarts on the new route (its clock keeps running).
     const simulating = cur.mode === 'simulating';
     const now = simulating ? cur.sim.nowMs : Date.now();
@@ -1308,6 +1339,7 @@ export function __resetStoreRuntime() {
   tracker = null;
   namingAttempted.clear();
   spokenManeuvers.clear();
+    spokenCameras.clear();
   voiceQueue = null;
   trip = null;
   speedLimitsFor = null;

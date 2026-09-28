@@ -138,6 +138,10 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     map.on('zoomstart', stopFollow);
     map.on('rotatestart', stopFollow);
     map.on('move', () => scheduleDeclutter());
+    map.on('moveend', () => {
+      const c = map.getCenter();
+      useExplore.getState().setView({ center: [c.lng, c.lat], zoom: map.getZoom() });
+    });
     mapRef.current = map;
     return () => {
       map.remove();
@@ -250,6 +254,18 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
         .filter((f) => (f.geometry as GeoJSON.LineString).coordinates.length > 1),
     });
   }, [segments, timed, styleVersion]);
+
+  // ---- Speed cameras (only when enabled) ------------------------------------------
+  const cameras = useAppStore((s) => s.speedCameras);
+  const camerasOn = useSettings((s) => s.speedCameras);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion) return;
+    setData(map, 'cameras', {
+      type: 'FeatureCollection',
+      features: camerasOn ? cameras.map((c) => pointFeature(c.coordinate, { id: c.id })) : [],
+    });
+  }, [cameras, camerasOn, styleVersion]);
 
   // ---- Places along the route ------------------------------------------------
   useEffect(() => {
@@ -477,12 +493,41 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigating, follow, styleVersion]);
 
+  // Compass: visible when the map is rotated or tilted (not while the car camera steers it).
+  const [bearing, setBearing] = useState(0);
+  const [tilted, setTilted] = useState(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const sync = () => {
+      setBearing(Math.round(map.getBearing()));
+      setTilted(map.getPitch() > 1);
+    };
+    sync();
+    map.on('rotate', sync);
+    map.on('pitch', sync);
+    return () => {
+      map.off('rotate', sync);
+      map.off('pitch', sync);
+    };
+  }, [styleVersion]);
+  const showCompass = (bearing !== 0 || tilted) && (!navigating || !follow);
+  const resetNorth = () => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: reduced ? 0 : 400 });
+
   const pointsById = useMemo(() => new Map(displayPoints.map((p) => [p.id, p])), [displayPoints]);
 
   return (
     <div className="map-wrap">
       <div ref={container} className="map" aria-label={m.ui.overview} role="region" />
       {mapError ? <div className="map-error">{mapError}</div> : null}
+      {showCompass ? (
+        <button className="compass" onClick={resetNorth} aria-label={m.ui.northUp} title={m.ui.northUp}>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" style={{ transform: `rotate(${-bearing}deg)` }}>
+            <path d="M12 3l3.2 9H8.8L12 3z" fill="var(--sev-critical)" />
+            <path d="M12 21l-3.2-9h6.4L12 21z" fill="currentColor" opacity="0.55" />
+          </svg>
+        </button>
+      ) : null}
       {hosts.map((h) => {
         const p = pointsById.get(h.id);
         return p

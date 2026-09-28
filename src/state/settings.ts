@@ -15,6 +15,8 @@ export interface Settings {
   weatherAlerts: WeatherAlertPrefs;
   speedWarnings: boolean;
   breakReminders: boolean;
+  /** Mapped speed cameras (off by default: not legal everywhere). */
+  speedCameras: boolean;
   batterySaver: boolean;
   /** Declared by the user; decides fuel vs charging stop advice. */
   vehicle: 'fuel' | 'ev';
@@ -35,6 +37,7 @@ export function defaultSettings(): Settings {
     weatherAlerts: { level: 'all', types: { rain: true, snow: true, fog: true, wind: true, temperature: true } },
     speedWarnings: true,
     breakReminders: true,
+    speedCameras: false,
     batterySaver: false,
     vehicle: 'fuel',
     fuelRangeKm: null,

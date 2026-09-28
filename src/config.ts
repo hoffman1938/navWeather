@@ -41,11 +41,13 @@ export const config = {
     speedLimits: str('VITE_SPEED_LIMIT_PROVIDER', 'overpass'),
     traffic: str('VITE_TRAFFIC_PROVIDER', 'none'),
     incidents: str('VITE_INCIDENT_PROVIDER', 'none'),
+    airQuality: str('VITE_AIR_QUALITY_PROVIDER', 'open-meteo'),
     speech: str('VITE_SPEECH_PROVIDER', 'browser'),
   },
   endpoints: {
     osrm: str('VITE_OSRM_BASE_URL', 'https://router.project-osrm.org'),
     openMeteo: str('VITE_OPEN_METEO_BASE_URL', 'https://api.open-meteo.com'),
+    openMeteoAir: str('VITE_OPEN_METEO_AIR_URL', 'https://air-quality-api.open-meteo.com'),
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),
     photon: str('VITE_PHOTON_BASE_URL', 'https://photon.komoot.io'),
     overpass: list('VITE_OVERPASS_URLS', [

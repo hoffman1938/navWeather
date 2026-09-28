@@ -140,6 +140,7 @@ export const ru: Messages = {
   },
 
   alert: {
+    clocks: (forward: boolean, hours: string, offset: string) => `Часы ${forward ? 'вперёд' : 'назад'} на ${hours} ч · ${offset}`,
     incident: {
       accident: 'ДТП',
       closure: 'Дорога перекрыта',
@@ -164,6 +165,9 @@ export const ru: Messages = {
       FUEL_STOP: 'Заправка',
       CHARGE_STOP: 'Зарядка',
       REST_BREAK: 'Перерыв',
+      SUN_GLARE: 'Низкое солнце',
+      TIMEZONE_CHANGE: 'Смена часового пояса',
+      SPEED_CAMERA: 'Камера скорости',
       DESTINATION: 'Пункт назначения',
       STOP: 'Остановка',
       POI: 'Место',
@@ -198,6 +202,8 @@ export const ru: Messages = {
       fuelStop: (name: string, distance: string) => `Рекомендуется заправка: ${name}, через ${distance}.`,
       chargeStop: (distance: string) => `Рекомендуется зарядка: примерно через ${distance}.`,
       restBreak: (place?: string) => `Около 2 часов за рулём${place ? `, около ${place}` : ''} — хорошее время для перерыва.`,
+      sunGlare: (when: string, place?: string) => `Низкое солнце впереди ${when}${place ? `, около ${place}` : ''} — возможно ослепление.`,
+      speedCamera: (limit?: string) => (limit ? `Впереди камера. Ограничение ${limit}.` : 'Впереди камера контроля скорости.'),
     },
   },
 
@@ -323,6 +329,7 @@ export const ru: Messages = {
     restart: 'Заново',
     speed: (x: number) => `Скорость симуляции ${x}×`,
     recenter: 'Вернуться',
+    northUp: 'Повернуть карту на север',
     overview: 'Весь маршрут',
     arrive: (time: string) => `Прибытие ${time}`,
     arrival: 'Прибытие',
@@ -406,6 +413,7 @@ export const ru: Messages = {
     enterPlace: 'Введите место',
     placesLimited: 'Названия мест сейчас ограничены — на погоду это не влияет',
     then: 'Затем',
+    continueOn: (road?: string) => (road ? `Продолжайте по ${road}` : 'Продолжайте прямо'),
     toward: (d: string) => `в направлении ${d}`,
     voice: 'Голосовой ассистент',
     voiceOn: 'Голос включён',
@@ -468,6 +476,8 @@ export const ru: Messages = {
     speedWarnings: 'Предупреждения о скорости',
     breakReminders: 'Напоминания о перерывах',
     breakRemindersHint: 'В долгой поездке предлагать перерыв примерно каждые 2 часа.',
+    speedCameras: 'Предупреждать о камерах',
+    speedCamerasHint: 'Только там, где это разрешено законом. Данные OpenStreetMap — могут быть неполными.',
     batterySaver: 'Экономия заряда',
     batterySaverHint: 'Меньше анимаций и обновлений позиции, когда это безопасно.',
     fuelRange: 'Запас хода (необязательно)',
@@ -539,6 +549,7 @@ export const ru: Messages = {
 
   share: {
     button: 'Поделиться геопозицией',
+    tripButton: 'Поделиться поездкой',
     title: 'Геопозиция в реальном времени',
     body: 'Люди со ссылкой видят, где вы находитесь, а при построенном маршруте — куда вы едете и когда прибудете. Регистрация не нужна.',
     name: 'Ваше имя (необязательно)',
@@ -621,6 +632,29 @@ export const ru: Messages = {
     noProvider: 'источник не подключён',
     osm: 'OpenStreetMap, может быть неполным — знаки важнее',
     loading: 'загрузка',
+  },
+  depart: {
+    title: 'Когда выехать',
+    suggest: (time: string, less: string) => `Выезд в ${time}: ${less}.`,
+    lessRain: (d: string) => `примерно на ${d} меньше дождя`,
+    lessSevere: (d: string) => `примерно на ${d} меньше непогоды`,
+    use: (time: string) => `Выехать в ${time}`,
+    currentBest: 'Выбранное время выезда — лучшее на ближайшие 12 часов.',
+    similar: 'Погода в пути примерно одинакова, когда бы вы ни выехали в ближайшие 12 часов.',
+    legendRain: 'Дождь',
+    legendSevere: 'Ливень, гроза, снег',
+    bar: (time: string, wet: string) => `Выезд в ${time}: около ${wet} под дождём`,
+    selected: 'выбрано',
+  },
+  air: {
+    title: 'Качество воздуха',
+    here: 'Погода в центре карты',
+    levels: { good: 'Хорошее', fair: 'Удовлетворительное', moderate: 'Умеренное', poor: 'Плохое', veryPoor: 'Очень плохое', extremelyPoor: 'Крайне плохое' },
+  },
+  parking: {
+    title: 'Машина здесь',
+    save: 'Запомнить парковку',
+    saved: 'Парковка сохранена',
   },
 };
 

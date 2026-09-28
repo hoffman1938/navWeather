@@ -6,8 +6,7 @@ import { useAppStore } from '../../state/store';
 import { formatLocalTime } from '../../utils/timezone';
 import { BottomSheet } from '../BottomSheet/BottomSheet';
 import { EventIcon } from '../Common/EventIcon';
-import { useLiveShare } from '../../share/liveShare';
-import { CloseIcon, LiveIcon, PauseIcon, PlayIcon } from '../Icons/Icons';
+import { CloseIcon, PauseIcon, PlayIcon } from '../Icons/Icons';
 import { PlacesPanel } from '../Places/PlacesPanel';
 import { DataSources } from '../Plan/DataSources';
 import { TimeScrubber } from '../TimeScrubber/TimeScrubber';
@@ -62,10 +61,7 @@ function EtaBar() {
           <span>{remainingMin !== null ? formatDuration(remainingMin * 60, m) : m.ui.waitingForLocation}</span>
           {remainingM !== null ? <span className="etabar__cap">{formatDistance(remainingM, units, m)}</span> : null}
         </div>
-        <div className="etabar__controls">
-          <ShareTripButton />
-          {simulating ? <SimControls /> : <EndButton />}
-        </div>
+        <div className="etabar__controls">{simulating ? <SimControls /> : <EndButton />}</div>
       </div>
       {simulating && simClockMin !== null ? (
         <p className="etabar__sim">
@@ -83,22 +79,6 @@ function EtaBar() {
         </p>
       ) : null}
     </div>
-  );
-}
-
-/** Share where I am and where I'm going (live). */
-function ShareTripButton() {
-  const m = useMessages();
-  const active = useLiveShare((s) => s.status === 'active');
-  return (
-    <button
-      className={`roundbtn${active ? ' roundbtn--on' : ''}`}
-      onClick={() => useLiveShare.getState().openDialog()}
-      aria-label={active ? m.share.active : m.share.button}
-      aria-pressed={active}
-    >
-      <LiveIcon size={20} />
-    </button>
   );
 }
 

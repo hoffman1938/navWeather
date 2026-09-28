@@ -60,12 +60,18 @@
 }
 .search__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   margin-top: 4px;
 }
 .search__spacer {
   flex: 1;
+}
+/* Long labels (ka/ru): the main action wraps to its own line instead of overflowing. */
+.search__actions .btn-primary {
+  margin-left: auto;
+  max-width: 100%;
 }
 .search__error {
   margin: 8px 8px 2px;

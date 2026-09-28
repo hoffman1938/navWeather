@@ -105,6 +105,7 @@ export function installFakeProviders(baseMs: number): Harness {
     elevation: null,
     traffic: new NoTrafficProvider(),
     incidents: new NoIncidentProvider(),
+    air: null,
     map: new StyleUrlMapProvider('test', 'light', 'dark'),
     weather: new WeatherService(weather, {
       ttlMs: 20 * 60000,

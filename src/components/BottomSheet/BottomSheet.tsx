@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SheetState } from '../../state/store';
 import { useLayoutStore } from '../../state/layout';
 import { useElementSize } from '../../hooks/useElementSize';
@@ -27,13 +27,16 @@ export function BottomSheet({ state, onChange, header, body, extra, label, grabb
   const drag = useRef<{ y: number; id: number; active: boolean } | null>(null);
   const [dy, setDy] = useState(0);
   const setInsets = useLayoutStore((s) => s.setInsets);
+  const setSheetCovers = useLayoutStore((s) => s.setSheetCovers);
   const m = useMessages();
 
   useElementSize(ref, (r) => {
-    // Docked at the side (landscape phones): the map loses width, not height.
-    const side = r.top < 80 && r.width < window.innerWidth * 0.6;
+    // Docked at the side (desktop panel, landscape phones): the map loses width, not height.
+    const side = r.left <= 40 && r.width < window.innerWidth * 0.6;
     setInsets(side ? { bottom: 0, left: Math.round(r.right) } : { bottom: Math.round(window.innerHeight - r.top), left: 0 });
+    setSheetCovers(!side && r.top < window.innerHeight * 0.42);
   });
+  useEffect(() => () => useLayoutStore.getState().setSheetCovers(false), []);
 
   const step = (dir: 1 | -1) => {
     const i = ORDER.indexOf(state);

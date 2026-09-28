@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildTimedRoute } from '../algorithms/routeTiming';
+import { buildTimedRoute, timeAtDistance } from '../algorithms/routeTiming';
+import type { RouteWeatherPoint } from '../types/weather';
+import { solarPosition } from '../utils/sun';
 import { en } from '../i18n/en';
 import { tbilisiBatumiRoute } from '../test/helpers';
 import { buildRouteIntelligence, type IntelligenceInput } from './routeIntelligence';
@@ -65,5 +67,50 @@ describe('break reminders', () => {
     expect(buildRouteIntelligence(input({ breakReminders: false })).events.some((e) => e.type === 'REST_BREAK')).toBe(false);
     const late = buildRouteIntelligence(input({ progressM: timed.totalDistM * 0.9 }));
     expect(late.events.some((e) => e.type === 'REST_BREAK')).toBe(false);
+  });
+});
+
+describe('sun and clock events', () => {
+  const pts = (tz: (i: number) => string, cond: 'CLEAR' | 'CLOUDY') =>
+    Array.from({ length: 12 }, (_, i) => {
+      const d = (i / 11) * timed.totalDistM;
+      return {
+        id: `p${i}`,
+        distanceFromStartKm: d / 1000,
+        arrivalMs: Date.UTC(2026, 8, 26, 4) + timeAtDistance(timed, d) * 1000,
+        timezone: tz(i),
+        placeName: i === 9 ? 'Samtredia' : undefined,
+        weather: { condition: cond, temperature: 20, cloudCover: cond === 'CLEAR' ? 5 : 95, isDay: true },
+      } as unknown as RouteWeatherPoint;
+    });
+
+  it('sun position: east in the morning, south at noon, west in the evening (Tbilisi)', () => {
+    const at = (h: number) => solarPosition(41.7, 44.8, Date.UTC(2026, 8, 26, h));
+    expect(at(3).azimuthDeg).toBeGreaterThan(70); // ~07:00 local
+    expect(at(3).azimuthDeg).toBeLessThan(110);
+    expect(Math.abs(at(9).azimuthDeg - 180)).toBeLessThan(25); // ~13:00 local
+    expect(at(14).azimuthDeg).toBeGreaterThan(250); // ~18:00 local
+  });
+
+  it('driving west towards a low sun under a clear sky: one glare notice; none when overcast', () => {
+    // Leave Tbilisi 13:10 UTC (17:10 local, late September): the western half is driven into the setting sun.
+    const clock = { mode: 'planning' as const, departureMs: Date.UTC(2026, 8, 26, 13, 10) };
+    const clear = buildRouteIntelligence(input({ clock, weatherPoints: pts(() => 'Asia/Tbilisi', 'CLEAR') }));
+    const glare = clear.events.filter((e) => e.type === 'SUN_GLARE');
+    expect(glare.length).toBeGreaterThan(0);
+    expect(glare[0].severity).toBe('medium');
+    expect(glare[0].voiceMessage).toMatch(/^Low sun ahead in about/);
+    const cloudy = buildRouteIntelligence(input({ clock, weatherPoints: pts(() => 'Asia/Tbilisi', 'CLOUDY') }));
+    expect(cloudy.events.some((e) => e.type === 'SUN_GLARE')).toBe(false);
+    const midday = buildRouteIntelligence(input({ clock: { mode: 'planning', departureMs: Date.UTC(2026, 8, 26, 6) }, weatherPoints: pts(() => 'Asia/Tbilisi', 'CLEAR') }));
+    expect(midday.events.some((e) => e.type === 'SUN_GLARE')).toBe(false);
+  });
+
+  it('a time zone change on the route (e.g. Georgia → Turkey) says which way the clocks go', () => {
+    const r = buildRouteIntelligence(input({ weatherPoints: pts((i) => (i < 8 ? 'Asia/Tbilisi' : 'Europe/Istanbul'), 'CLOUDY') }));
+    const tz = r.events.filter((e) => e.type === 'TIMEZONE_CHANGE');
+    expect(tz).toHaveLength(1);
+    expect(tz[0].shortMessage).toBe('Clocks go back 1 h · GMT+3');
+    expect(tz[0].severity).toBe('low');
   });
 });

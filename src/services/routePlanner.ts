@@ -1,3 +1,4 @@
+import { localizeScript } from '../i18n/script';
 import { snapPlacesToRoute } from '../algorithms/placesAlongRoute';
 import { nameSamples, refineSamplesForWeather, mergeSamples, sampleRoute } from '../algorithms/routeSampling';
 import { buildTimedRoute, positionAtDistance } from '../algorithms/routeTiming';
@@ -104,7 +105,8 @@ export async function planRouteOptions(
     avoid: options.avoid,
     signal,
   });
-  const withTraffic = await Promise.all(routes.map((r) => providers.traffic.applyTraffic(r, signal)));
+  const localized = routes.map((r) => localizeRouteNames(r, options.language ?? 'en'));
+  const withTraffic = await Promise.all(localized.map((r) => providers.traffic.applyTraffic(r, signal)));
   onStage?.('places');
   const primary = await enrichRoute(providers, withTraffic[0], {
     signal,
@@ -123,6 +125,19 @@ export async function planRoute(
   options: PlanOptions = {},
 ): Promise<PlannedRoute> {
   return (await planRouteOptions(providers, origin, destination, { ...options, alternatives: false })).primary;
+}
+
+/** Street names and road numbers in the UI's script (OSM often has Georgian only). */
+export function localizeRouteNames(route: Route, language: string): Route {
+  if (language === 'ka') return route;
+  const fix = (s?: string) => (s ? localizeScript(s, language) : s);
+  return {
+    ...route,
+    legs: route.legs.map((leg) => ({
+      ...leg,
+      steps: leg.steps.map((st) => ({ ...st, name: fix(st.name) ?? '', ref: fix(st.ref), destinations: fix(st.destinations), rotaryName: fix(st.rotaryName) })),
+    })),
+  };
 }
 
 /** Timing + distance/time sampling only (no network). */

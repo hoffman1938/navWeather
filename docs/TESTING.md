@@ -27,7 +27,10 @@ npm run test:share    # end-to-end checks of the live-sharing relay
 | Location | `services/location.test.ts` | error classification, shared watcher, GPS→Wi-Fi fallback, one-shot fix |
 | Explore | `state/explore.test.ts` | place card weather + drive time, dropped pins, directions from "Your location", blocked location |
 | Sharing | `share/*.test.ts`, `scripts/share-smoke.mjs` | validation, merge (route once, latest position only), cadence, relay auth/limits/ordering/stop |
-| Saved places | `state/savedPlaces.test.ts` | slots, dedupe, recents opt-out |
+| Saved places, parking | `state/savedPlaces.test.ts` | slots, dedupe, recents opt-out, one parking spot |
+| Best time to leave | `algorithms/departurePlanner.test.ts` | exposure per departure, nearest clearly-better suggestion, forecast horizon |
+| Sun, clocks, cameras | `routeIntelligence.test.ts`, `algorithms/cameras.test.ts` | sun azimuth, glare only into a low sun under clear sky, time-zone change wording, cameras snapped and announced once |
+| Names and grammar | `i18n/script.test.ts` | Georgian → Latin/Cyrillic (streets, road numbers), Georgian postposition rules |
 | Store end-to-end | `state/store.test.ts`, `state/scenarios.test.ts` | Tbilisi → Batumi: plan, weather, refresh, simulate, alerts, deviation + recalculation, network loss, arrival summary, assistant |
 | PWA | `test/serviceWorker.test.ts` | shell only; provider, tile and `/api` traffic never cached |
 
@@ -43,6 +46,14 @@ providers, location watcher, live-share status. During a simulated drive it
 adds +10 km, +30 min, next event, deviate, "heavy rain ahead" and "accident
 report". Injected data is flagged and the UI labels it as simulated. None of
 this is in production builds.
+
+## Screenshot audit
+
+Every state (explore, search, place card, directions, route, expanded route,
+settings, driving, expanded driving, share dialog, arrival) is captured at
+1440×900 and 390×844, light and dark, English and Georgian, with headless
+Chrome driving the dev build (emulated GPS). Findings and fixes are tracked in
+`docs/PLAN.md` §3.
 
 ## Manual / browser checks performed
 

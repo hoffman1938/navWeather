@@ -39,6 +39,7 @@ function providers(placesDelayMs: number, failPlaces = false): Providers {
     speechRecognition: new FakeRecognition(),
     traffic: new NoTrafficProvider(),
     incidents: new NoIncidentProvider(),
+    air: null,
     map: new StyleUrlMapProvider('t', 'l', 'd'),
     weather: new WeatherService(new FakeWeatherProvider(Date.now()), {
       ttlMs: 1e6,

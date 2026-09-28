@@ -46,3 +46,7 @@
     bottom: calc(var(--safe-bottom) + 12px);
   }
 }
+.fab--on {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}

@@ -107,6 +107,15 @@ export function formatDuration(seconds: number, m: Messages): string {
   return mm === 0 ? `${num(h, m.locale)} ${m.units.h}` : `${num(h, m.locale)} ${m.units.h} ${num(mm, m.locale)} ${m.units.min}`;
 }
 
+/** Tight spaces (timeline columns): "1 h 40", "55 min". */
+export function formatDurationCompact(seconds: number, m: Messages): string {
+  const total = Math.round(Math.max(0, seconds) / 60);
+  if (total < 60) return formatDuration(seconds, m);
+  const h = Math.floor(total / 60);
+  const mm = total % 60;
+  return mm === 0 ? `${num(h, m.locale)} ${m.units.h}` : `${num(h, m.locale)} ${m.units.h} ${String(mm).padStart(2, '0')}`;
+}
+
 /** Spoken duration: "about 25 minutes", "about an hour", "1 hour 20 minutes". */
 export function spokenDuration(seconds: number, m: Messages, withAbout = true): string {
   const total = Math.round(Math.max(0, seconds) / 60);

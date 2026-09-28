@@ -1,3 +1,4 @@
+import { localizeScript } from '../../i18n/script';
 import type { LngLat } from '../../types/geo';
 import type { PlaceKind } from '../../types/route';
 import { cumulativeDistances } from '../../utils/distance';
@@ -79,7 +80,7 @@ export function parseOverpassElements(elements: OverpassElement[], language: str
     seen.add(e.id);
     const kind = e.tags.place as PlaceKind;
     if (kind !== 'city' && kind !== 'town' && kind !== 'village') continue;
-    const name = e.tags[`name:${language}`] ?? e.tags['int_name'] ?? e.tags['name:en'] ?? e.tags.name;
+    const name = e.tags[`name:${language}`] ?? (language === 'ka' ? e.tags.name : undefined) ?? e.tags['int_name'] ?? e.tags['name:en'] ?? localizeScript(e.tags.name ?? '', language);
     if (!name) continue;
     const pop = Number(String(e.tags.population ?? '').replace(/[^\d]/g, ''));
     out.push({

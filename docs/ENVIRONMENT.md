@@ -22,6 +22,7 @@ Worker route instead (see `worker/`).
 | `VITE_MAP_PROVIDER` | `openfreemap` | `openfreemap` |
 | `VITE_TRAFFIC_PROVIDER` | `none` | `none` (interface ready) |
 | `VITE_INCIDENT_PROVIDER` | `none` | `none` (interface ready) |
+| `VITE_AIR_QUALITY_PROVIDER` | `open-meteo` | `open-meteo`, `none` |
 | `VITE_SPEECH_PROVIDER` | `browser` | `browser` |
 
 ## Endpoints
@@ -30,6 +31,7 @@ Worker route instead (see `worker/`).
 | --- | --- |
 | `VITE_OSRM_BASE_URL` | `https://router.project-osrm.org` |
 | `VITE_OPEN_METEO_BASE_URL` | `https://api.open-meteo.com` |
+| `VITE_OPEN_METEO_AIR_URL` | `https://air-quality-api.open-meteo.com` |
 | `VITE_NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` |
 | `VITE_PHOTON_BASE_URL` | `https://photon.komoot.io` |
 | `VITE_OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` |

@@ -8,7 +8,7 @@ import type { Place } from '../types/geo';
  * never positions.
  */
 
-export type SavedSlot = 'home' | 'work' | 'favorite';
+export type SavedSlot = 'home' | 'work' | 'favorite' | 'parking';
 
 interface SavedPlace extends Place {
   slot: SavedSlot;
@@ -55,7 +55,7 @@ function load(): Persisted {
     if (!raw) return empty;
     const d = JSON.parse(raw) as Partial<Persisted>;
     return {
-      saved: (d.saved ?? []).filter((p): p is SavedPlace => valid(p) && ['home', 'work', 'favorite'].includes((p as SavedPlace).slot)),
+      saved: (d.saved ?? []).filter((p): p is SavedPlace => valid(p) && ['home', 'work', 'favorite', 'parking'].includes((p as SavedPlace).slot)),
       recents: (d.recents ?? []).filter(valid).slice(0, MAX_RECENTS),
       rememberRecents: d.rememberRecents !== false,
     };
@@ -83,7 +83,7 @@ export const useSavedPlaces = create<SavedPlacesState>()((set, get) => {
     save(place, slot) {
       const p = { ...slim(place), slot };
       let saved = get().saved;
-      // Home and Work are single slots; a favourite is saved once per spot.
+      // Home, Work and Parking are single slots; a favourite is saved once per spot.
       saved = slot === 'favorite' ? saved.filter((s) => !(s.slot === 'favorite' && sameSpot(s, p))) : saved.filter((s) => s.slot !== slot);
       commit({ saved: [p, ...saved].slice(0, MAX_FAVORITES + 2) });
     },
@@ -115,10 +115,14 @@ export const useSavedPlaces = create<SavedPlacesState>()((set, get) => {
 /** Suggestions for an empty search field: Home, Work, favourites, then recent destinations. */
 export function quickPlaces(): { place: Place; slot: SavedSlot | 'recent' }[] {
   const { saved, recents } = useSavedPlaces.getState();
-  const order: SavedSlot[] = ['home', 'work', 'favorite'];
+  const order: SavedSlot[] = ['parking', 'home', 'work', 'favorite'];
   const out: { place: Place; slot: SavedSlot | 'recent' }[] = [...saved]
     .sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot))
     .map((s) => ({ place: s, slot: s.slot }));
   for (const r of recents) if (!out.some((o) => sameSpot(o.place, r))) out.push({ place: r, slot: 'recent' });
   return out.slice(0, 8);
+}
+
+export function parkingSpot(): Place | null {
+  return useSavedPlaces.getState().saved.find((s) => s.slot === 'parking') ?? null;
 }

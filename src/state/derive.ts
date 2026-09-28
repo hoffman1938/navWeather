@@ -1,3 +1,4 @@
+import type { RouteCamera } from '../algorithms/cameras';
 import type { RouteIncident } from '../algorithms/incidents';
 import { buildCurrentPoint, buildRouteWeatherPoints, reconcilePoints } from '../algorithms/routeWeather';
 import { computeArrivals } from '../algorithms/routeTiming';
@@ -101,6 +102,7 @@ export interface DeriveInput {
   vehicle?: 'fuel' | 'ev';
   incidents?: RouteIncident[];
   breakReminders?: boolean;
+  speedCameras?: RouteCamera[];
   extraEvents: RouteEvent[];
   previous: Derived;
 }
@@ -172,6 +174,7 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     vehicle: input.vehicle,
     incidents: input.incidents,
     breakReminders: input.breakReminders,
+    speedCameras: input.speedCameras,
     extraEvents: input.extraEvents,
     m,
     units,

@@ -1,3 +1,4 @@
+import { localizeScript } from '../../i18n/script';
 import type { LngLat, Place } from '../../types/geo';
 import { fetchJson, RateLimiter } from '../http';
 import type { GeocodeOptions, GeocodingProvider } from './GeocodingProvider';
@@ -50,7 +51,7 @@ export class NominatimProvider implements GeocodingProvider {
         signal: options.signal,
       }),
     );
-    const place = results[0] ? toPlace(results[0]) : null;
+    const place = results[0] ? toPlace(results[0], lang) : null;
     this.cache.set(key, place);
     return place;
   }
@@ -75,7 +76,7 @@ export class NominatimProvider implements GeocodingProvider {
         signal: options.signal,
       }),
     );
-    const place = result && !result.error ? toPlace(result, coordinate) : null;
+    const place = result && !result.error ? toPlace(result, lang, coordinate) : null;
     this.cache.set(key, place);
     return place;
   }
@@ -89,7 +90,7 @@ function validCoord(lon: number, lat: number): boolean {
   return Number.isFinite(lon) && Number.isFinite(lat) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
 }
 
-function toPlace(r: NominatimResult, exact?: LngLat): Place | null {
+function toPlace(r: NominatimResult, lang: string, exact?: LngLat): Place | null {
   const a = r.address ?? {};
   const settlement = a.city ?? a.town ?? a.village ?? a.hamlet ?? a.suburb ?? a.municipality;
   const name = r.name || settlement || r.display_name.split(',')[0];
@@ -99,8 +100,8 @@ function toPlace(r: NominatimResult, exact?: LngLat): Place | null {
   if (!validCoord(coordinate[0], coordinate[1])) return null;
   return {
     id: `nominatim:${r.place_id}`,
-    name,
-    label,
+    name: localizeScript(name, lang),
+    label: localizeScript(label, lang),
     coordinate,
     kind: r.addresstype ?? r.type,
   };

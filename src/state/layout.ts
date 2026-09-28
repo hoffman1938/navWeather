@@ -8,8 +8,20 @@ export interface Insets {
   right: number;
 }
 
-export const useLayoutStore = create<{ insets: Insets; setInsets(p: Partial<Insets>): void }>((set, get) => ({
+interface LayoutState {
+  insets: Insets;
+  /** A bottom sheet covers most of the map: floating map buttons step aside. */
+  sheetCovers: boolean;
+  setInsets(p: Partial<Insets>): void;
+  setSheetCovers(v: boolean): void;
+}
+
+export const useLayoutStore = create<LayoutState>((set, get) => ({
   insets: { top: 80, bottom: 280, left: 0, right: 0 },
+  sheetCovers: false,
+  setSheetCovers: (sheetCovers) => {
+    if (get().sheetCovers !== sheetCovers) set({ sheetCovers });
+  },
   setInsets: (p) => {
     const cur = get().insets;
     const next = { ...cur, ...p };

@@ -19,6 +19,7 @@ import {
 } from '../voice/providers';
 import { OSRMProvider } from './routing/OSRMProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
+import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
 import { NoIncidentProvider, type IncidentProvider } from './traffic/IncidentProvider';
 import { NoTrafficProvider, type TrafficProvider } from './traffic/TrafficProvider';
 import { OpenMeteoProvider } from './weather/OpenMeteoProvider';
@@ -38,6 +39,8 @@ export interface Providers {
   elevation: ElevationProvider | null;
   traffic: TrafficProvider;
   incidents: IncidentProvider;
+  /** Air quality (AQI) — optional. */
+  air: AirQualityProvider | null;
   map: MapProvider;
   weather: WeatherService;
   tts: TextToSpeechProvider;
@@ -107,6 +110,8 @@ export function createProviders(cfg: AppConfig = config): Providers {
   // No free live-traffic source exists; the interface is ready for one.
   const traffic: TrafficProvider = p.traffic === 'none' ? new NoTrafficProvider() : unknown('traffic', p.traffic);
   const incidents: IncidentProvider = p.incidents === 'none' ? new NoIncidentProvider() : unknown('incident', p.incidents);
+  const air: AirQualityProvider | null =
+    p.airQuality === 'open-meteo' ? new OpenMeteoAirQualityProvider(e.openMeteoAir) : p.airQuality === 'none' ? null : unknown('air quality', p.airQuality);
   if (p.speech !== 'browser') unknown('speech', p.speech);
 
   return {
@@ -120,6 +125,7 @@ export function createProviders(cfg: AppConfig = config): Providers {
     elevation,
     traffic,
     incidents,
+    air,
     map,
     weather: new WeatherService(weatherProvider, {
       ttlMs: cfg.weather.cacheTtlMinutes * 60000,

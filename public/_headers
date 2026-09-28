@@ -1,7 +1,7 @@
 # Cloudflare Pages response headers. connect-src must list every provider
 # endpoint configured through VITE_* variables (update both together).
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://router.project-osrm.org https://nominatim.openstreetmap.org https://photon.komoot.io https://overpass-api.de https://overpass.kumi.systems https://api.open-meteo.com https://tiles.openfreemap.org; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://router.project-osrm.org https://nominatim.openstreetmap.org https://photon.komoot.io https://overpass-api.de https://overpass.kumi.systems https://api.open-meteo.com https://air-quality-api.open-meteo.com https://tiles.openfreemap.org; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
   Permissions-Policy: geolocation=(self), microphone=(self), camera=(), payment=(), usb=()
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff

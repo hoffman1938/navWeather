@@ -2,7 +2,9 @@
  * Georgian messages. Draft translation — needs review by a native speaker
  * before release. Georgian nouns stay singular after numerals and "in" is a
  * suffix (25 წუთში), so time/distance forms below are locative.
- * Place names get a hyphenated postposition (ხაშურ-თან → "Khashuri-თან").
+ * Place and road names take the postposition by Georgian case rules
+ * (ხაშური → ხაშურთან, სამტრედია → სამტრედიასთან, ბათუმი → ბათუმამდე);
+ * numbers, abbreviations and Latin-script names keep the hyphen (S12-ზე).
  */
 import type { Messages } from './en';
 import type { PluralForms } from './plural';
@@ -18,8 +20,29 @@ const dir: Record<string, string> = {
   uturn: 'შემობრუნება',
 };
 const sideOf = (d?: string) => (d && d.includes('left') ? 'მარცხენა მხარე' : 'მარჯვენა მხარე');
-const near = (p: string) => `${p}-თან ახლოს`;
-const onto = (road?: string) => (road ? `, ${road}-ზე` : '');
+type Postposition = 'tan' | 'shi' | 'ze' | 'mde' | 'is';
+const SUFFIX: Record<Postposition, string> = { tan: 'თან', shi: 'ში', ze: 'ზე', mde: 'მდე', is: 'ის' };
+
+/** A name with a postposition, declined like a Georgian noun (last word only). */
+export function withPostposition(name: string, pp: Postposition): string {
+  const last = name.slice(-1);
+  if (!/[\u10D0-\u10FA]/.test(last)) return `${name}-${SUFFIX[pp]}`; // S12-ზე, Khunevi-თან
+  if (last === 'ი') {
+    // Consonant stem: the nominative -ი drops.
+    const stem = name.slice(0, -1);
+    return pp === 'mde' ? `${stem}ამდე` : `${stem}${SUFFIX[pp]}`;
+  }
+  if ('აეოუ'.includes(last)) {
+    if (pp === 'tan') return `${name}სთან`;
+    if (pp === 'is') return last === 'ა' || last === 'ე' ? `${name.slice(0, -1)}ის` : `${name}ს`;
+    return `${name}${SUFFIX[pp]}`;
+  }
+  return pp === 'mde' ? `${name}ამდე` : `${name}${SUFFIX[pp]}`;
+}
+
+const near = (p: string) => `${withPostposition(p, 'tan')} ახლოს`;
+const onto = (road?: string) => (road ? `, ${withPostposition(road, 'ze')}` : '');
+const toward = (d: string) => `${withPostposition(d, 'is')} მიმართულებით`;
 const ordinal = (n: number) =>
   ['პირველ', 'მეორე', 'მესამე', 'მეოთხე', 'მეხუთე', 'მეექვსე', 'მეშვიდე', 'მერვე', 'მეცხრე', 'მეათე'][n - 1] ?? `მე-${n}`;
 
@@ -68,8 +91,8 @@ export const ka: Messages = {
     newName: (road: string) => `გააგრძელეთ${onto(road)}`,
     merge: (d?: string, road?: string) => `შეუერთდით ნაკადს${d ? ` (${sideOf(d)})` : ''}${onto(road)}`,
     onRamp: (_d?: string, road?: string) => `შედით მისასვლელ გზაზე${onto(road)}`,
-    offRamp: (_d?: string, toward?: string) => `გადით გასასვლელზე${toward ? `, ${toward}-ის მიმართულებით` : ''}`,
-    fork: (d: string, toward?: string) => `განშტოებაზე დაიჭირეთ ${sideOf(d)}${toward ? `, ${toward}-ის მიმართულებით` : ''}`,
+    offRamp: (_d?: string, to?: string) => `გადით გასასვლელზე${to ? `, ${toward(to)}` : ''}`,
+    fork: (d: string, to?: string) => `განშტოებაზე დაიჭირეთ ${sideOf(d)}${to ? `, ${toward(to)}` : ''}`,
     roundabout: (exit?: number, road?: string) =>
       exit ? `წრიულ გზაზე გადით ${ordinal(exit)} გასასვლელზე${onto(road)}` : 'შედით წრიულ გზაზე',
     roundaboutTurn: (d: string) => `წრიულ გზაზე მოუხვიეთ ${dir[d] ?? d}`,
@@ -129,7 +152,7 @@ export const ka: Messages = {
       freezing: (p?: string) => `შესაძლოა ყინულოვანი წვიმა${p ? `, ${near(p)}` : ''}`,
       rainMuch: 'წვიმა მოსალოდნელია მარშრუტის დიდ ნაწილზე',
       group: (label: string, p?: string) => `${label}${p ? `, ${near(p)}` : ''}`,
-      groupIn: (label: string, place: string) => `${label}, ${place}-ში`,
+      groupIn: (label: string, place: string) => `${label}, ${withPostposition(place, 'shi')}`,
       fog: (p?: string) => `შესაძლოა ნისლი${p ? `, ${near(p)}` : ''}`,
       clearDry: 'მშრალი და მოწმენდილი ამინდი მთელ მარშრუტზე',
       mostlyDry: 'მარშრუტზე უმეტესად მშრალი ამინდია',
@@ -138,6 +161,7 @@ export const ka: Messages = {
   },
 
   alert: {
+    clocks: (forward: boolean, hours: string, offset: string) => `საათი ${hours} სთ-ით ${forward ? 'წინ' : 'უკან'} · ${offset}`,
     incident: {
       accident: 'ავარია',
       closure: 'გზა დაკეტილია',
@@ -162,6 +186,9 @@ export const ka: Messages = {
       FUEL_STOP: 'საწვავი',
       CHARGE_STOP: 'დამუხტვა',
       REST_BREAK: 'შესვენება',
+      SUN_GLARE: 'დაბალი მზე',
+      TIMEZONE_CHANGE: 'სასაათო სარტყლის ცვლილება',
+      SPEED_CAMERA: 'სიჩქარის კამერა',
       DESTINATION: 'დანიშნულება',
       STOP: 'გაჩერება',
       POI: 'ადგილი',
@@ -192,7 +219,9 @@ export const ka: Messages = {
       incident: (what: string, when: string, reported: boolean) => `წინ: ${what}${reported ? ' (შეტყობინებით)' : ''}, ${when}.`,
       fuelStop: (name: string, distance: string) => `გირჩევთ საწვავის შევსებას: ${name}, ${distance} წინ.`,
       chargeStop: (distance: string) => `გირჩევთ დამუხტვას, დაახლოებით ${distance} წინ.`,
-      restBreak: (place?: string) => `დაახლოებით 2 საათია საჭესთან ხართ${place ? `, ${place}-სთან ახლოს` : ''} — კარგი დროა შესვენებისთვის.`,
+      restBreak: (place?: string) => `დაახლოებით 2 საათია საჭესთან ხართ${place ? `, ${near(place)}` : ''} — კარგი დროა შესვენებისთვის.`,
+      sunGlare: (when: string, place?: string) => `წინ დაბალი მზეა ${when}${place ? `, ${near(place)}` : ''} — შესაძლოა დაგაბრმავოთ.`,
+      speedCamera: (limit?: string) => (limit ? `წინ კამერაა. ლიმიტი ${limit}.` : 'წინ სიჩქარის კამერაა.'),
     },
   },
 
@@ -203,10 +232,10 @@ export const ka: Messages = {
     unsupported: 'ხმოვანი ბრძანებები ამ ბრაუზერში არ მუშაობს.',
     micDenied: 'მიკროფონზე წვდომა უარყოფილია.',
     eta: (time: string, duration: string) => `ჩახვალთ ${time}-ზე, ${duration}.`,
-    distanceTo: (place: string, distance: string, duration: string) => `${place}-მდე ${distance}, ${duration}.`,
+    distanceTo: (place: string, distance: string, duration: string) => `${withPostposition(place, 'mde')} ${distance}, ${duration}.`,
     placeNotOnRoute: (place: string) => `${place} თქვენს მარშრუტზე არ არის.`,
     nextTurn: (voice: string) => voice,
-    noMoreTurns: (destination: string) => `გააგრძელეთ ამ გზით ${destination}-მდე.`,
+    noMoreTurns: (destination: string) => `გააგრძელეთ ამ გზით ${withPostposition(destination, 'mde')}.`,
     noWeatherIssues: 'მარშრუტის დარჩენილ ნაწილზე მნიშვნელოვანი ამინდი არ არის მოსალოდნელი.',
     rainNow: (clears?: string) => (clears ? `ახლა წვიმს. შესუსტდება ${clears}.` : 'ახლა წვიმს.'),
     noRain: 'მარშრუტზე წვიმა არ არის მოსალოდნელი.',
@@ -226,7 +255,13 @@ export const ka: Messages = {
     avoid: { tolls: 'ფასიანი გზები', highways: 'ავტომაგისტრალები', ferries: 'ბორნები' },
     stopped: 'ნავიგაცია შეწყდა.',
     whereAmI: (road?: string, place?: string) =>
-      road && place ? `ხართ ${road}-ზე, ${near(place)}.` : road ? `ხართ ${road}-ზე.` : place ? `ხართ ${near(place)}.` : 'ჯერ ვერ ვადგენ, სად ხართ.',
+      road && place
+        ? `ხართ ${withPostposition(road, 'ze')}, ${near(place)}.`
+        : road
+          ? `ხართ ${withPostposition(road, 'ze')}.`
+          : place
+            ? `ხართ ${near(place)}.`
+            : 'ჯერ ვერ ვადგენ, სად ხართ.',
     muted: 'ხმოვანი მითითებები გამორთულია.',
     unmuted: 'ხმოვანი მითითებები ჩართულია.',
   },
@@ -307,7 +342,7 @@ export const ka: Messages = {
     presetIn1h: '1 საათში',
     presetIn3h: '3 საათში',
     presetTomorrow: 'ხვალ 08:00',
-    customTime: (place: string, offset: string) => `${place}-ის დრო (${offset})`,
+    customTime: (place: string, offset: string) => `${withPostposition(place, 'is')} დრო (${offset})`,
     horizonHint: 'პროგნოზი დაახლოებით ორი კვირით ადრე ხელმისაწვდომია და შორეული დღეებისთვის ნაკლებად ზუსტია.',
     start: 'დაწყება',
     simulate: 'მგზავრობის სიმულაცია',
@@ -318,6 +353,7 @@ export const ka: Messages = {
     restart: 'თავიდან',
     speed: (x: number) => `სიმულაციის სიჩქარე ${x}×`,
     recenter: 'ცენტრირება',
+    northUp: 'რუკის ჩრდილოეთით მობრუნება',
     overview: 'მთელი მარშრუტი',
     arrive: (time: string) => `ჩასვლა ${time}`,
     arrival: 'ჩასვლა',
@@ -352,7 +388,7 @@ export const ka: Messages = {
     whereHint: 'გადაადგილეთ, რომ ნახოთ სავარაუდო მდებარეობა და პროგნოზი იმ დროისთვის.',
     youllBeAt: (place: string) => `იქნებით ${near(place)}`,
     youllBeKm: (km: string) => `გავლილი იქნება ${km}`,
-    youllHaveArrived: (place: string) => `უკვე იქნებით ${place}-ში`,
+    youllHaveArrived: (place: string) => `უკვე იქნებით ${withPostposition(place, 'shi')}`,
     intoDrive: (dur: string, dist: string) => `${dur} გზაში · ${dist} სტარტიდან`,
     forecastThen: 'პროგნოზი იმ დროისთვის',
     noForecastThen: 'ამ დროის პროგნოზი ჯერ არ არის',
@@ -401,7 +437,8 @@ export const ka: Messages = {
     enterPlace: 'შეიყვანეთ ადგილი',
     placesLimited: 'ადგილების სახელები ახლა შეზღუდულია — ამინდზე გავლენა არ აქვს',
     then: 'შემდეგ',
-    toward: (d: string) => `${d}-ის მიმართულებით`,
+    continueOn: (road?: string) => (road ? `გააგრძელეთ მოძრაობა ${withPostposition(road, 'ze')}` : 'გააგრძელეთ პირდაპირ'),
+    toward: (d: string) => toward(d),
     voice: 'ხმოვანი ასისტენტი',
     voiceOn: 'ხმა ჩართულია',
     voiceOff: 'ხმა გამორთულია',
@@ -463,6 +500,8 @@ export const ka: Messages = {
     speedWarnings: 'სიჩქარის გაფრთხილებები',
     breakReminders: 'შესვენების შეხსენება',
     breakRemindersHint: 'გრძელ გზაზე შესვენებას შეგახსენებთ დაახლოებით ყოველ 2 საათში.',
+    speedCameras: 'კამერების გაფრთხილება',
+    speedCamerasHint: 'მხოლოდ იქ, სადაც ეს კანონით დაშვებულია. OpenStreetMap-ის მონაცემები — შეიძლება არასრული იყოს.',
     batterySaver: 'ბატარეის დაზოგვა',
     batterySaverHint: 'ნაკლები ანიმაცია და მდებარეობის განახლება, როცა ეს უსაფრთხოა.',
     vehicle: 'ავტომობილი',
@@ -534,6 +573,7 @@ export const ka: Messages = {
 
   share: {
     button: 'მდებარეობის გაზიარება',
+    tripButton: 'მგზავრობის გაზიარება',
     title: 'მდებარეობის გაზიარება რეალურ დროში',
     body: 'ბმულის მქონე ადამიანები ხედავენ, სად ხართ, ხოლო მარშრუტის შემთხვევაში — სად მიდიხართ და როდის ჩახვალთ. ანგარიში არ სჭირდებათ.',
     name: 'თქვენი სახელი (არასავალდებულო)',
@@ -616,5 +656,28 @@ export const ka: Messages = {
     noProvider: 'წყარო არ არის დაკავშირებული',
     osm: 'OpenStreetMap, შეიძლება არასრული იყოს — ნიშნებს აქვს უპირატესობა',
     loading: 'იტვირთება',
+  },
+  depart: {
+    title: 'როდის გავიდეთ',
+    suggest: (time: string, less: string) => `გასვლა ${time}-ზე: ${less}.`,
+    lessRain: (d: string) => `დაახლოებით ${d}-ით ნაკლები წვიმა`,
+    lessSevere: (d: string) => `დაახლოებით ${d}-ით ნაკლები ცუდი ამინდი`,
+    use: (time: string) => `გასვლა ${time}-ზე`,
+    currentBest: 'არჩეული დრო საუკეთესოა მომდევნო 12 საათში.',
+    similar: 'გზაზე ამინდი დაახლოებით ერთნაირია, როდესაც არ უნდა გახვიდეთ მომდევნო 12 საათში.',
+    legendRain: 'წვიმა',
+    legendSevere: 'ძლიერი წვიმა, ჭექა-ქუხილი, თოვლი',
+    bar: (time: string, wet: string) => `გასვლა ${time}-ზე: დაახლოებით ${wet} წვიმაში`,
+    selected: 'არჩეულია',
+  },
+  air: {
+    title: 'ჰაერის ხარისხი',
+    here: 'ამინდი რუკის ცენტრში',
+    levels: { good: 'კარგი', fair: 'დამაკმაყოფილებელი', moderate: 'საშუალო', poor: 'ცუდი', veryPoor: 'ძალიან ცუდი', extremelyPoor: 'უკიდურესად ცუდი' },
+  },
+  parking: {
+    title: 'გაჩერებული მანქანა',
+    save: 'პარკინგის დამახსოვრება',
+    saved: 'პარკინგი შენახულია',
   },
 };

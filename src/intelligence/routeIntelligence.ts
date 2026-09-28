@@ -1,6 +1,10 @@
+import type { RouteCamera } from '../algorithms/cameras';
 import type { RouteIncident } from '../algorithms/incidents';
 import { nextSpeedLimitChange, type SpeedLimitProfile } from '../algorithms/speedLimits';
 import { distanceAtTime, positionAtDistance, timeAtDistance } from '../algorithms/routeTiming';
+import { bearingDeg, bearingDelta } from '../utils/distance';
+import { solarPosition } from '../utils/sun';
+import { formatUtcOffset, timeZoneOffsetMinutes } from '../utils/timezone';
 import type { Messages } from '../i18n/en';
 import { formatDistance, spokenDistance, spokenDuration, speedValue, type UnitPrefs } from '../i18n/format';
 import type { Maneuver } from '../navigation/maneuvers';
@@ -37,6 +41,8 @@ export interface IntelligenceInput {
   vehicle?: 'fuel' | 'ev';
   /** Incidents on the route (provider-normalized; may be unverified reports). */
   incidents?: RouteIncident[];
+  /** Mapped speed cameras on the route (only when the user turned them on). */
+  speedCameras?: RouteCamera[];
   /** Suggest a break about every 2 h of driving on long trips (default on). */
   breakReminders?: boolean;
   /** Events from other providers (traffic, incidents…), already normalized. */
@@ -222,6 +228,33 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
     }
   }
 
+  for (const cam of input.speedCameras ?? []) {
+    if (cam.distanceAlongM < progressM) continue;
+    const limit = cam.kmh ? `${speedValue(cam.kmh, units.distance)} ${units.distance === 'imperial' ? m.units.mph : m.units.kmh}` : '';
+    events.push(
+      routeEvent(
+        {
+          id: `CAM@${cam.id}`,
+          type: 'SPEED_CAMERA',
+          category: 'speed',
+          severity: 'low', // spoken by distance in the driving loop, not by the alert engine
+          title: m.alert.title.SPEED_CAMERA,
+          shortMessage: limit,
+          voiceMessage: m.alert.voice.speedCamera(limit || undefined),
+          icon: 'camera',
+          source: 'openstreetmap',
+          confidence: 0.8,
+        },
+        timed,
+        cam.distanceAlongM,
+        progressM,
+        clock,
+      ),
+    );
+  }
+  events.push(...sunGlareEvents(input, timed, progressM, clock, m));
+  events.push(...timeZoneEvents(input, timed, progressM, clock, m));
+
   // Incidents: only ahead, only while still valid at the time we get there.
   for (const inc of input.incidents ?? []) {
     if (inc.distanceAlongM < progressM) continue;
@@ -273,4 +306,104 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
   if (dest) ahead.push(dest);
 
   return { events, nextWeather, ahead };
+}
+
+/**
+ * Low sun straight ahead: glare risk where, at the ETA, the sun is 0.5–15°
+ * above the horizon, within 30° of the driving direction, and the sky there is
+ * not overcast. Stretches shorter than ~4 km (a single bend) are ignored.
+ */
+function sunGlareEvents(input: IntelligenceInput, timed: TimedRoute, progressM: number, clock: RouteClock, m: Messages): RouteEvent[] {
+  const STEP = 2000;
+  const points = input.weatherPoints;
+  const skyAt = (d: number) => {
+    let best: RouteWeatherPoint | undefined;
+    for (const p of points) if (!best || Math.abs(p.distanceFromStartKm * 1000 - d) < Math.abs(best.distanceFromStartKm * 1000 - d)) best = p;
+    return best?.weather ?? null;
+  };
+  const runs: { startM: number; endM: number; eta: number }[] = [];
+  let run: { startM: number; endM: number; eta: number } | null = null;
+  for (let d = progressM; d < timed.totalDistM - 500; d += STEP) {
+    const eta = arrivalAt(timed, d, clock);
+    const here = positionAtDistance(timed, d).coordinate;
+    const sun = solarPosition(here[1], here[0], eta);
+    const ahead = positionAtDistance(timed, Math.min(timed.totalDistM, d + 300)).coordinate;
+    const w = skyAt(d);
+    const clearish = !!w && (w.condition === 'CLEAR' || w.condition === 'PARTLY_CLOUDY') && (w.cloudCover ?? 0) < 75;
+    const glare = sun.elevationDeg > 0.5 && sun.elevationDeg < 15 && Math.abs(bearingDelta(bearingDeg(here, ahead), sun.azimuthDeg)) < 30 && clearish;
+    if (glare) {
+      if (run) run.endM = d;
+      else run = { startM: d, endM: d, eta };
+    } else if (run) {
+      runs.push(run);
+      run = null;
+    }
+  }
+  if (run) runs.push(run);
+  return runs
+    .filter((r) => r.endM - r.startM >= 2 * STEP)
+    .slice(0, 3)
+    .map((r) => {
+      const near = points
+        .filter((p) => p.placeName && Math.abs(p.distanceFromStartKm * 1000 - r.startM) < 15_000)
+        .sort((a, b) => Math.abs(a.distanceFromStartKm * 1000 - r.startM) - Math.abs(b.distanceFromStartKm * 1000 - r.startM))[0]?.placeName;
+      const minutes = Math.max(0, (r.eta - referenceTime(clock)) / 60_000);
+      return routeEvent(
+        {
+          id: `GLARE@${Math.round(r.startM / 5000)}`,
+          type: 'SUN_GLARE',
+          category: 'weather',
+          severity: 'medium',
+          title: m.alert.title.SUN_GLARE,
+          shortMessage: near ? m.ui.near(near) : '',
+          voiceMessage: m.alert.voice.sunGlare(spokenDuration(minutes * 60, m), near),
+          icon: 'glare',
+          source: 'sun-position',
+          confidence: 0.75,
+        },
+        timed,
+        r.startM,
+        progressM,
+        clock,
+        { endDistanceAlongM: r.endM, placeName: near },
+      );
+    });
+}
+
+/** Where the local time zone (UTC offset) changes along the route. */
+function timeZoneEvents(input: IntelligenceInput, timed: TimedRoute, progressM: number, clock: RouteClock, m: Messages): RouteEvent[] {
+  const out: RouteEvent[] = [];
+  const pts = [...input.weatherPoints].sort((a, b) => a.distanceFromStartKm - b.distanceFromStartKm);
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    if (a.timezone === b.timezone) continue;
+    const before = timeZoneOffsetMinutes(b.arrivalMs, a.timezone);
+    const after = timeZoneOffsetMinutes(b.arrivalMs, b.timezone);
+    const delta = after - before;
+    const d = b.distanceFromStartKm * 1000;
+    if (delta === 0 || d < progressM) continue;
+    const hours = `${Math.abs(delta) / 60}`.replace('.', m.locale === 'en' ? '.' : ',');
+    out.push(
+      routeEvent(
+        {
+          id: `TZ@${b.id}`,
+          type: 'TIMEZONE_CHANGE',
+          category: 'time',
+          severity: 'low',
+          title: m.alert.title.TIMEZONE_CHANGE,
+          shortMessage: m.alert.clocks(delta > 0, hours, formatUtcOffset(b.arrivalMs, b.timezone)),
+          voiceMessage: m.alert.clocks(delta > 0, hours, formatUtcOffset(b.arrivalMs, b.timezone)),
+          icon: 'clock',
+          source: 'time-zone',
+          confidence: 1,
+        },
+        timed,
+        d,
+        progressM,
+        clock,
+      ),
+    );
+  }
+  return out;
 }

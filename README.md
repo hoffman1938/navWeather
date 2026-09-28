@@ -38,18 +38,24 @@ a phone via `http://192.168…` will be refused by the browser.
 **Explore (like any map app)** — search a place or press-and-hold (click on
 desktop) anywhere on the map. The card shows the weather now, the next 24
 hours and 7 days, and — if your location is known — the drive time and the
-**weather when you would arrive**. Directions start from "Your location".
-Save places as Home, Work or favourites; share a place as a link.
+**weather when you would arrive**, plus air quality. A chip shows the
+weather and AQI at the map centre. Directions start from "Your location".
+Save places as Home, Work or favourites; share a place as a link; after a
+drive, save where you parked (this device only).
 
 **Plan** — route options with weather exposure per route ("Heavy rain 35 min"
 vs "Mostly dry"; never auto-selected), the weather timeline at each ETA, heads-up
 events, "Where will I be at…", places along the route with real detour times,
-multi-stop trips, departure time in the start location's time zone.
+multi-stop trips, departure time in the start location's time zone, and
+**when to leave**: the next 12 hours of departures compared by rain and severe
+weather on the way ("Leaving at 06:30: about 54 min less heavy weather").
 
 **Drive** — turn-by-turn (lanes when OSM has them), speed-adaptive voice
 prompts, heading-up camera that re-centres itself, off-route recalculation,
 speed limits (OSM, "signs take precedence"), the "Ahead" list and time-based
-weather alerts that stay quiet unless it matters. Push-to-talk voice questions
+weather alerts that stay quiet unless it matters, low-sun glare warnings,
+time-zone changes, break reminders, and optional speed-camera alerts (OSM,
+off by default — not legal everywhere). Push-to-talk voice questions
 ("When will the rain start?", "Find a gas station", "Recalculate route").
 Arrival shows a trip summary (not stored).
 
@@ -105,4 +111,5 @@ Pages (`dist/`), just without live sharing.
 - [Architecture](docs/ARCHITECTURE.md) — engines, data flow, providers, state, relay
 - [Environment](docs/ENVIRONMENT.md) — every variable and binding
 - [Testing](docs/TESTING.md) — what is covered, dev tools, what isn't tested
+- [Product plan](docs/PLAN.md) — competitor study, what goes on the map, design audit, roadmap (in Russian)
 - [Audit & backlog](docs/AUDIT.md) — findings, status, remaining gaps

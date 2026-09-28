@@ -15,3 +15,9 @@
   color: var(--text-3);
   text-align: center;
 }
+
+/* A sheet pulled over most of the map: its buttons would only collide with the top bar. */
+[data-sheet-covers] .voice,
+[data-sheet-covers] .map-controls {
+  visibility: hidden;
+}

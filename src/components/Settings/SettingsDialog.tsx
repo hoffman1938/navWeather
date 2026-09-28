@@ -139,6 +139,7 @@ export function SettingsDialog() {
       <div className="set-group">
         <Switch label={S.speedWarnings} checked={s.speedWarnings} onChange={(speedWarnings) => up({ speedWarnings })} hint={m.ui.speedLimitNote} />
         <Switch label={S.breakReminders} checked={s.breakReminders} onChange={(breakReminders) => up({ breakReminders })} hint={S.breakRemindersHint} />
+        <Switch label={S.speedCameras} checked={s.speedCameras} onChange={(speedCameras) => up({ speedCameras })} hint={S.speedCamerasHint} />
         <Switch label={S.batterySaver} checked={s.batterySaver} onChange={(batterySaver) => up({ batterySaver })} hint={S.batterySaverHint} />
         <Select
           label={S.vehicle}
@@ -185,7 +186,8 @@ function SavedPlacesSettings() {
   const saved = useSavedPlaces((st) => st.saved);
   const recents = useSavedPlaces((st) => st.recents.length);
   const remember = useSavedPlaces((st) => st.rememberRecents);
-  const label = (slot: string, name: string) => (slot === 'home' ? `${m.explore.home} · ${name}` : slot === 'work' ? `${m.explore.work} · ${name}` : name);
+  const label = (slot: string, name: string) =>
+    slot === 'home' ? `${m.explore.home} · ${name}` : slot === 'work' ? `${m.explore.work} · ${name}` : slot === 'parking' ? m.parking.title : name;
   return (
     <div className="set-group">
       <h3 className="label">{S.savedPlaces}</h3>
