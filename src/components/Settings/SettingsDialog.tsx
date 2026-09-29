@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LOCALES, type Locale } from '../../i18n';
-import { modelCardUrl, NATURAL_VOICES, naturalVoiceFor, RUNTIME_MB, sampleUrl } from '../../voice/natural/catalog';
-import { statusOf, useNaturalVoice } from '../../voice/natural/state';
-import { voiceQuality, voicesFor } from '../../voice/voices';
+import { googleVoicesFor } from '../../voice/voices';
 import { useMessages, useSettings, type Settings } from '../../state/settings';
 import { loadDriveExtras, useAppStore } from '../../state/store';
 import { useSavedPlaces } from '../../state/savedPlaces';
@@ -211,11 +209,11 @@ export function SettingsDialog() {
 }
 
 /** The device's voices for a language (they load asynchronously in Chrome and Safari). */
-function useDeviceVoices(lang: string): SpeechSynthesisVoice[] {
+function useGoogleVoices(lang: string): SpeechSynthesisVoice[] {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    const sync = () => setVoices(voicesFor(window.speechSynthesis.getVoices(), lang, { online: navigator.onLine !== false }));
+    const sync = () => setVoices(googleVoicesFor(window.speechSynthesis.getVoices(), lang));
     sync();
     window.speechSynthesis.addEventListener?.('voiceschanged', sync);
     return () => window.speechSynthesis.removeEventListener?.('voiceschanged', sync);
@@ -223,105 +221,28 @@ function useDeviceVoices(lang: string): SpeechSynthesisVoice[] {
   return voices;
 }
 
-/** Which voice speaks: the best device voice, a specific one, or the free on-device natural voice. */
+/** Which Google voice speaks: the best one for the language, or a specific one. */
 function VoiceSettings() {
   const m = useMessages();
   const S = m.settings;
   const locale = useSettings((st) => st.language);
   const saved = useSettings((st) => st.voiceByLang[locale] ?? 'auto');
-  const voices = useDeviceVoices(m.speechLang);
-  const supported = useNaturalVoice((st) => st.supported);
-  const chosen = naturalVoiceFor(locale, saved);
-  // A value saved by an older version ('natural') shows as the voice it meant.
-  const choice = chosen ? `natural:${chosen.id}` : saved;
-  const status = useNaturalVoice((st) => (chosen ? statusOf(st, chosen.id) : 'unknown'));
-  const progress = useNaturalVoice((st) => st.progress);
-  const [sampleFailed, setSampleFailed] = useState(false);
-  const recording = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => {
-    void useNaturalVoice.getState().check(locale);
-  }, [locale]);
-  useEffect(() => setSampleFailed(false), [choice]);
-  // Closing Settings stops a recording that is still playing.
-  useEffect(() => () => recording.current?.pause(), []);
-
+  const voices = useGoogleVoices(m.speechLang);
   const choose = (value: string) => {
     const st = useSettings.getState();
     st.update({ voiceByLang: { ...st.voiceByLang, [locale]: value } });
   };
-  const label = (v: SpeechSynthesisVoice) => {
-    const tags = [voiceQuality(v) === 'natural' ? S.voiceNaturalTag : null, v.localService ? null : S.voiceNeedsInternet].filter(Boolean);
-    return tags.length ? `${v.name} (${tags.join(', ')})` : v.name;
-  };
-  const options: [string, string][] = [
-    ['auto', S.voiceAuto],
-    ...voices.map((v): [string, string] => [`device:${v.voiceURI}`, label(v)]),
-    ...(supported ? NATURAL_VOICES[locale].map((v): [string, string] => [`natural:${v.id}`, S.voiceNatural(v.name, v.male, v.sizeMB + RUNTIME_MB)]) : []),
-  ];
-  const known = options.some(([v]) => v === choice);
-  // Not downloaded yet: hear a recording of it first (a few dozen KB instead of the whole voice).
-  const recorded = !!chosen && status !== 'ready';
-
-  const playSample = () => {
-    recording.current?.pause();
-    setSampleFailed(false);
-    const tts = getProviders().tts;
-    if (!chosen || !recorded) {
-      tts.preview?.(S.voiceSampleText, m.speechLang, choice);
-      return;
-    }
-    tts.cancel();
-    const audio = new Audio(sampleUrl(chosen));
-    recording.current = audio;
-    audio.onerror = () => setSampleFailed(true);
-    audio.play().catch(() => setSampleFailed(true));
-  };
+  const options: [string, string][] = [['auto', S.voiceAuto], ...voices.map((v): [string, string] => [`device:${v.voiceURI}`, v.name])];
+  const known = options.some(([v]) => v === saved);
 
   return (
     <>
-      <Select label={S.voiceChoice} value={known ? choice : 'auto'} options={options} onChange={choose} />
-      {!voices.length && !chosen ? <p className="set-note set-note--warn">{supported ? S.noDeviceVoice : m.ui.noVoice}</p> : null}
-      {!chosen && voices.length && !voices.some((v) => voiceQuality(v) === 'natural') ? <p className="set-note">{S.voiceEdgeTip}</p> : null}
-      {chosen ? (
-        <div className="set-natural" aria-live="polite">
-          {!supported ? (
-            <p className="set-note">{S.naturalUnsupported}</p>
-          ) : status === 'downloading' ? (
-            <>
-              <progress className="set-progress" max={1} value={progress} aria-label={S.naturalDownloading(Math.round(progress * 100))} />
-              <p className="set-note">{S.naturalDownloading(Math.round(progress * 100))}</p>
-              <button className="btn btn-quiet" onClick={() => useNaturalVoice.getState().cancel()}>
-                {m.ui.cancel}
-              </button>
-            </>
-          ) : status === 'ready' ? (
-            <>
-              <p className="set-note">{S.naturalReady}</p>
-              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().remove(chosen.id)}>
-                {S.naturalRemove}
-              </button>
-            </>
-          ) : status === 'error' || status === 'none' ? (
-            <>
-              {status === 'error' ? <p className="set-note set-note--warn">{S.naturalError}</p> : null}
-              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().download(chosen.id)}>
-                {status === 'error' ? S.naturalRetry : S.naturalDownload(chosen.sizeMB + RUNTIME_MB)}
-              </button>
-            </>
-          ) : null}
-          <p className="set-note">
-            {S.naturalAbout}{' '}
-            <a href={modelCardUrl(chosen)} target="_blank" rel="noopener noreferrer">
-              {S.naturalLicense}
-            </a>
-          </p>
-        </div>
-      ) : null}
-      <button className="btn btn-quiet set-sample" onClick={playSample}>
+      <Select label={S.voiceChoice} value={known ? saved : 'auto'} options={options} onChange={choose} />
+      {!voices.length ? <p className="set-note">{S.noGoogleVoice}</p> : <p className="set-note">{S.voiceGoogleNote}</p>}
+      <button className="btn btn-quiet set-sample" onClick={() => getProviders().tts.preview?.(S.voiceSampleText, m.speechLang, known ? saved : 'auto')}>
         <SpeakerIcon size={18} />
-        {recorded ? S.voiceSampleRecorded : S.voiceSample}
+        {S.voiceSample}
       </button>
-      {sampleFailed ? <p className="set-note set-note--warn">{S.voiceSampleFailed}</p> : null}
     </>
   );
 }

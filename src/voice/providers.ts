@@ -1,4 +1,5 @@
-import { pickLocalVoice, pickVoice, voiceQuality, voicesFor } from './voices';
+import { speakable } from './speakable';
+import { googleVoicesFor, pickLocalVoice, pickVoice } from './voices';
 
 /**
  * Speech provider contracts. Browser implementations below; a native shell
@@ -11,7 +12,7 @@ export interface TextToSpeechProvider {
   cancel(): void;
   /** iOS/Safari only allow speech after a user gesture — call from one. */
   unlock(): void;
-  /** False when nothing on this device can speak the language (e.g. no Georgian voice). */
+  /** False when nothing on this device can speak the language. */
   canSpeak?(lang: string): boolean;
   /** Settings: say `text` with a voice choice that isn't saved yet. */
   preview?(text: string, lang: string, choice: string): void;
@@ -35,10 +36,10 @@ export interface SpeechRecognitionProvider {
 // ---------------------------------------------------------------------------
 
 /**
- * The browser's own voices. Picks the most natural-sounding voice for the
- * language (or the one chosen in Settings) — not the robotic default — and,
- * if a voice that needs a connection fails, says it again with one that
- * works on the device.
+ * The browser's voices: a Google voice (the one chosen in Settings, else the
+ * best for the language); if a Google voice that needs a connection fails,
+ * the sentence is said again with a voice that works on the device. Text is
+ * spelled out for the ear first ("60 км/ч" → "60 километров в час").
  */
 export class BrowserSpeechSynthesis implements TextToSpeechProvider {
   readonly name = 'browser-speech-synthesis';
@@ -50,22 +51,24 @@ export class BrowserSpeechSynthesis implements TextToSpeechProvider {
     return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   }
 
-  /** Voices for a language, most natural first (they load asynchronously in some browsers). */
+  /** Google voices for a language (they load asynchronously in some browsers). */
   voices(lang: string): SpeechSynthesisVoice[] {
     if (!this.supported) return [];
-    return voicesFor(window.speechSynthesis.getVoices(), lang, { online: isOnline() });
+    return googleVoicesFor(window.speechSynthesis.getVoices(), lang);
   }
 
   canSpeak(lang: string): boolean {
     if (!this.supported) return false;
     // Chrome/Safari fill the list asynchronously: an empty list means "not known yet", not "none".
-    if (!window.speechSynthesis.getVoices().length) return true;
-    return this.voices(lang).length > 0;
+    const all = window.speechSynthesis.getVoices();
+    return !all.length || pickVoice(all, lang, { online: true }) !== undefined;
   }
 
-  /** Does the device have a truly natural voice for the language (Edge "Natural", Siri, premium) usable right now? */
-  hasNaturalVoice(lang: string): boolean {
-    return this.voices(lang).some((v) => voiceQuality(v) === 'natural' && (v.localService || isOnline()));
+  /** Settings: hear a voice before choosing it ('auto' or 'device:<voiceURI>'). */
+  preview(text: string, lang: string, choice: string): void {
+    this.unlock();
+    this.cancel();
+    this.speak(text, { lang, onEnd: () => undefined, voiceURI: choice.startsWith('device:') ? choice.slice(7) : null });
   }
 
   speak(text: string, opts: { lang: string; onEnd: () => void; voiceURI?: string | null }): void {
@@ -75,10 +78,11 @@ export class BrowserSpeechSynthesis implements TextToSpeechProvider {
     }
     const all = window.speechSynthesis.getVoices();
     const voice = pickVoice(all, opts.lang, { online: isOnline(), preferredURI: opts.voiceURI ?? this.preferredVoice(opts.lang) });
-    this.say(text, opts.lang, voice, opts.onEnd, () => {
-      // A network voice (Edge "Natural", Chrome "Google …") can fail with no signal: repeat on the device.
+    const said = speakable(text, opts.lang);
+    this.say(said, opts.lang, voice, opts.onEnd, () => {
+      // A Google voice needs a connection and can fail with no signal: repeat on the device.
       const local = !voice || voice.localService ? undefined : pickLocalVoice(all, opts.lang);
-      if (local) this.say(text, opts.lang, local, opts.onEnd, opts.onEnd);
+      if (local) this.say(said, opts.lang, local, opts.onEnd, opts.onEnd);
       else opts.onEnd();
     });
   }

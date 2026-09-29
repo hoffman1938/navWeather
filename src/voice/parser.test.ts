@@ -25,7 +25,6 @@ describe('navigation command parser', () => {
     ['Mute', { type: 'mute' }],
     ['Какая погода впереди?', { type: 'weather_ahead' }],
     ['Где я?', { type: 'where_am_i' }],
-    ['სად ვარ?', { type: 'where_am_i' }],
   ])('%s', (text, intent) => {
     expect(parseCommand(text)).toEqual(intent);
   });
@@ -48,7 +47,7 @@ describe('navigation command parser', () => {
 
 describe('route and safety commands', () => {
   it('recalculate', () => {
-    for (const u of ['Recalculate route', 'reroute', 'update my route', 'Пересчитай маршрут', 'გადაითვალე მარშრუტი']) {
+    for (const u of ['Recalculate route', 'reroute', 'update my route', 'Пересчитай маршрут']) {
       expect(parseCommand(u).type).toBe('recalculate');
     }
   });
@@ -75,8 +74,6 @@ describe('driver reports by voice', () => {
     ['Отметь ремонт дороги', 'roadworks'],
     ['Сообщи, что дорога перекрыта', 'closure'],
     ['Сообщи о яме на дороге', 'hazard'],
-    ['შეატყობინე ავარია', 'accident'],
-    ['შეატყობინე ნისლი', 'weather'],
   ])('%s', (text, kind) => {
     expect(parseCommand(text)).toEqual({ type: 'report', kind });
   });

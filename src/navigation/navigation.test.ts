@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { en } from '../i18n/en';
 import { ru } from '../i18n/ru';
-import { ka } from '../i18n/ka';
 import { tbilisiBatumiRoute } from '../test/helpers';
 import { buildTimedRoute } from '../algorithms/routeTiming';
 import { buildManeuvers, computeGuidance, type Maneuver } from './maneuvers';
@@ -66,16 +65,14 @@ describe('instructions (generated, localized)', () => {
     expect(instructionText(mv(over), en)).toBe(text);
   });
 
-  it('localizes to Russian and Georgian from the same maneuver', () => {
+  it('localizes to Russian from the same maneuver', () => {
     const m = mv({ kind: 'turn', modifier: 'right', roadRef: 'S1' });
     expect(instructionText(m, ru)).toBe('Поверните направо на S1');
-    expect(instructionText(m, ka)).toBe('მოუხვიეთ მარჯვნივ, S1-ზე');
   });
 
   it('voice skips road names the voice cannot pronounce, preferring refs', () => {
     expect(spokenRoad('თავისუფლების მოედანი', undefined, en)).toBeUndefined();
     expect(spokenRoad('თბილისი — სენაკი — ლესელიძე', 'S1', en)).toBe('S1');
-    expect(spokenRoad('თავისუფლების მოედანი', undefined, ka)).toBe('თავისუფლების მოედანი');
     expect(roadLabel('თბილისი — სენაკი — ლესელიძე', 'ს 1')).toBe('ს 1');
     expect(roadLabel('Rustaveli Ave', 'S1')).toBe('Rustaveli Ave (S1)');
   });

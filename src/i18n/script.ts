@@ -7,7 +7,6 @@
  * (2002, without apostrophes, as on road signs) or the customary Cyrillic
  * one. The street-type word is translated (ქუჩა → St / ул.) and road
  * numbers keep their letter as on signs (ს 12 → S12, შ 1 → Sh1).
- * The Georgian UI shows names untouched.
  */
 
 const GEORGIAN = /[ა-ჺ]/;
@@ -58,9 +57,9 @@ export function hasGeorgian(text: string): boolean {
   return GEORGIAN.test(text);
 }
 
-/** Transliterate Georgian script in `text` for the given UI language ("ka" leaves it as is). */
+/** Transliterate Georgian script in `text` for the given UI language. */
 export function localizeScript(text: string, locale: string): string {
-  if (!text || locale === 'ka' || !GEORGIAN.test(text)) return text;
+  if (!text || !GEORGIAN.test(text)) return text;
   const target: Target = locale === 'ru' ? 'ru' : 'en';
   const table = target === 'ru' ? CYRILLIC : LATIN;
 
@@ -83,73 +82,4 @@ export function localizeScript(text: string, locale: string): string {
   });
   t = mapped.join('').trim();
   return `${prefix}${t}${suffix}`.replace(/\s{2,}/g, ' ');
-}
-
-/*
- * Latin-script names for a Russian or Georgian voice ("Khashuri" → Хашури /
- * ხაშური). A voice made for one language reads another script with foreign
- * sounds — or not at all — so names are said the way locals say them. The
- * digraphs are the Georgian national romanization's, read backwards;
- * apostrophes mark its ejectives (k' → კ).
- */
-const FROM_LATIN: Record<'ru' | 'ka', [string, string][]> = {
-  ru: [
-    ["ch'", 'ч'], ["ts'", 'ц'], ['kh', 'х'], ['gh', 'г'], ['sh', 'ш'], ['ch', 'ч'], ['ts', 'ц'], ['dz', 'дз'], ['zh', 'ж'],
-    ['ph', 'ф'], ['th', 'т'], ['ck', 'к'], ['qu', 'кв'], ['ee', 'и'], ['oo', 'у'], ['ya', 'я'], ['yu', 'ю'], ['yo', 'йо'],
-    ['a', 'а'], ['b', 'б'], ['d', 'д'], ['e', 'е'], ['f', 'ф'], ['g', 'г'], ['h', 'х'], ['i', 'и'], ['j', 'дж'], ['k', 'к'],
-    ['l', 'л'], ['m', 'м'], ['n', 'н'], ['o', 'о'], ['p', 'п'], ['q', 'к'], ['r', 'р'], ['s', 'с'], ['t', 'т'], ['u', 'у'],
-    ['v', 'в'], ['w', 'в'], ['x', 'кс'], ['z', 'з'],
-  ],
-  ka: [
-    ["ch'", 'ჭ'], ["ts'", 'წ'], ["k'", 'კ'], ["t'", 'ტ'], ["p'", 'პ'], ["q'", 'ყ'], ['kh', 'ხ'], ['gh', 'ღ'], ['sh', 'შ'],
-    ['ch', 'ჩ'], ['ts', 'ც'], ['dz', 'ძ'], ['zh', 'ჟ'], ['ph', 'ფ'], ['th', 'თ'], ['ck', 'ქ'], ['qu', 'ქვ'], ['ee', 'ი'],
-    ['oo', 'უ'], ['a', 'ა'], ['b', 'ბ'], ['d', 'დ'], ['e', 'ე'], ['f', 'ფ'], ['g', 'გ'], ['h', 'ჰ'], ['i', 'ი'], ['j', 'ჯ'],
-    ['k', 'ქ'], ['l', 'ლ'], ['m', 'მ'], ['n', 'ნ'], ['o', 'ო'], ['p', 'ფ'], ['q', 'ყ'], ['r', 'რ'], ['s', 'ს'], ['t', 'თ'],
-    ['u', 'უ'], ['v', 'ვ'], ['w', 'ვ'], ['x', 'ქს'], ['y', 'ი'], ['z', 'ზ'],
-  ],
-};
-
-function latinWord(w: string, target: 'ru' | 'ka'): string {
-  const lower = w.toLowerCase().replace(/’/g, "'");
-  let out = '';
-  for (let i = 0; i < lower.length; ) {
-    const ch = lower[i];
-    const next = lower[i + 1] ?? '';
-    const digraph = FROM_LATIN[target].find(([lat]) => lat.length > 1 && lower.startsWith(lat, i));
-    if (digraph) {
-      out += digraph[1];
-      i += digraph[0].length;
-      continue;
-    }
-    // Letters that depend on their neighbours.
-    if (ch === 'c') {
-      out += /[eiy]/.test(next) ? (target === 'ru' ? 'ц' : 'ს') : target === 'ru' ? 'к' : 'ქ';
-      i++;
-      continue;
-    }
-    if (ch === 'y' && target === 'ru') {
-      out += /[aeiou]/.test(next) || i === lower.length - 1 ? 'й' : 'и';
-      i++;
-      continue;
-    }
-    if (ch === 'e' && target === 'ru' && i === 0) {
-      out += 'э';
-      i++;
-      continue;
-    }
-    const letter = FROM_LATIN[target].find(([lat]) => lat === ch);
-    if (letter) out += letter[1];
-    else if (ch !== "'") out += ch;
-    i++;
-  }
-  // Georgian spells a sound once (Wissol → ვისოლ); Russian keeps the double letter.
-  if (target === 'ka') return out.replace(/(.)\1/gu, '$1');
-  if (!out) return out;
-  // Keep the look of the original: capitalised names, all-caps abbreviations.
-  return w === w.toUpperCase() && w.length > 1 ? out.toUpperCase() : /^[A-Z]/.test(w) ? out[0].toUpperCase() + out.slice(1) : out;
-}
-
-/** Latin words in `text` written in Cyrillic ("ru") or Georgian ("ka") script. */
-export function latinToScript(text: string, target: 'ru' | 'ka'): string {
-  return text.replace(/[A-Za-z][A-Za-z'’]*/g, (w) => latinWord(w, target));
 }

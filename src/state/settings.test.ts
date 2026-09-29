@@ -33,12 +33,12 @@ describe('stored settings', () => {
   });
 
   it('keeps valid voice choices per language and drops anything else', () => {
-    const s = parseSettings(
-      JSON.stringify({ voiceByLang: { en: 'natural', ka: 'device:Microsoft Eka Online (Natural)', ru: 'natural:ru_RU-ruslan-medium', fr: 'natural' } }),
-      base,
-    );
-    expect(s.voiceByLang).toEqual({ en: 'natural', ka: 'device:Microsoft Eka Online (Natural)', ru: 'natural:ru_RU-ruslan-medium' });
-    expect(parseSettings(JSON.stringify({ voiceByLang: { ru: 'robot', en: 'natural:../x' } }), base).voiceByLang).toEqual({});
+    const s = parseSettings(JSON.stringify({ voiceByLang: { en: 'device:Google US English', ru: 'auto', ka: 'auto', fr: 'auto' } }), base);
+    expect(s.voiceByLang).toEqual({ en: 'device:Google US English', ru: 'auto' });
+    // The downloadable natural voice is gone: such a choice falls back to automatic.
+    expect(parseSettings(JSON.stringify({ voiceByLang: { ru: 'natural:ru_RU-ruslan-medium', en: 'natural' } }), base).voiceByLang).toEqual({});
+    // Georgian was removed: a saved Georgian UI falls back to the default language.
+    expect(parseSettings(JSON.stringify({ language: 'ka' }), base).language).toBe(base.language);
     expect(parseSettings(JSON.stringify({ voiceByLang: 'natural' }), base).voiceByLang).toEqual({});
   });
 

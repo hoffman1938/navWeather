@@ -42,11 +42,8 @@ export function SearchPanel() {
     if (routeStatus === 'error') setEditing(true);
   }, [routeStatus]);
 
-  const submit = () => {
-    const s = useAppStore.getState();
-    if ((!s.origin.text.trim() && !s.origin.place) || (!s.destination.text.trim() && !s.destination.place)) return;
-    void s.calculateRoute();
-  };
+  // An empty field isn't ignored: calculateRoute says which place is missing.
+  const submit = () => void useAppStore.getState().calculateRoute();
 
   const useCurrent = () => useExplore.getState().useMyLocationAsOrigin();
   const openSettings = () => useAppStore.getState().setSettingsOpen(true);

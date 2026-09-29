@@ -83,7 +83,7 @@ export class PhotonProvider implements AutocompleteProvider, GeocodingProvider {
     params.append('layer', 'city');
     params.append('layer', 'locality');
     const lang = options.language ?? this.language;
-    // Unsupported languages (ka, ru) get local names — Georgian names for a Georgian UI.
+    // Unsupported languages (ru) get local names, transliterated below.
     if (['en', 'de', 'fr', 'it'].includes(lang)) params.set('lang', lang);
     const data = await fetchJson<{ features: PhotonFeature[] }>(`${this.base}/reverse?${params}`, {
       provider: 'Search service',

@@ -18,8 +18,7 @@ describe('place names', () => {
   it('Russian: its own name, else the Georgian name in Cyrillic (not the English one)', () => {
     expect(names('ru')).toEqual(['Хашури', 'Хуневи', 'Nowhere']);
   });
-  it('Georgian and English', () => {
-    expect(names('ka')).toEqual(['ხაშური', 'ხუნევი', 'Nowhere']);
+  it('English', () => {
     expect(names('en')).toEqual(['Khashuri', 'Khunevi', 'Nowhere']);
   });
 });

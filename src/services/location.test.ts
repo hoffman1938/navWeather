@@ -1,5 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { classifyLocationError, locateOnce, LocationError, LocationWatcher, rememberFix, type LocationErrorKind } from './location';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  __resetApproximate,
+  classifyLocationError,
+  locateOnce,
+  LocationError,
+  LocationWatcher,
+  rememberFix,
+  tripStart,
+  type LocationErrorKind,
+} from './location';
 
 type Ok = (p: GeolocationPosition) => void;
 type Err = (e: GeolocationPositionError) => void;
@@ -29,7 +38,11 @@ function fakeGeo() {
   return { geo: geo as unknown as Geolocation, watches, once, mock: geo };
 }
 
-beforeEach(() => rememberFix(null));
+beforeEach(() => {
+  rememberFix(null);
+  __resetApproximate();
+});
+afterEach(() => vi.unstubAllGlobals());
 
 describe('classifyLocationError', () => {
   const geo = {} as Geolocation;
@@ -126,5 +139,83 @@ describe('locateOnce', () => {
     g.once[0].err(err(1));
     await expect(p).rejects.toEqual(new LocationError('denied'));
     await expect(locateOnce({ secure: false, geo: g.geo })).rejects.toMatchObject({ kind: 'insecure' });
+  });
+});
+
+describe('locateOnce: "position unavailable"', () => {
+  it('tries the GPS when the quick network fix can\'t work out a position', async () => {
+    const g = fakeGeo();
+    const p = locateOnce({ secure: true, geo: g.geo });
+    g.once[0].err(err(2));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(g.once[1].opts?.enableHighAccuracy).toBe(true);
+    g.once[1].ok(position(44.8, 41.7));
+    await expect(p).resolves.toMatchObject({ coordinate: [44.8, 41.7] });
+  });
+});
+
+describe('LocationWatcher: "position unavailable" on the map', () => {
+  it('a Wi-Fi watch that can\'t find a position tries the GPS once before giving up', () => {
+    const g = fakeGeo();
+    const errors: LocationErrorKind[] = [];
+    const w = new LocationWatcher({ onFix: () => undefined, onError: (k) => errors.push(k) }, () => ({ secure: true, geo: g.geo }));
+    w.acquire('locate');
+    g.watches.get(1)!.err(err(2));
+    expect(errors).toEqual([]);
+    expect(g.watches.get(2)?.opts?.enableHighAccuracy).toBe(true);
+    // The GPS finds nothing either: now the user is told.
+    g.watches.get(2)!.err(err(3));
+    g.watches.get(3)!.err(err(2));
+    expect(errors).toEqual(['unavailable']);
+  });
+});
+
+describe('tripStart: where a trip from "Your location" starts', () => {
+  const serve = (body: unknown, ok = true) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(body), { status: ok ? 200 : 404 })),
+    );
+
+  it('the device position when there is one', async () => {
+    serve({ lat: 1, lon: 2 });
+    const g = fakeGeo();
+    const p = tripStart(undefined, { secure: true, geo: g.geo });
+    g.once[0].ok(position(44.8, 41.7));
+    await expect(p).resolves.toEqual({ coordinate: [44.8, 41.7], approximate: null });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('location blocked or unavailable: the connection\'s rough area, said to be approximate', async () => {
+    serve({ lat: 41.69, lon: 44.8, city: 'Tbilisi' });
+    const g = fakeGeo();
+    const p = tripStart(undefined, { secure: true, geo: g.geo });
+    g.once[0].err(err(1));
+    await expect(p).resolves.toEqual({ coordinate: [44.8, 41.69], approximate: { city: 'Tbilisi', reason: 'denied' } });
+    // Pressing Go right after doesn't wait for the device to fail again.
+    await expect(tripStart(undefined, { secure: true, geo: g.geo })).resolves.toMatchObject({ approximate: { city: 'Tbilisi' } });
+    expect(g.mock.getCurrentPosition).toHaveBeenCalledTimes(1);
+  });
+
+  it('works on an insecure page too (no device location there at all)', async () => {
+    serve({ lat: 41.69, lon: 44.8, city: null });
+    await expect(tripStart(undefined, { secure: false, geo: fakeGeo().geo })).resolves.toMatchObject({ approximate: { city: null, reason: 'insecure' } });
+  });
+
+  it('neither works: the device\'s own reason', async () => {
+    serve({ error: 'unknown' }, false);
+    const g = fakeGeo();
+    const p = tripStart(undefined, { secure: true, geo: g.geo });
+    g.once[0].err(err(1));
+    await expect(p).rejects.toEqual(new LocationError('denied'));
+  });
+
+  it('ignores a malformed answer', async () => {
+    serve({ lat: 'x', lon: 500 });
+    const g = fakeGeo();
+    const p = tripStart(undefined, { secure: true, geo: g.geo });
+    g.once[0].err(err(1));
+    await expect(p).rejects.toBeInstanceOf(LocationError);
   });
 });

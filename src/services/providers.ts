@@ -17,8 +17,8 @@ import {
   type SpeechRecognitionProvider,
   type TextToSpeechProvider,
 } from '../voice/providers';
-import { NaturalSpeech, naturalSupported } from '../voice/natural/NaturalSpeech';
-import { SpeechRouter } from '../voice/speech';
+import type { Locale } from '../i18n';
+import { useSettings } from '../state/settings';
 import { OSRMProvider } from './routing/OSRMProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
 import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
@@ -144,10 +144,19 @@ export function createProviders(cfg: AppConfig = config): Providers {
       minForecastHours: cfg.weather.minForecastHours,
       updateCheckMs: cfg.weather.updateCheckMinutes * 60000,
     }),
-    // Browser voices (the most natural one available) + the free on-device natural voice.
-    tts: new SpeechRouter(new BrowserSpeechSynthesis(), naturalSupported() ? new NaturalSpeech() : null),
+    tts: googleVoice(),
     speechRecognition: new BrowserSpeechRecognition(),
   };
+}
+
+/** Google voices; the one picked in Settings (per language) when there is one. */
+function googleVoice(): BrowserSpeechSynthesis {
+  const tts = new BrowserSpeechSynthesis();
+  tts.preferredVoice = (lang) => {
+    const choice = useSettings.getState().voiceByLang[lang.slice(0, 2).toLowerCase() as Locale];
+    return choice?.startsWith('device:') ? choice.slice(7) : null;
+  };
+  return tts;
 }
 
 let singleton: Providers | null = null;

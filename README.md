@@ -76,21 +76,19 @@ server, and it is deleted when you stop or the link expires.
 leaving your desk; in development a diagnostics panel adds jumps, deviation,
 simulated weather and incidents (always labelled as simulated).
 
-**Voice** — by default the app speaks with the most natural-sounding voice
-your device has (Edge "Natural" voices, Chrome "Google" voices, Apple
-"Enhanced/Premium" voices) instead of the robotic default, and repeats a
-sentence with an on-device voice if a network voice fails. For a human-like
-voice everywhere — including Georgian, which most browsers can't speak — pick a
-**natural voice in Settings → Voice** (Russian: male «Руслан» or female
-«Ирина»; Georgian: «ნათია»): a free, open-source neural voice
-([Piper](https://github.com/rhasspy/piper)). Listen to a recording of it first,
-then download it once (~93 MB); speech is then made entirely on your device and
-works offline. Everything it says is spelled out the way a person reads it
-(«60 километров в час», «თორმეტ საათსა და ორმოცდათხუთმეტ წუთზე», names in its
-own alphabet). If it is ever too slow for a turn instruction, the device voice
-says that sentence so guidance is never late.
+**Voice** — Google voices only («Google русский», "Google US English", …;
+Chrome has them, free). Settings → Voice lists the Google voices for your
+language. Russian text is spelled out for the ear («60 километров в час»,
+«на улицу Руставели»). Google voices need a connection: offline, or in a
+browser without Google voices (Safari, Firefox), the browser's own voice says
+the sentence so guidance is never silent.
 
-English, Georgian and Russian; metric/imperial; light/dark/automatic (day/night
+**Your location** — the start of a trip is your device position; if the device
+can't give one (location off or blocked, no GPS on a desktop), the trip starts
+from your approximate area (city level, from your connection via the app's own
+Worker — no third party) and the app says so; type an exact start any time.
+
+English and Russian; metric/imperial; light/dark/automatic (day/night
 by the sun at the car while driving); installable PWA.
 
 ## What it costs: nothing
@@ -105,7 +103,6 @@ Every part runs on free services or free tiers, with no API keys and no card:
 | Weather, air quality, elevation | Open-Meteo | free for **non-commercial** use (≈10 000 calls/day) |
 | Search | Nominatim (1 request/s) and Photon | fair use |
 | Places, speed limits, cameras | Overpass (OpenStreetMap) | fair use, often slow |
-| Natural voice | Piper voices from Hugging Face; runs on your device | free download; each voice has its own license (see "About this voice" in Settings) — «Руслан» is for non-commercial use |
 | Device voices, speech recognition | built into the browser | free |
 
 If you ever make it a paid/commercial product, Open-Meteo needs a paid plan
@@ -127,15 +124,12 @@ your own — the provider interfaces make that a configuration change.
   connection.
 - **Free services are shared** (Overpass is often slow; the OSRM demo server has
   no uptime guarantee). Swap endpoints in `.env` for production.
-- **Translations:** Georgian and Russian are drafts that need native review.
+- **Translation:** Russian is a draft that needs native review.
 - Chrome's speech recognition sends audio to the browser vendor; the mic is
   only opened when you press it.
-- **Natural voice:** the first download is large (~93 MB, Wi-Fi recommended)
-  and the first sentence after starting may take a moment on older phones.
-  Piper voices are clear and natural but not quite a studio voice, and a
-  Russian voice may stress an unfamiliar Georgian place name wrongly; the best
-  free *online* voices are Microsoft Edge's "Natural" voices (including
-  Russian and Georgian), which the app picks automatically in Edge.
+- **Voice:** Google voices need a connection and come with Chrome; elsewhere
+  or offline the browser's own voice speaks. An approximate start (location
+  unavailable) is only as good as your connection's location — a VPN moves it.
 
 ## Privacy
 
@@ -144,10 +138,10 @@ destinations (can be turned off and cleared in Settings), and — while you shar
 — the share's own link/key so you can stop it after a reload. Positions and
 routes are never stored. Live sharing sends your position only while you share.
 A driver report sends only its kind and your position at that moment; the
-relay keeps a daily-salted hash instead of your IP address. The natural voice
-downloads its model once and then speaks on the device — no text is sent
-anywhere (device voices marked "needs internet" are the browser vendor's
-online voices).
+relay keeps a daily-salted hash instead of your IP address. Google voices are Google's
+online voices (the sentence is sent to Google to be spoken). The approximate
+start is worked out by the app's own Worker from the connection and is not
+stored.
 
 ## Deploy (Cloudflare, Free plan)
 
