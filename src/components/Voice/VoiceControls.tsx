@@ -6,6 +6,7 @@ import { listenAndAnswer } from '../../voice/assistant';
 import { useLiveShare } from '../../share/liveShare';
 import { LiveIcon, MicIcon, SpeakerIcon } from '../Icons/Icons';
 import { LocateButton } from '../Map/LocateButton';
+import { LayersButton } from '../Map/WeatherLayerControls';
 import './Voice.css';
 
 /**
@@ -45,6 +46,7 @@ export function VoiceControls() {
   if (!hasPlan) {
     return (
       <div className="voice">
+        <LayersButton />
         <LocateButton />
       </div>
     );
@@ -76,6 +78,7 @@ export function VoiceControls() {
           {caption}
         </p>
       ) : null}
+      {!driving ? <LayersButton /> : null}
       {!driving ? <LocateButton /> : null}
       <button
         className={`fab${sharing ? ' fab--on' : ''}`}

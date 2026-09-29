@@ -1,4 +1,4 @@
-import { AttributionControl, Map as MLMap, Marker, setWorkerUrl } from 'maplibre-gl';
+import { AttributionControl, Map as MLMap, Marker, setWorkerUrl, type MapLayerMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 // MapLibre 6 resolves its worker relative to its own module URL, which breaks
 // once bundled — let Vite build the worker and hand MapLibre the final URL.
@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useEffectiveTheme } from '../../hooks/useEffectiveTheme';
 import { useReducedMotion } from '../../hooks/useMediaQuery';
+import { createRouteProjector } from '../../algorithms/placesAlongRoute';
+import { formatDuration } from '../../i18n/format';
 import { navigationZoom } from '../../navigation/instructions';
 import { getProviders } from '../../services/providers';
 import { useExplore } from '../../state/explore';
@@ -18,10 +20,12 @@ import type { LngLat } from '../../types/geo';
 import type { TimedRoute } from '../../types/route';
 import { lowerIndex, sliceLine } from '../../utils/distance';
 import { LocateIcon } from '../Icons/Icons';
+import { exposureLine } from '../Plan/RouteOptions';
 import { WeatherMarker } from '../WeatherMarker/WeatherMarker';
-import { addRouteLayers, EMPTY_FC, lineFeature, pointFeature, routeGradient, setData } from './mapLayers';
+import { add3dBuildings, addRouteLayers, EMPTY_FC, lineFeature, pointFeature, routeGradient, setData } from './mapLayers';
 import { useExploreLayer } from './useExploreLayer';
 import { useLiveLayer } from './useLiveLayer';
+import { useWeatherLayer } from './useWeatherLayer';
 import './Map.css';
 
 setWorkerUrl(maplibreWorkerUrl);
@@ -121,6 +125,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     map.addControl(new AttributionControl({ compact: true }), 'top-right');
     map.on('style.load', () => {
       addRouteLayers(map);
+      add3dBuildings(map);
       setStyleVersion((v) => v + 1);
     });
     map.on('error', (e) => {
@@ -173,8 +178,15 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
         map.off('moveend', apply);
       };
     }
-    // Keep what's on screen still (a sheet opening must not slide the map
-    // and the pin under your finger); camera moves use the new padding.
+    // A route the user hasn't panned away from is re-framed in the new space.
+    const st = useAppStore.getState();
+    if (st.mode === 'planning' && st.plan && !userMovedRef.current && !useExplore.getState().card) {
+      map.setPadding(padding);
+      fitRouteRef.current?.(true);
+      return;
+    }
+    // Otherwise keep what's on screen still (a sheet opening must not slide
+    // the map and the pin under your finger); camera moves use the new padding.
     const { width, height } = map.getContainer().getBoundingClientRect();
     const x = padding.left + (width - padding.left - padding.right) / 2;
     const y = padding.top + (height - padding.top - padding.bottom) / 2;
@@ -187,7 +199,12 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       const map = mapRef.current;
       const s = useAppStore.getState();
       if (!map || !s.plan) return;
-      const [w, so, e, n] = s.plan.timed.route.bbox;
+      // While choosing, frame every option so the alternatives are visible too.
+      const boxes = s.mode === 'planning' && s.routeOptions.length > 1 ? s.routeOptions.map((o) => o.timed.route.bbox) : [s.plan.timed.route.bbox];
+      const w = Math.min(...boxes.map((b) => b[0]));
+      const so = Math.min(...boxes.map((b) => b[1]));
+      const e = Math.max(...boxes.map((b) => b[2]));
+      const n = Math.max(...boxes.map((b) => b[3]));
       // fitBounds padding is added to the overlay insets (setPadding).
       map.fitBounds(
         [
@@ -203,6 +220,8 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
 
   const userMovedRef = useRef(userMoved);
   userMovedRef.current = userMoved;
+  const fitRouteRef = useRef(fitRoute);
+  fitRouteRef.current = fitRoute;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -255,6 +274,76 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     });
   }, [segments, timed, styleVersion]);
 
+  // ---- Alternative routes: grey lines + a time/weather label; tap to choose ----------
+  const routeOptions = useAppStore((s) => s.routeOptions);
+  const selectedOption = useAppStore((s) => s.selectedOption);
+  const optionSummaries = useAppStore((s) => s.derived.options);
+  const offered = useAppStore((s) => s.weatherReroute?.plan ?? null);
+  const altLabels = useRef<Marker[]>([]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion) return;
+    altLabels.current.forEach((mk) => mk.remove());
+    altLabels.current = [];
+    const planning = mode === 'planning' && routeOptions.length > 1;
+    const alts = planning ? routeOptions.map((o, i) => ({ o, i })).filter(({ i }) => i !== selectedOption) : [];
+    setData(map, 'alternatives', {
+      type: 'FeatureCollection',
+      features: offered && mode !== 'planning' ? [lineFeature(offered.timed.route.geometry, { index: -1 })] : alts.map(({ o, i }) => lineFeature(o.timed.route.geometry, { index: i })),
+    });
+    const chosen = routeOptions[selectedOption];
+    if (!planning || !chosen) return;
+    const project = createRouteProjector(chosen.timed);
+    for (const { o, i } of alts) {
+      // Label where this option is furthest from the chosen route (where it visibly differs).
+      const g = o.timed.route.geometry;
+      let best = g[Math.floor(g.length / 2)];
+      let bestD = -1;
+      for (let k = 0; k < g.length; k += Math.max(1, Math.floor(g.length / 60))) {
+        const d = project(g[k]).distanceFromLineM;
+        if (d > bestD) {
+          bestD = d;
+          best = g[k];
+        }
+      }
+      const summary = optionSummaries.find((x) => x.index === i);
+      const delta = o.timed.totalTimeS - chosen.timed.totalTimeS;
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'altlabel';
+      const time = Math.abs(delta) < 60 ? m.ui.same : `${delta > 0 ? '+' : '−'}${formatDuration(Math.abs(delta), m)}`;
+      const wet = summary?.hasWeather ? exposureLine(summary, m, 1) : '';
+      el.textContent = wet ? `${time} · ${wet}` : time;
+      el.setAttribute('aria-label', `${m.ui.alternative} ${i}: ${el.textContent}`);
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        void useAppStore.getState().selectRouteOption(i);
+      });
+      // Open towards the middle of the routes so a label near the edge isn't cut off.
+      const [w, , e] = chosen.timed.route.bbox;
+      const anchor = best[0] < (w + e) / 2 ? 'left' : 'right';
+      altLabels.current.push(new Marker({ element: el, anchor, offset: [anchor === 'left' ? 6 : -6, 0] }).setLngLat(best).addTo(map));
+    }
+  }, [routeOptions, selectedOption, optionSummaries, offered, mode, styleVersion, m]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion) return;
+    const onClick = (e: MapLayerMouseEvent) => {
+      const i = Number(e.features?.[0]?.properties?.index);
+      if (Number.isFinite(i) && useAppStore.getState().mode === 'planning') void useAppStore.getState().selectRouteOption(i);
+    };
+    const enter = () => (map.getCanvas().style.cursor = 'pointer');
+    const leave = () => (map.getCanvas().style.cursor = '');
+    map.on('click', 'alt-hit', onClick);
+    map.on('mouseenter', 'alt-hit', enter);
+    map.on('mouseleave', 'alt-hit', leave);
+    return () => {
+      map.off('click', 'alt-hit', onClick);
+      map.off('mouseenter', 'alt-hit', enter);
+      map.off('mouseleave', 'alt-hit', leave);
+    };
+  }, [styleVersion]);
+
   // ---- Speed cameras (only when enabled) ------------------------------------------
   const cameras = useAppStore((s) => s.speedCameras);
   const camerasOn = useSettings((s) => s.speedCameras);
@@ -267,15 +356,57 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     });
   }, [cameras, camerasOn, styleVersion]);
 
-  // ---- Places along the route ------------------------------------------------
+  // ---- Road hazards ahead (sharp curves, level crossings) while driving ------------
+  const hazards = useAppStore((s) => (s.mode !== 'planning' ? s.roadHazards : null));
+  const hazardsOn = useSettings((s) => s.roadHazards);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !styleVersion) return;
+    setData(map, 'hazards', {
+      type: 'FeatureCollection',
+      features: hazardsOn && hazards ? hazards.map((h) => pointFeature(h.coordinate, { id: h.id, kind: h.kind })) : [],
+    });
+  }, [hazards, hazardsOn, styleVersion]);
+
+  // ---- Places: along the route, or "near here" while exploring; tap → card ----------
+  const nearby = useExplore((s) => s.nearby);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion) return;
+    const list = poi?.results.map((r) => r.poi) ?? (timed ? [] : (nearby?.results.map((r) => r.poi) ?? []));
     setData(map, 'pois', {
       type: 'FeatureCollection',
-      features: (poi?.results ?? []).map((r) => pointFeature(r.poi.coordinate, { id: r.poi.id })),
+      features: list.map((p) => pointFeature(p.coordinate, { id: p.id })),
     });
-  }, [poi, styleVersion]);
+    if (!timed && nearby?.status === 'ready' && nearby.results.length) {
+      const pts = nearby.results.slice(0, 12).map((r) => r.poi.coordinate).concat([nearby.center]);
+      const w = Math.min(...pts.map((p) => p[0]));
+      const e = Math.max(...pts.map((p) => p[0]));
+      const s = Math.min(...pts.map((p) => p[1]));
+      const n = Math.max(...pts.map((p) => p[1]));
+      map.fitBounds([[w, s], [e, n]], { padding: 48, maxZoom: 16, duration: reduced ? 0 : 600 });
+    }
+  }, [poi, nearby, timed, styleVersion, reduced]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion) return;
+    const onClick = (e: MapLayerMouseEvent) => {
+      const id = e.features?.[0]?.properties?.id;
+      const all = [...(useAppStore.getState().poi?.results ?? []), ...(useExplore.getState().nearby?.results ?? [])];
+      const hit = all.find((r) => r.poi.id === id);
+      if (hit && useAppStore.getState().mode === 'planning') useExplore.getState().openPoi(hit.poi);
+    };
+    const enter = () => (map.getCanvas().style.cursor = 'pointer');
+    const leave = () => (map.getCanvas().style.cursor = '');
+    map.on('click', 'pois', onClick);
+    map.on('mouseenter', 'pois', enter);
+    map.on('mouseleave', 'pois', leave);
+    return () => {
+      map.off('click', 'pois', onClick);
+      map.off('mouseenter', 'pois', enter);
+      map.off('mouseleave', 'pois', leave);
+    };
+  }, [styleVersion]);
 
   // ---- Focus ring (selected card > scrubbed time > scroll highlight) ---------
   const focusPoint = useMemo(() => {
@@ -469,6 +600,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
 
   useExploreLayer(mapRef, styleVersion, { viewer, reduced });
   useLiveLayer(mapRef, styleVersion, { enabled: viewer, reduced });
+  useWeatherLayer(mapRef, styleVersion);
 
   // Driving: after the user pans away and leaves the map alone, go back to following.
   useEffect(() => {
@@ -512,6 +644,14 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     };
   }, [styleVersion]);
   const showCompass = (bearing !== 0 || tilted) && (!navigating || !follow);
+
+  // 3D buildings only while the map is tilted (and not in battery saver).
+  const show3d = tilted && !batterySaver;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion || !map.getLayer('building-3d')) return;
+    map.setLayoutProperty('building-3d', 'visibility', show3d ? 'visible' : 'none');
+  }, [show3d, styleVersion]);
   const resetNorth = () => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: reduced ? 0 : 400 });
 
   const pointsById = useMemo(() => new Map(displayPoints.map((p) => [p.id, p])), [displayPoints]);

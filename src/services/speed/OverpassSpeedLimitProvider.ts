@@ -80,4 +80,16 @@ export class OverpassSpeedLimitProvider implements SpeedLimitProvider {
     }
     return out;
   }
+
+  async getLevelCrossings(route: LngLat[], signal?: AbortSignal): Promise<{ id: string; coordinate: LngLat }[]> {
+    const parts = routeBoxes(route, 25_000, 0.002).map((b) => `node(${b})["railway"="level_crossing"];`);
+    const data = await overpassQuery<{ elements: { id: number; lat?: number; lon?: number }[] }>(
+      this.endpoints,
+      `[out:json][timeout:25];(${parts.join('')});out skel;`,
+      { provider: 'Road hazards', signal, timeoutMs: this.timeoutMs },
+    );
+    return (data.elements ?? [])
+      .filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lon))
+      .map((e) => ({ id: `osm:${e.id}`, coordinate: [e.lon!, e.lat!] as LngLat }));
+  }
 }

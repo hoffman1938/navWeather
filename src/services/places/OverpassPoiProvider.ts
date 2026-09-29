@@ -2,6 +2,7 @@ import { localizeScript } from '../../i18n/script';
 import type { LngLat } from '../../types/geo';
 import { cumulativeDistances } from '../../utils/distance';
 import { overpassQuery } from '../overpass';
+import { parseCharging } from './evCharging';
 import type { Poi, PoiCategory, PoiProvider } from './PoiProvider';
 
 /** OSM tag filters per category (fixed strings — no user input reaches Overpass QL). */
@@ -60,6 +61,17 @@ export class OverpassPoiProvider implements PoiProvider {
     });
     return parsePois(data.elements ?? [], category, options.language ?? this.language);
   }
+
+  async searchNear(category: PoiCategory, [lon, lat]: LngLat, radiusM: number, options: { signal?: AbortSignal; language?: string } = {}): Promise<Poi[]> {
+    const r = Math.round(Math.min(Math.max(radiusM, 300), 25_000));
+    const parts = FILTERS[category].map((f) => `nwr(around:${r},${lat.toFixed(5)},${lon.toFixed(5)})${f};`);
+    const data = await overpassQuery<{ elements: OverpassElement[] }>(this.endpoints, `[out:json][timeout:15];(${parts.join('')});out center tags 80;`, {
+      provider: 'Places service',
+      signal: options.signal,
+      timeoutMs: this.timeoutMs,
+    });
+    return parsePois(data.elements ?? [], category, options.language ?? this.language);
+  }
 }
 
 export function buildPoiQuery(category: PoiCategory, corridor: LngLat[], corridorM: number): string {
@@ -86,6 +98,12 @@ export function buildPoiQuery(category: PoiCategory, corridor: LngLat[], corrido
   return `[out:json][timeout:15];(${parts.join('')});out center tags 300;`;
 }
 
+/** Brand (or operator) in the UI language when mapped, else transliterated like names. */
+function brandOf(t: Record<string, string>, language: string): string | undefined {
+  const raw = t[`brand:${language}`] ?? t['brand:en'] ?? t.brand ?? t[`operator:${language}`] ?? t['operator:en'] ?? t.operator;
+  return raw ? localizeScript(raw, language) : undefined;
+}
+
 function parsePois(elements: OverpassElement[], category: PoiCategory, language: string): Poi[] {
   const seen = new Set<string>();
   const out: Poi[] = [];
@@ -101,9 +119,10 @@ function parsePois(elements: OverpassElement[], category: PoiCategory, language:
       id,
       category,
       name: t[`name:${language}`] ?? t['name:en'] ?? (t.name ? localizeScript(t.name, language) : undefined),
-      brand: t.brand ?? t.operator ?? undefined,
+      brand: brandOf(t, language),
       coordinate: [lon, lat],
       openingHours: t.opening_hours,
+      ...(category === 'ev_charging' ? { charging: parseCharging(t) } : {}),
       source: 'openstreetmap',
     });
   }

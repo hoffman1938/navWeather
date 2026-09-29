@@ -3,6 +3,8 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { isAbortError } from '../services/http';
 import { latestFix, locateOnce, LocationError, LocationWatcher, rememberFix, type LocationErrorKind, type LocationFix } from '../services/location';
 import { getProviders } from '../services/providers';
+import type { LayerKind } from '../algorithms/weatherGrid';
+import type { Poi, PoiCategory } from '../services/places/PoiProvider';
 import { parseCoordinateText } from '../services/routePlanner';
 import { placeUrl } from '../share/links';
 import { useLiveShare } from '../share/liveShare';
@@ -10,6 +12,7 @@ import type { LngLat, Place } from '../types/geo';
 import type { LocationForecast } from '../types/weather';
 import { haversineM } from '../utils/distance';
 import { currentMessages } from './settings';
+import { chargingSummary } from '../services/places/evCharging';
 import { useAppStore, type SheetState } from './store';
 
 /**
@@ -28,6 +31,19 @@ export interface PlaceCard {
   drive: { status: 'loading' | 'ready' | 'error'; durationS?: number; distanceM?: number; arrivalMs?: number } | null;
 }
 
+export interface NearbyResult {
+  poi: Poi;
+  distanceM: number;
+}
+
+export interface NearbySearch {
+  category: PoiCategory;
+  center: LngLat;
+  radiusM: number;
+  status: 'loading' | 'ready' | 'error';
+  results: NearbyResult[];
+}
+
 export interface ExploreState {
   myLocation: LocationFix | null;
   /** off → pending (waiting for first fix) → on (dot shown). */
@@ -44,6 +60,13 @@ export interface ExploreState {
   view: { center: LngLat; zoom: number } | null;
   /** Place being shared as a link (dialog open). */
   sharePlace: Place | null;
+  /** "Coffee near here" results (explore mode). */
+  nearby: NearbySearch | null;
+  /** Forecast layer over the map and the hour it shows (0 = now … 24). */
+  layer: 'off' | LayerKind;
+  layerHour: number;
+  /** `partial`: some grid points failed; those areas stay blank (never filled in). */
+  layerStatus: 'idle' | 'loading' | 'ready' | 'partial' | 'error';
 
   locateMe(): void;
   stopLocate(): void;
@@ -59,6 +82,11 @@ export interface ExploreState {
   /** Card for the user's own position (tap on the blue dot). */
   showMe(): void;
   openSharePlace(place: Place): void;
+  setLayer(layer: 'off' | LayerKind): void;
+  setLayerHour(hour: number): void;
+  searchNearby(category: PoiCategory): Promise<void>;
+  clearNearby(): void;
+  openPoi(poi: Poi): void;
   closeSharePlace(): void;
   directionsTo(place: Place): Promise<void>;
   addAsStop(place: Place): Promise<void>;
@@ -70,6 +98,7 @@ export interface ExploreState {
 }
 
 let cardAbort: AbortController | null = null;
+let nearbyAbort: AbortController | null = null;
 
 export function coordsLabel([lon, lat]: LngLat): string {
   return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
@@ -112,6 +141,10 @@ export const useExplore = create<ExploreState>()(
     cardSheet: 'default',
     view: null,
     sharePlace: null,
+    nearby: null,
+    layer: 'off',
+    layerHour: 0,
+    layerStatus: 'idle',
 
     locateMe() {
       const s = get();
@@ -205,6 +238,48 @@ export const useExplore = create<ExploreState>()(
       get().selectPlace({ id: 'me', name: m.ui.currentLocation, label: coordsLabel(fix.coordinate), coordinate: fix.coordinate, kind: 'me' }, 'me');
     },
     openSharePlace: (sharePlace) => set({ sharePlace }),
+    setLayer: (layer) => set({ layer, layerHour: 0, layerStatus: layer === 'off' ? 'idle' : get().layerStatus }),
+    setLayerHour: (layerHour) => set({ layerHour: Math.max(0, Math.min(24, Math.round(layerHour))) }),
+
+    async searchNearby(category) {
+      nearbyAbort?.abort();
+      const ctrl = new AbortController();
+      nearbyAbort = ctrl;
+      const s = get();
+      // Around you when the map follows you; otherwise around what you're looking at.
+      const fix = s.myLocation && s.followMe ? s.myLocation.coordinate : null;
+      const center = fix ?? s.view?.center ?? latestFix(10 * 60_000)?.coordinate;
+      const provider = getProviders().poi;
+      if (!center || !provider?.searchNear) return;
+      const zoom = s.view?.zoom ?? 12;
+      const radiusM = zoom >= 15 ? 1500 : zoom >= 13 ? 3000 : zoom >= 11 ? 8000 : 15_000;
+      get().closeCard();
+      set({ nearby: { category, center, radiusM, status: 'loading', results: [] } });
+      try {
+        const pois = await provider.searchNear(category, center, radiusM, { signal: ctrl.signal, language: currentMessages().locale });
+        if (ctrl.signal.aborted) return;
+        const results = pois
+          .map((poi) => ({ poi, distanceM: haversineM(center, poi.coordinate) }))
+          .sort((a, b) => a.distanceM - b.distanceM)
+          .slice(0, 30);
+        set({ nearby: { category, center, radiusM, status: 'ready', results } });
+      } catch (e) {
+        if (!isAbortError(e)) set({ nearby: { category, center, radiusM, status: 'error', results: [] } });
+      }
+    },
+
+    clearNearby() {
+      nearbyAbort?.abort();
+      set({ nearby: null });
+    },
+
+    openPoi(poi) {
+      const m = currentMessages();
+      const name = poi.name ?? poi.brand ?? m.poi.unnamed(m.poi.category[poi.category]);
+      const charging = poi.charging ? chargingSummary(poi.charging, m.poi.chargingUpTo) : null;
+      const label = [poi.brand && poi.brand !== name ? poi.brand : null, m.poi.category[poi.category], charging].filter(Boolean).join(' · ');
+      get().selectPlace({ id: poi.id, name, label, coordinate: poi.coordinate, kind: poi.category }, 'search');
+    },
     closeSharePlace: () => set({ sharePlace: null }),
 
     async directionsTo(place) {

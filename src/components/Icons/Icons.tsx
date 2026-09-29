@@ -174,3 +174,8 @@ export const ParkingIcon = ({ size, className }: P) => (
     <path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3" />
   </svg>
 );
+export const LayersIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" />
+  </svg>
+);

@@ -1,4 +1,5 @@
 import type { LngLat } from '../../types/geo';
+import type { ChargingInfo } from './evCharging';
 
 export type PoiCategory =
   | 'fuel'
@@ -24,6 +25,8 @@ export interface Poi {
   brand?: string;
   coordinate: LngLat;
   openingHours?: string;
+  /** EV chargers: connectors and power, when mapped. */
+  charging?: ChargingInfo;
   source: string;
 }
 
@@ -35,4 +38,6 @@ export interface PoiProvider {
     corridor: LngLat[],
     options: { corridorM: number; signal?: AbortSignal; language?: string },
   ): Promise<Poi[]>;
+  /** Places of a category within `radiusM` of a point ("coffee near here"). */
+  searchNear?(category: PoiCategory, center: LngLat, radiusM: number, options?: { signal?: AbortSignal; language?: string }): Promise<Poi[]>;
 }

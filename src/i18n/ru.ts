@@ -243,6 +243,8 @@ export const ru: Messages = {
   },
 
   poi: {
+    chargingUpTo: (kw: string) => `до ${kw}`,
+    connectorsUnknown: 'Разъёмы не указаны',
     category: {
       fuel: 'заправка',
       ev_charging: 'зарядная станция',
@@ -478,6 +480,8 @@ export const ru: Messages = {
     breakRemindersHint: 'В долгой поездке предлагать перерыв примерно каждые 2 часа.',
     speedCameras: 'Предупреждать о камерах',
     speedCamerasHint: 'Только там, где это разрешено законом. Данные OpenStreetMap — могут быть неполными.',
+    roadHazards: 'Опасности на дороге',
+    roadHazardsHint: 'Крутые повороты (по форме дороги, с учётом прогноза: мокро или скользко) и ж/д переезды (OpenStreetMap). Голосом примерно за 300 м.',
     batterySaver: 'Экономия заряда',
     batterySaverHint: 'Меньше анимаций и обновлений позиции, когда это безопасно.',
     fuelRange: 'Запас хода (необязательно)',
@@ -516,6 +520,11 @@ export const ru: Messages = {
     directions: 'Маршрут',
     back: 'Назад',
     droppedPin: 'Метка',
+    nearbyLabel: 'Найти рядом',
+    nearbyTitle: (what: string) => `${what} рядом`,
+    nearbyWithin: (r: string) => `В радиусе ${r}`,
+    nearbyNone: 'Здесь ничего не нашлось. Отдалите или сдвиньте карту и повторите поиск.',
+    searchThisArea: 'Искать в этой области',
     lookingUp: 'Уточняем место…',
     searchFailed: 'Поиск сейчас недоступен. Попробуйте чуть позже.',
     save: 'Сохранить',
@@ -655,6 +664,58 @@ export const ru: Messages = {
     title: 'Машина здесь',
     save: 'Запомнить парковку',
     saved: 'Парковка сохранена',
+  },
+  elevation: {
+    title: 'Высота',
+    highest: 'Самая высокая точка',
+    legend: 'Цвет — температура в момент проезда',
+  },
+  layers: {
+    title: 'Слои карты',
+    off: 'Без слоя',
+    precip: 'Осадки',
+    temp: 'Температура',
+    play: 'Показать следующие 24 часа',
+    hourLabel: 'Час прогноза',
+    light: 'Слабые',
+    heavy: 'Сильные',
+    partial: 'Часть области недоступна',
+    forecastNote: 'Приблизительно: прогноз в 49 точках (Open-Meteo), не радар.',
+  },
+  hazard: {
+    curve: 'Крутой поворот',
+    hairpin: 'Серпантин',
+    series: 'Повороты',
+    levelCrossing: 'Ж/д переезд',
+    left: 'налево',
+    right: 'направо',
+    wet: 'Дорога может быть мокрой',
+    icy: 'Возможна гололедица',
+    voiceCurve: (side: 'left' | 'right', kind: 'curve' | 'hairpin' | 'series', surface: 'dry' | 'wet' | 'icy') => {
+      const dir = side === 'left' ? 'налево' : 'направо';
+      return (
+        (kind === 'series' ? `Впереди серия крутых поворотов, первый ${dir}.` : kind === 'hairpin' ? `Впереди серпантин, поворот ${dir}.` : `Впереди крутой поворот ${dir}.`) +
+        (surface === 'icy' ? ' Возможна гололедица.' : surface === 'wet' ? ' Дорога может быть мокрой.' : '')
+      );
+    },
+    voiceLevelCrossing: 'Впереди железнодорожный переезд.',
+    signLabel: (what: string, dist: string) => `${what} через ${dist}`,
+  },
+  reroute: {
+    condition: { storm: 'Грозы', snow: 'Снег', heavy: 'Сильный дождь', fog: 'Туман' },
+    title: (cond: string) => `${cond} на вашем маршруте`,
+    avoids: (min: number) => (min > 0 ? `Другой маршрут обходит примерно ${min} мин непогоды` : 'На другом маршруте непогоды меньше'),
+    extra: (min: number) => (min <= 0 ? 'без потери времени' : `+${min} мин`),
+    basis: 'По прогнозу на время, когда вы там будете.',
+    take: 'Поехать по нему',
+    keep: 'Оставить мой',
+    voice: (cond: string, min: number) => `${cond} на вашем маршруте. Есть объезд${min > 0 ? `, дольше на ${min} мин` : ''}.`,
+  },
+  resume: {
+    title: (place: string) => `Продолжить путь: ${place}?`,
+    body: 'Навигация прервалась при перезагрузке страницы.',
+    continue: 'Продолжить',
+    dismiss: 'Нет',
   },
 };
 

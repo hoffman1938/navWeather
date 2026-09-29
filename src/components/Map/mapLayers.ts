@@ -26,7 +26,7 @@ export function addRouteLayers(map: MLMap) {
   const beforeId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
   // lineMetrics → line-progress, so the driven part is a gradient stop, not a re-uploaded line.
   if (!map.getSource('route')) map.addSource('route', { type: 'geojson', data: EMPTY_FC, lineMetrics: true });
-  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy', 'cameras']) {
+  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy', 'cameras', 'hazards', 'alternatives']) {
     if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: EMPTY_FC });
   }
   const lineLayout = { 'line-join': 'round', 'line-cap': 'round' } as const;
@@ -83,6 +83,39 @@ export function addRouteLayers(map: MLMap) {
         ],
         'line-blur': ['interpolate', ['linear'], ['zoom'], 4, 2, 14, 6],
       },
+    },
+    beforeId,
+  );
+  // Alternative routes: quieter lines under the chosen one; a wide invisible
+  // line makes them easy to tap.
+  const alt = cssVar('--route-alt', '#9aa3ad');
+  map.addLayer(
+    {
+      id: 'alt-casing',
+      type: 'line',
+      source: 'alternatives',
+      layout: lineLayout,
+      paint: { 'line-color': casing, 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 4, 9, 8, 14, 13] },
+    },
+    beforeId,
+  );
+  map.addLayer(
+    {
+      id: 'alt-line',
+      type: 'line',
+      source: 'alternatives',
+      layout: lineLayout,
+      paint: { 'line-color': alt, 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 2.5, 9, 4.5, 14, 8] },
+    },
+    beforeId,
+  );
+  map.addLayer(
+    {
+      id: 'alt-hit',
+      type: 'line',
+      source: 'alternatives',
+      layout: lineLayout,
+      paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 24 },
     },
     beforeId,
   );
@@ -155,6 +188,18 @@ export function addRouteLayers(map: MLMap) {
     },
   });
   map.addLayer({
+    id: 'hazards',
+    type: 'circle',
+    source: 'hazards',
+    minzoom: 10,
+    paint: {
+      'circle-radius': 5,
+      'circle-color': cssVar('--sev-high', '#b45309'),
+      'circle-stroke-color': surface,
+      'circle-stroke-width': 2,
+    },
+  });
+  map.addLayer({
     id: 'endpoints',
     type: 'circle',
     source: 'endpoints',
@@ -205,4 +250,36 @@ export function circleFeature(center: LngLat, radiusM: number, steps = 48): GeoJ
     ring.push([lon + dLon * Math.cos(a), lat + dLat * Math.sin(a)]);
   }
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } };
+}
+
+/**
+ * 3D buildings from the basemap's own building heights (OpenMapTiles
+ * `render_height`), under the route so it stays visible. Added hidden; shown
+ * while the map is tilted. Skipped when the style has no building layer.
+ */
+export function add3dBuildings(map: MLMap) {
+  if (map.getLayer('building-3d')) return;
+  const layers = map.getStyle().layers ?? [];
+  const flat = layers.find((l) => l.type === 'fill' && 'source-layer' in l && l['source-layer'] === 'building') as maplibregl.FillLayerSpecification | undefined;
+  if (!flat || typeof flat.source !== 'string') return;
+  const before = map.getLayer('me-accuracy') ? 'me-accuracy' : layers.find((l) => l.type === 'symbol')?.id;
+  map.addLayer(
+    {
+      id: 'building-3d',
+      type: 'fill-extrusion',
+      source: flat.source,
+      'source-layer': 'building',
+      minzoom: 15,
+      filter: ['!=', ['get', 'hide_3d'], true],
+      layout: { visibility: 'none' },
+      paint: {
+        'fill-extrusion-color': cssVar('--map-building-3d', '#dcdcd5'),
+        // Grow in over half a zoom level instead of popping up.
+        'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.5, ['coalesce', ['get', 'render_height'], 0]],
+        'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.5, ['coalesce', ['get', 'render_min_height'], 0]],
+        'fill-extrusion-opacity': 0.8,
+      },
+    },
+    before,
+  );
 }

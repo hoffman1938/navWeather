@@ -1,0 +1,97 @@
+.layers {
+  position: relative;
+}
+.layers__pop {
+  right: calc(100% + 8px);
+  bottom: 0;
+  width: 220px;
+}
+.layers__pop .popover__row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.layers__note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+/* Forecast layer time bar: over the map, clear of the right-hand buttons. */
+.layerbar {
+  position: absolute;
+  z-index: 12; /* under the map buttons' menus */
+  left: calc(var(--inset-left, 0px) + var(--safe-left) + 12px);
+  right: calc(var(--safe-right) + 76px);
+  bottom: calc(var(--inset-bottom, 200px) + 12px);
+  max-width: 460px;
+  padding: 6px 10px 8px;
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+.layerbar__top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.layerbar__label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  line-height: 1.25;
+}
+.layerbar__title,
+.layerbar__time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.layerbar__title {
+  font-size: 14px;
+}
+.layerbar__time {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.layerbar__spin {
+  display: inline-block;
+  margin-left: 8px;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+}
+.layerbar__err {
+  color: var(--sev-high);
+}
+.layerbar__slider {
+  width: 100%;
+  accent-color: var(--accent-fill);
+}
+.layerbar__legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.layerbar__ramp {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+}
+.layerbar__legend--precip .layerbar__ramp {
+  background: linear-gradient(90deg, rgba(110, 170, 255, 0.45), rgb(40, 110, 230), rgb(20, 60, 190), rgb(140, 50, 200), rgb(220, 40, 150));
+}
+.layerbar__legend--temp .layerbar__ramp {
+  background: linear-gradient(90deg, rgb(60, 110, 220), rgb(80, 170, 230), rgb(90, 190, 150), rgb(200, 210, 80), rgb(240, 160, 50), rgb(220, 60, 40));
+}
+.layerbar__note {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+[data-sheet-covers] .layerbar {
+  visibility: hidden;
+}

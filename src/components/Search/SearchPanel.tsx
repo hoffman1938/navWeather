@@ -5,6 +5,7 @@ import { useMessages } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { useElementSize } from '../../hooks/useElementSize';
 import { BackIcon, CloseIcon, DirectionsIcon, EditIcon, SettingsIcon, SwapIcon } from '../Icons/Icons';
+import { NearbyChips } from '../Explore/Nearby';
 import { PlaceInput } from './PlaceInput';
 import './Search.css';
 
@@ -82,6 +83,7 @@ export function SearchPanel() {
             <SettingsIcon size={20} />
           </button>
         </form>
+        <NearbyChips />
       </div>
     );
   }

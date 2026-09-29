@@ -1,14 +1,18 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { AlertBanner } from './components/Drive/AlertBanner';
+import { RerouteOffer } from './components/Drive/RerouteOffer';
 import { ArrivalSheet } from './components/Drive/ArrivalSheet';
 import { DriveSheet } from './components/Drive/DriveSheet';
 import { ManeuverBanner } from './components/Drive/ManeuverBanner';
+import { HazardSign } from './components/Drive/HazardSign';
 import { SpeedSign } from './components/Drive/SpeedSign';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { MapWeatherChip } from './components/Explore/MapWeatherChip';
+import { NearbySheet } from './components/Explore/Nearby';
 import { PlaceSheet } from './components/Explore/PlaceSheet';
 import { LiveView } from './components/Live/LiveView';
 import { LocateButton } from './components/Map/LocateButton';
+import { LayerTimeline } from './components/Map/WeatherLayerControls';
 import { LiveShareDialog, SharePlaceDialog, ShareStatus } from './components/Share/Share';
 import { LocationPrimer, NavPrompt, Notice } from './components/Notice/Notice';
 import { PlanSheet } from './components/Plan/PlanSheet';
@@ -56,7 +60,9 @@ function MainApp() {
   const sharing = useLiveShare((s) => s.status === 'active');
   useWakeLock(driving || sharing);
   const hasCard = useExplore((s) => s.card !== null);
+  const hasNearby = useExplore((s) => s.nearby !== null);
   const arrived = useAppStore((s) => s.arrival !== null);
+  const hasPlan = useAppStore((s) => s.plan !== null);
   const m = useMessages();
 
   return (
@@ -67,12 +73,18 @@ function MainApp() {
         </Suspense>
       </ErrorBoundary>
       {driving && !arrived ? <DriveTop /> : arrived ? null : <SearchPanel />}
-      {driving && !arrived ? <SpeedSign /> : null}
+      {driving && !arrived ? (
+        <div className="drive-signs">
+          <HazardSign />
+          <SpeedSign />
+        </div>
+      ) : null}
       <VoiceControls />
       {!driving ? <MapWeatherChip /> : null}
+      {!driving && !arrived ? <LayerTimeline /> : null}
       <ShareStatus />
       <Notice />
-      {arrived ? <ArrivalSheet /> : driving ? <DriveSheet /> : hasCard ? <PlaceSheet /> : <PlanSheet />}
+      {arrived ? <ArrivalSheet /> : driving ? <DriveSheet /> : hasCard ? <PlaceSheet /> : hasNearby && !hasPlan ? <NearbySheet /> : <PlanSheet />}
       <SettingsDialog />
       <LocationPrimer />
       <NavPrompt />
@@ -162,6 +174,7 @@ function DriveTop() {
     <div className="drive-top" ref={ref}>
       <ManeuverBanner />
       <AlertBanner />
+      <RerouteOffer />
     </div>
   );
 }

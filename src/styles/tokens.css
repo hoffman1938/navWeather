@@ -51,6 +51,8 @@
   --route: light-dark(#0a64e8, #4c8dff);
   --route-casing: light-dark(#ffffff, #0b0d10);
   --route-traveled: light-dark(#9aa3ad, #59616c);
+  --route-alt: light-dark(#8d97a3, #6b7480);
+  --map-building-3d: light-dark(#dcdcd5, #25282e);
 
   --shadow-float: 0 2px 12px light-dark(rgba(15, 23, 42, 0.16), rgba(0, 0, 0, 0.5)), 0 0 0 1px var(--border);
   --shadow-marker: 0 1px 4px light-dark(rgba(15, 23, 42, 0.25), rgba(0, 0, 0, 0.6));

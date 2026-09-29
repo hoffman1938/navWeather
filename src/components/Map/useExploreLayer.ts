@@ -10,6 +10,14 @@ import { circleFeature, EMPTY_FC, setData } from './mapLayers';
 const PIN_SVG =
   '<svg viewBox="0 0 30 40" width="30" height="40" aria-hidden="true"><path d="M15 39s12-12.6 12-23A12 12 0 0 0 3 16c0 10.4 12 23 12 23z" fill="#d93025" stroke="#fff" stroke-width="2"/><circle cx="15" cy="16" r="4.5" fill="#fff"/></svg>';
 
+const icon = (d: string) =>
+  `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+const SAVED_GLYPH: Record<'home' | 'work' | 'favorite', string> = {
+  home: icon('M4 11l8-7 8 7M6 9.5V20h4v-5h4v5h4V9.5'),
+  work: icon('M3.5 8.5h17v11h-17zM9 8.5v-2A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5v2'),
+  favorite: `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor"/></svg>`,
+};
+
 /** How long a finger must rest on the map to drop a pin. */
 const LONG_PRESS_MS = 500;
 
@@ -148,38 +156,52 @@ export function useExploreLayer(mapRef: RefObject<MLMap | null>, styleVersion: n
     };
   }, [mapRef, ready, opts.viewer, opts.reduced]);
 
-  // ---- Where I parked (saved on this device) ----------------------------------------
+  // ---- Saved places: parking spot, Home, Work, favourites (this device only) ----------
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || opts.viewer) return;
-    let marker: Marker | null = null;
+    const markers = new Map<string, Marker>();
     const render = () => {
-      const spot = useSavedPlaces.getState().saved.find((s) => s.slot === 'parking');
-      if (!spot) {
-        marker?.remove();
-        marker = null;
-        return;
+      const { saved } = useSavedPlaces.getState();
+      const app = useAppStore.getState();
+      // While driving, only the parking spot matters; the rest is planning context.
+      const visible = app.mode === 'planning' ? saved : saved.filter((s) => s.slot === 'parking');
+      const keep = new Set(visible.map((s) => `${s.slot}:${s.id}`));
+      for (const [k, mk] of markers) {
+        if (!keep.has(k)) {
+          mk.remove();
+          markers.delete(k);
+        }
       }
-      if (!marker) {
-        const el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'parking-pin';
-        el.textContent = 'P';
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const cur = useSavedPlaces.getState().saved.find((s) => s.slot === 'parking');
-          if (cur) useExplore.getState().selectPlace(cur, 'search');
-        });
-        marker = new Marker({ element: el }).setLngLat(spot.coordinate).addTo(map);
+      for (const place of visible) {
+        const k = `${place.slot}:${place.id}`;
+        let mk = markers.get(k);
+        if (!mk) {
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = place.slot === 'parking' ? 'parking-pin' : `saved-pin saved-pin--${place.slot}`;
+          if (place.slot === 'parking') el.textContent = 'P';
+          else el.innerHTML = SAVED_GLYPH[place.slot];
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            useExplore.getState().selectPlace(place, 'search');
+          });
+          mk = new Marker({ element: el }).setLngLat(place.coordinate).addTo(map);
+          markers.set(k, mk);
+        }
+        const m = currentMessages();
+        const name = place.slot === 'home' ? m.explore.home : place.slot === 'work' ? m.explore.work : place.name;
+        mk.getElement().setAttribute('aria-label', name);
+        mk.getElement().title = name;
       }
-      marker.getElement().setAttribute('aria-label', spot.name);
-      marker.setLngLat(spot.coordinate);
     };
     render();
     const unsub = useSavedPlaces.subscribe(render);
+    const unsubMode = useAppStore.subscribe((s) => s.mode, render);
     return () => {
       unsub();
-      marker?.remove();
+      unsubMode();
+      markers.forEach((mk) => mk.remove());
     };
   }, [mapRef, ready, opts.viewer]);
 
@@ -208,6 +230,9 @@ export function useExploreLayer(mapRef: RefObject<MLMap | null>, styleVersion: n
 
     const onClick = (e: MapMouseEvent) => {
       if (e.originalEvent.target !== map.getCanvas()) return; // markers handle their own clicks
+      // A tap on an alternative route selects it (RouteMap handles that), not a pin.
+      if (map.getLayer('alt-hit') && map.queryRenderedFeatures(e.point, { layers: ['alt-hit'] }).length) return;
+      if (map.getLayer('pois') && map.queryRenderedFeatures(e.point, { layers: ['pois'] }).length) return;
       const app = useAppStore.getState();
       if (app.mode !== 'planning') return;
       if (app.selectedPointId) {

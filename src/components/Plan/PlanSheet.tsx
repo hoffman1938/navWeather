@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { conditionText, formatAgo, formatDistance, formatDuration, formatSpeed, formatTemp } from '../../i18n/format';
 import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
@@ -11,8 +12,10 @@ import { WeatherIcon } from '../WeatherIcon/WeatherIcon';
 import { WeatherStrip } from '../WeatherStrip/WeatherStrip';
 import { DataSources } from './DataSources';
 import { DepartureChart, DepartureTip } from './DeparturePlanner';
+import { ElevationProfile } from './ElevationProfile';
 import { DepartureSelector } from './DepartureSelector';
 import { RouteOptions } from './RouteOptions';
+import { ResumeDrive, takeResumableDrive } from './ResumeDrive';
 import './Plan.css';
 
 const LOADING: Record<string, keyof ReturnType<typeof useMessages>['ui']['stage']> = {
@@ -68,6 +71,7 @@ export function PlanSheet() {
         <div className="plan-extra">
           <DepartureChart />
           <HeadsUp />
+          <ElevationProfile />
           <PointDetails />
           <TimeScrubber />
           <AlongTheWay />
@@ -86,6 +90,8 @@ function coarsePointer(): boolean {
 
 function Intro() {
   const m = useMessages();
+  const [resumable, setResumable] = useState(() => takeResumableDrive() !== null);
+  if (resumable) return <ResumeDrive onDone={() => setResumable(false)} />;
   const tryDemo = () => {
     const s = useAppStore.getState();
     s.setOriginText('Tbilisi, Georgia');

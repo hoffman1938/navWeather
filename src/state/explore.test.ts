@@ -103,3 +103,25 @@ describe('directions from a place', () => {
     expect(h.routingCalls).toHaveLength(0);
   });
 });
+
+describe('quick categories near the map centre', () => {
+  it('lists places nearest first, opens a card, and closing it returns to the list', async () => {
+    useExplore.setState({ view: { center: [44.8015, 41.6937], zoom: 14 } });
+    h.poi.results = [
+      { id: 'far', category: 'cafe', name: 'Far Café', coordinate: [44.82, 41.70], source: 'test' },
+      { id: 'near', category: 'cafe', name: 'Near Café', coordinate: [44.802, 41.694], source: 'test' },
+    ];
+    await useExplore.getState().searchNearby('cafe');
+    const n = useExplore.getState().nearby!;
+    expect(n).toMatchObject({ category: 'cafe', status: 'ready', radiusM: 3000 });
+    expect(n.results.map((r) => r.poi.id)).toEqual(['near', 'far']);
+    expect(n.results[0].distanceM).toBeLessThan(100);
+
+    useExplore.getState().openPoi(n.results[0].poi);
+    expect(useExplore.getState().card?.place).toMatchObject({ name: 'Near Café', label: 'café', kind: 'cafe' });
+    useExplore.getState().closeCard();
+    expect(useExplore.getState().nearby?.results).toHaveLength(2);
+    useExplore.getState().clearNearby();
+    expect(useExplore.getState().nearby).toBeNull();
+  });
+});

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getProviders } from '../services/providers';
 import { useLiveShare } from '../share/liveShare';
 import { locationWatcher, useExplore } from '../state/explore';
-import { getVoiceQueue, useAppStore } from '../state/store';
+import { getVoiceQueue, maybeOfferWeatherReroute, useAppStore, weatherRerouteDiagnostics } from '../state/store';
 import { simulateDeviation, simulateIncident, simulateWeatherChange, skipKm, skipMinutes, skipToNextEvent } from './devTools';
 import './DevPanel.css';
 
@@ -68,7 +68,9 @@ export default function DevPanel() {
             <button onClick={simulateDeviation}>Deviate</button>
             <button onClick={simulateWeatherChange}>Heavy rain ahead</button>
             <button onClick={simulateIncident}>Accident report</button>
+            <button onClick={() => void maybeOfferWeatherReroute(true)}>Weather re-route check</button>
           </div>
+          {weatherRerouteDiagnostics() ? <p className="devpanel__note">Re-route: {weatherRerouteDiagnostics()}</p> : null}
         </section>
       ) : null}
       <section>

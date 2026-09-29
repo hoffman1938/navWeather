@@ -81,6 +81,10 @@ export function installFakeProviders(baseMs: number): Harness {
       poiState.calls++;
       return poiState.results;
     },
+    async searchNear() {
+      poiState.calls++;
+      return poiState.results;
+    },
   };
 
   const providers: Providers = {

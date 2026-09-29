@@ -371,3 +371,90 @@ button.me-dot::after {
   position: absolute;
   inset: -8px;
 }
+/* Saved places on the map (Home, Work, favourites) */
+.saved-pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: var(--shadow-marker);
+  color: #fff;
+  cursor: pointer;
+}
+.saved-pin::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.saved-pin--home,
+.saved-pin--work {
+  background: #1a73e8;
+}
+.saved-pin--favorite {
+  background: #e8710a;
+}
+
+/* Quick category chips + nearby results */
+.nearby-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  pointer-events: auto;
+}
+.nearby-chips::-webkit-scrollbar {
+  display: none;
+}
+.nearby-chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.nearby-chip.is-on {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.rows.nearby-list {
+  padding: 0 16px 8px;
+}
+.nearby-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 0;
+  text-align: left;
+  color: var(--text);
+}
+.nearby-row__text {
+  display: grid;
+  min-width: 0;
+}
+.nearby-row__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nearby-row__sub {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.nearby-row__dist {
+  flex: none;
+  color: var(--text-2);
+  font-size: 14px;
+}

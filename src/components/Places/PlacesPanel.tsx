@@ -3,6 +3,7 @@ import type { PoiCategory } from '../../services/places/PoiProvider';
 import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { getProviders } from '../../services/providers';
+import { chargingLine } from '../Explore/Nearby';
 import './Places.css';
 
 const QUICK: PoiCategory[] = ['fuel', 'ev_charging', 'restaurant', 'cafe', 'hotel', 'parking', 'rest_area', 'pharmacy', 'hospital'];
@@ -51,6 +52,7 @@ export function PlacesPanel() {
                     {m.poi.ahead(formatDistance(r.aheadM, units, m))} ·{' '}
                     {r.offRouteM < 150 ? m.poi.onRoute : m.poi.offRoute(formatDistance(r.offRouteM, units, m))}
                   </span>
+                  {r.poi.category === 'ev_charging' ? <span className="place__meta">{chargingLine(r.poi, m)}</span> : null}
                 </span>
                 {detourMin !== null ? <span className="place__detour tabular">{m.poi.detourMin(detourMin)}</span> : null}
                 <button

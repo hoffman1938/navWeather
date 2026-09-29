@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setProviders } from '../services/providers';
 import { installFakeProviders, type Harness } from '../test/harness';
 import { respond, __resetAssistant } from '../voice/assistant';
-import { simulateDeviation, simulateIncident, skipToNextEvent } from '../dev/devTools';
+import { simulateDeviation, simulateIncident, simulateWeatherChange, skipToNextEvent } from '../dev/devTools';
 import { useSettings } from './settings';
-import { __resetStoreRuntime, getVoiceQueue, useAppStore } from './store';
+import { __resetStoreRuntime, getVoiceQueue, maybeOfferWeatherReroute, useAppStore, type WeatherRerouteOffer } from './store';
 
 /**
  * Driver-facing scenarios on Tbilisi → Batumi (brief §86–93): simulated drive
@@ -222,5 +222,53 @@ describe('critical path: deviation mid-drive (brief §58)', () => {
     skipToNextEvent();
     drive(4);
     expect(h.tts.spoken.some((t) => /Accident reported ahead/.test(t))).toBe(true);
+  });
+});
+
+describe('weather re-route while driving (offered, never automatic)', () => {
+  async function driving(minutes: number) {
+    await plan();
+    useAppStore.getState().setSimulationSpeed(60);
+    useAppStore.getState().startSimulation();
+    drive(minutes);
+  }
+
+  it('looks for other routes only with severe weather ahead, and never offers the same road', async () => {
+    await driving(20);
+    const calls = h.routingCalls.length;
+    await maybeOfferWeatherReroute(true); // the fake forecast has plain rain only
+    expect(h.routingCalls.length).toBe(calls);
+    simulateWeatherChange(); // heavy rain 20–80 km ahead
+    await maybeOfferWeatherReroute(true);
+    expect(h.routingCalls.length).toBe(calls + 1); // asked for routes from the car
+    expect(useAppStore.getState().weatherReroute).toBeNull(); // the only one is the same road
+    expect(useAppStore.getState().plan?.timed.route.origin.name).toBe('Tbilisi'); // nothing changed
+  });
+
+  function offerOf(): WeatherRerouteOffer {
+    const s = useAppStore.getState();
+    const e = { score: 60, severeMinutes: 15, wetMinutes: 15, fogMinutes: 0 };
+    return { plan: s.plan!, extraS: 300, current: e, alternative: { ...e, score: 5, severeMinutes: 0, wetMinutes: 5 }, condition: 'storm', atProgressM: s.progress!.distanceAlongM, from: s.vehicle!.coordinate };
+  }
+
+  it('dismiss keeps the route; accept switches the drive; an old offer lapses', async () => {
+    await driving(10);
+    const before = useAppStore.getState().plan;
+    useAppStore.setState({ weatherReroute: offerOf() });
+    useAppStore.getState().dismissWeatherReroute();
+    expect(useAppStore.getState().weatherReroute).toBeNull();
+    expect(useAppStore.getState().plan).toBe(before);
+
+    const offer = offerOf();
+    useAppStore.setState({ weatherReroute: offer });
+    await useAppStore.getState().acceptWeatherReroute();
+    const s = useAppStore.getState();
+    expect(s.weatherReroute).toBeNull();
+    expect(s.plan).toBe(offer.plan);
+    expect(s.mode).toBe('simulating');
+
+    useAppStore.setState({ weatherReroute: offerOf() });
+    drive(5); // ~5 km further on
+    expect(useAppStore.getState().weatherReroute).toBeNull();
   });
 });

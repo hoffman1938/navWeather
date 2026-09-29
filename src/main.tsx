@@ -35,7 +35,9 @@ window.addEventListener('vite:preloadError', () => {
 
 // Dev only: expose stores for debugging in the console / automated checks.
 if (import.meta.env.DEV) {
-  void Promise.all([import('./state/explore'), import('./state/store'), import('./share/liveShare'), import('./share/viewer')]).then(([e, s, l, v]) => {
-    Object.assign(window, { __navweather: { explore: e.useExplore, app: s.useAppStore, liveShare: l.useLiveShare, viewer: v.useViewer } });
-  });
+  void Promise.all([import('./state/explore'), import('./state/store'), import('./share/liveShare'), import('./share/viewer'), import('./state/savedPlaces')]).then(
+    ([e, s, l, v, p]) => {
+      Object.assign(window, { __navweather: { explore: e.useExplore, app: s.useAppStore, liveShare: l.useLiveShare, viewer: v.useViewer, places: p.useSavedPlaces } });
+    },
+  );
 }

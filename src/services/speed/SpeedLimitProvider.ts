@@ -20,4 +20,6 @@ export interface SpeedLimitProvider {
   getSpeedLimits(route: LngLat[], signal?: AbortSignal): Promise<SpeedLimitWay[]>;
   /** Mapped speed cameras along the route (may be incomplete). */
   getSpeedCameras?(route: LngLat[], signal?: AbortSignal): Promise<SpeedCamera[]>;
+  /** Mapped railway level crossings along the route (may be incomplete). */
+  getLevelCrossings?(route: LngLat[], signal?: AbortSignal): Promise<{ id: string; coordinate: LngLat }[]>;
 }

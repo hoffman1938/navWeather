@@ -36,7 +36,7 @@
   .mbanner__dist {
     font-size: 26px;
   }
-  .speed {
+  .drive-signs {
     left: calc(min(380px, 46vw) + var(--safe-left) + 16px);
     bottom: 12px;
   }
@@ -109,6 +109,40 @@
   opacity: 0.85;
 }
 
+/* Weather re-route offer (never automatic) */
+.reroute {
+  padding: 10px 12px 12px 14px;
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  border-left: 4px solid var(--sev-high);
+}
+.reroute__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.reroute__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+}
+.reroute__text small {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.reroute__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.reroute__actions .btn {
+  flex: 1 1 auto;
+}
+
 .alert {
   display: flex;
   align-items: center;
@@ -141,7 +175,7 @@
 }
 
 /* ---- Speed ---- */
-.speed {
+.drive-signs {
   position: absolute;
   z-index: 12;
   left: calc(var(--safe-left) + 12px);
@@ -149,7 +183,69 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 10px;
+}
+.speed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
+}
+
+/* Hazard warning sign: white plate, red border, like the road sign */
+.hazard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  animation: hazard-in 0.25s ease-out;
+}
+.hazard__sign {
+  width: 58px;
+  height: 58px;
+  color: #111;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+.hazard__plate {
+  fill: #fff;
+  stroke: #d32f2f;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+.hazard__dist {
+  padding: 1px 6px;
+  border-radius: var(--r-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  font-size: 13px;
+  font-weight: 700;
+}
+.hazard__surface {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: #2f7de1;
+}
+.hazard--icy .hazard__surface {
+  color: #5fb8e8;
+}
+@keyframes hazard-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hazard {
+    animation: none;
+  }
 }
 .speed__sign {
   display: grid;

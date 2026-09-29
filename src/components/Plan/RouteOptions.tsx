@@ -63,11 +63,11 @@ export function RouteOptions() {
 /** Most significant first. Rain alone is listed only when nothing worse is expected. */
 const SIGNIFICANT: ExposureKind[] = ['storm', 'snow', 'heavy', 'fog', 'wind'];
 
-/** "Heavy rain 35 min · Fog 10 min", or the familiar rain/dry line. */
-function exposureLine(o: RouteOptionSummary, m: ReturnType<typeof useMessages>): string {
+/** "Heavy rain 35 min · Fog 10 min", or the familiar rain/dry line (also used on the map). */
+export function exposureLine(o: RouteOptionSummary, m: ReturnType<typeof useMessages>, max = 2): string {
   const top = SIGNIFICANT.filter((k) => o.exposure[k] >= 5)
     .sort((a, b) => o.exposure[b] - o.exposure[a])
-    .slice(0, 2)
+    .slice(0, max)
     .map((k) => `${m.ui.exposure[k]} ${formatDuration(o.exposure[k] * 60, m)}`);
   if (top.length) return top.join(' · ');
   return o.wetMinutes >= 10 ? m.ui.wetterBy(o.wetMinutes) : m.ui.mostlyDry;

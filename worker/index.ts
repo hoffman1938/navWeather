@@ -1,14 +1,20 @@
 import { MAX_BODY_BYTES, sanitizeCreate, SHARE_ID_RE } from '../src/share/protocol';
+import { REPORT_ID_RE } from '../src/reports/protocol';
 import { json, randomToken, readJson, sha256Hex } from './http';
 import { LiveShare } from './liveShare';
+import { Reports } from './reports';
 
-export { LiveShare };
+export { LiveShare, Reports };
 
 export interface Env {
   ASSETS: Fetcher;
   LIVE_SHARE: DurableObjectNamespace<LiveShare>;
   /** Workers rate-limiting binding (wrangler.toml [[ratelimits]]); optional so the relay still runs without it. */
   CREATE_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+  /** Driver reports (one SQLite Durable Object). */
+  REPORTS: DurableObjectNamespace<Reports>;
+  /** Abuse guard for reporting and voting (per client IP). */
+  REPORT_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
 
 /**
@@ -19,6 +25,10 @@ export interface Env {
  *   GET    /api/share/:id/ws       WebSocket stream of snapshots (viewers)
  *   PUT    /api/share/:id          position update   (Authorization: Bearer key)
  *   DELETE /api/share/:id          stop sharing      (Authorization: Bearer key)
+ *
+ *   GET    /api/reports?bbox=w,s,e,n       active driver reports in an area
+ *   POST   /api/reports                    report { kind, lat, lon }
+ *   POST   /api/reports/:id/vote           { vote: 'still' | 'gone' }
  */
 export default {
   async fetch(request, env): Promise<Response> {
@@ -28,6 +38,8 @@ export default {
     // CSRF: browsers label cross-site requests; only same-origin pages may write.
     const site = request.headers.get('Sec-Fetch-Site');
     if (request.method !== 'GET' && site && site !== 'same-origin' && site !== 'none') return json({ error: 'forbidden' }, 403);
+
+    if (url.pathname === '/api/reports' || url.pathname.startsWith('/api/reports/')) return reports(request, url, env);
 
     if (url.pathname === '/api/share') {
       if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
@@ -58,3 +70,23 @@ export default {
     return stub.fetch(new Request(`https://live-share${m[2] ? '/ws' : '/'}`, request));
   },
 } satisfies ExportedHandler<Env>;
+
+async function reports(request: Request, url: URL, env: Env): Promise<Response> {
+  const stub = env.REPORTS.get(env.REPORTS.idFromName('global'));
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
+  if (url.pathname === '/api/reports' && request.method === 'GET') {
+    return stub.fetch(`https://reports/list?bbox=${encodeURIComponent(url.searchParams.get('bbox') ?? '')}`);
+  }
+  const vote = /^\/api\/reports\/([^/]+)\/vote$/.exec(url.pathname);
+  const create = url.pathname === '/api/reports';
+  if (request.method !== 'POST' || (!create && !vote)) return json({ error: create ? 'method-not-allowed' : 'not-found' }, create ? 405 : 404);
+  if (vote && !REPORT_ID_RE.test(vote[1])) return json({ error: 'not-found' }, 404);
+  if (!(request.headers.get('content-type') ?? '').startsWith('application/json')) return json({ error: 'unsupported-media-type' }, 415);
+  if (env.REPORT_LIMITER && !(await env.REPORT_LIMITER.limit({ key: ip })).success) return json({ error: 'too-many-requests' }, 429);
+  // The client IP only reaches the object, which keeps a salted hash of it.
+  return stub.fetch(`https://reports/${create ? 'create' : `vote/${vote![1]}`}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-client-ip': ip, ...(request.headers.get('content-length') ? { 'content-length': request.headers.get('content-length')! } : {}) },
+    body: request.body,
+  });
+}

@@ -17,6 +17,8 @@ export interface Settings {
   breakReminders: boolean;
   /** Mapped speed cameras (off by default: not legal everywhere). */
   speedCameras: boolean;
+  /** Voice + sign before sharp curves (route geometry) and railway crossings (OSM). */
+  roadHazards: boolean;
   batterySaver: boolean;
   /** Declared by the user; decides fuel vs charging stop advice. */
   vehicle: 'fuel' | 'ev';
@@ -38,6 +40,7 @@ export function defaultSettings(): Settings {
     speedWarnings: true,
     breakReminders: true,
     speedCameras: false,
+    roadHazards: true,
     batterySaver: false,
     vehicle: 'fuel',
     fuelRangeKm: null,

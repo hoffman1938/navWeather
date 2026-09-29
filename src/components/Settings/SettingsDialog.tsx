@@ -139,6 +139,7 @@ export function SettingsDialog() {
       <div className="set-group">
         <Switch label={S.speedWarnings} checked={s.speedWarnings} onChange={(speedWarnings) => up({ speedWarnings })} hint={m.ui.speedLimitNote} />
         <Switch label={S.breakReminders} checked={s.breakReminders} onChange={(breakReminders) => up({ breakReminders })} hint={S.breakRemindersHint} />
+        <Switch label={S.roadHazards} checked={s.roadHazards} onChange={(roadHazards) => up({ roadHazards })} hint={S.roadHazardsHint} />
         <Switch label={S.speedCameras} checked={s.speedCameras} onChange={(speedCameras) => up({ speedCameras })} hint={S.speedCamerasHint} />
         <Switch label={S.batterySaver} checked={s.batterySaver} onChange={(batterySaver) => up({ batterySaver })} hint={S.batterySaverHint} />
         <Select

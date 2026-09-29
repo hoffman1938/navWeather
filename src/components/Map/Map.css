@@ -107,3 +107,20 @@
     top: 52px;
   }
 }
+
+/* Alternative route labels ("+12 min · Mostly dry") */
+.altlabel {
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-marker);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.altlabel:hover,
+.altlabel:focus-visible {
+  color: var(--accent);
+}

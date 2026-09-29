@@ -9,6 +9,7 @@ import { EventIcon } from '../Common/EventIcon';
 import { CloseIcon, PauseIcon, PlayIcon } from '../Icons/Icons';
 import { PlacesPanel } from '../Places/PlacesPanel';
 import { DataSources } from '../Plan/DataSources';
+import { ElevationProfile } from '../Plan/ElevationProfile';
 import { TimeScrubber } from '../TimeScrubber/TimeScrubber';
 import { WeatherStrip } from '../WeatherStrip/WeatherStrip';
 import { AheadList } from './AheadList';
@@ -27,6 +28,7 @@ export function DriveSheet() {
       extra={
         <div className="drive-extra">
           <WeatherStrip />
+          <ElevationProfile />
           <TimeScrubber />
           <PlacesPanel />
           <DataSources />

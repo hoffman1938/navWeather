@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { dueCamera, snapCamerasToRoute, type RouteCamera } from '../algorithms/cameras';
+import { dueHazard, findSharpCurves, hazardLabelKind, mergeHazards, roadSurface, snapLevelCrossings, weatherAtDistance, type RoadHazard } from '../algorithms/roadHazards';
 import { snapIncidentsToRoute, type RouteIncident } from '../algorithms/incidents';
 import { initialDeviationState, updateDeviation } from '../algorithms/routeDeviation';
 import { createProgressTracker, edgeSpeedMps, hasArrived } from '../algorithms/routeProgress';
+import { timeAtDistance } from '../algorithms/routeTiming';
 import { diffForecast } from '../algorithms/routeWeather';
+import { exposureOf, pickWeatherReroute, remainingSamples, sharedForecastFor, worthChecking, type Exposure } from '../algorithms/weatherReroute';
 import { advanceSimulation, simProgress } from '../algorithms/simulation';
 import { matchSpeedLimits, speedLimitAt, updateSpeeding, type SpeedLimitProfile } from '../algorithms/speedLimits';
 import { config } from '../config';
@@ -44,6 +47,7 @@ import { haversineM } from '../utils/distance';
 import { deviceTimeZone } from '../utils/timezone';
 import { VoiceQueue } from '../voice/queue';
 import { deriveRouteWeather, emptyDerived, type Derived } from './derive';
+import { clearDriveSession, saveDriveSession } from './driveSession';
 import { useSavedPlaces } from './savedPlaces';
 import { currentMessages, settingsSnapshot, useSettings } from './settings';
 
@@ -141,6 +145,10 @@ export interface AppState {
   incidents: RouteIncident[];
   /** Mapped speed cameras on the route (only when enabled in Settings). */
   speedCameras: RouteCamera[];
+  /** Sharp curves + railway crossings on the route being driven. */
+  roadHazards: RoadHazard[];
+  /** A route around severe weather ahead, offered while driving (never taken automatically). */
+  weatherReroute: WeatherRerouteOffer | null;
 
   forecasts: Map<string, LocationForecast>;
   /** Dev tools injected simulated weather/incidents — the UI labels it. */
@@ -234,6 +242,8 @@ export interface AppState {
   addStop(place: Place): Promise<void>;
 
   dismissArrival(): void;
+  acceptWeatherReroute(): Promise<void>;
+  dismissWeatherReroute(): void;
   /** Re-plan: from the vehicle while driving, else the current request. */
   recalculate(): void;
   setAssistant(patch: Partial<AssistantState>): void;
@@ -251,10 +261,31 @@ let tracker: ReturnType<typeof createProgressTracker> | null = null;
 let lastDeriveAt = 0;
 let lastDeriveSimMs = 0;
 let lastRecalcAt = 0;
+let rerouteCheckedAt = 0;
+let rerouteQuietUntil = 0;
+let rerouteCheck: AbortController | null = null;
+/** Last weather re-route check, for the developer panel. */
+let rerouteDiag = '';
+export const weatherRerouteDiagnostics = () => rerouteDiag;
+
+export interface WeatherRerouteOffer {
+  plan: PlannedRoute;
+  /** Extra driving time vs the current route from here (s; may be negative). */
+  extraS: number;
+  current: Exposure;
+  alternative: Exposure;
+  /** The worst weather it avoids, for the headline. */
+  condition: 'storm' | 'snow' | 'heavy' | 'fog';
+  /** Where the car was when offered: stale ~1.5 km later. */
+  atProgressM: number;
+  from: LngLat;
+  headingDeg?: number;
+}
 let noticeSeq = 0;
 const namingAttempted = new Set<string>();
 const spokenManeuvers = new Set<string>();
 const spokenCameras = new Set<string>();
+const spokenHazards = new Set<string>();
 let voiceQueue: VoiceQueue | null = null;
 let trip: TripTracker | null = null;
 
@@ -406,6 +437,7 @@ export const useAppStore = create<AppState>()(
     speedLimits: null,
     incidents: [],
     speedCameras: [],
+    roadHazards: [],
     forecasts: new Map(),
     simulatedData: false,
     weatherStatus: 'idle',
@@ -426,6 +458,7 @@ export const useAppStore = create<AppState>()(
     speeding: { speeding: false, since: null },
     alertState: initialDriverAlertState,
     activeAlert: null,
+    weatherReroute: null,
     arrival: null,
     poi: null,
     assistant: initialAssistant,
@@ -503,12 +536,14 @@ export const useAppStore = create<AppState>()(
         namingAttempted.clear();
         spokenManeuvers.clear();
     spokenCameras.clear();
+    spokenHazards.clear();
         set({
           plan: primary,
           routeOptions: [primary, ...alternatives],
           selectedOption: 0,
           speedLimits: null,
           speedCameras: [],
+          roadHazards: [],
           routeStatus: 'ready',
           clockMs: Date.now(),
           selectedPointId: null,
@@ -518,6 +553,7 @@ export const useAppStore = create<AppState>()(
           lastRefresh: null,
           alertState: initialDriverAlertState,
           activeAlert: null,
+          weatherReroute: null,
           derived: emptyDerived,
           sheet: 'default',
         });
@@ -569,6 +605,7 @@ export const useAppStore = create<AppState>()(
     },
 
     clearRoute: () => {
+      clearDriveSession();
       routeAbort?.abort();
       weatherAbort?.abort();
       planTasks?.abort();
@@ -598,6 +635,7 @@ export const useAppStore = create<AppState>()(
         navPrompt: null,
         poi: null,
         activeAlert: null,
+        weatherReroute: null,
       });
     },
 
@@ -809,6 +847,10 @@ export const useAppStore = create<AppState>()(
       tracker = createProgressTracker(s.plan.timed);
       spokenManeuvers.clear();
     spokenCameras.clear();
+    spokenHazards.clear();
+      // The route was just chosen with its weather in view: first weather re-route check in ~10 min.
+      rerouteCheckedAt = Date.now();
+      rerouteQuietUntil = 0;
       startTrip(s.plan.timed.totalTimeS, Date.now(), false);
       set({
         arrival: null,
@@ -825,9 +867,12 @@ export const useAppStore = create<AppState>()(
         navPrompt: null,
         alertState: initialDriverAlertState,
         activeAlert: null,
+        weatherReroute: null,
       });
       get().showNotice('info', currentMessages().ui.waitingForLocation, true);
+      rememberDrive();
       loadSpeedLimits();
+      loadRoadHazards();
     },
 
     handlePosition(pos) {
@@ -886,7 +931,8 @@ export const useAppStore = create<AppState>()(
         const summary = finishTrip(get(), now);
         get().stopNavigation(); // clears the voice queue — announce after it
         get().say(m.voice.arrived(st.plan!.timed.route.destination.name), 1);
-        set({ arrival: summary, sheet: 'default', activeAlert: null });
+        set({ arrival: summary, sheet: 'default', activeAlert: null, weatherReroute: null });
+        if (get().mode === 'navigating') clearDriveSession();
       }
     },
 
@@ -908,6 +954,7 @@ export const useAppStore = create<AppState>()(
     },
 
     stopNavigation() {
+      clearDriveSession();
       // Cancel an in-flight re-route so it can't resurrect navigation (audit race).
       routeAbort?.abort();
       routeAbort = null;
@@ -926,6 +973,7 @@ export const useAppStore = create<AppState>()(
         sheet: 'default',
         clockMs: Date.now(),
         activeAlert: null,
+        weatherReroute: null,
         speeding: { speeding: false, since: null },
         notice: get().notice?.persistent ? null : get().notice,
       });
@@ -940,8 +988,12 @@ export const useAppStore = create<AppState>()(
       getProviders().tts.unlock();
       spokenManeuvers.clear();
     spokenCameras.clear();
+    spokenHazards.clear();
       const startMs = departureMsOf({ ...s, clockMs: Date.now() });
       const first = advanceSimulation(s.plan.timed, { nowMs: startMs, modelTimeS: 0 }, startMs, 0, 1);
+      // The route was just chosen with its weather in view: first weather re-route check in ~10 min.
+      rerouteCheckedAt = Date.now();
+      rerouteQuietUntil = 0;
       startTrip(s.plan.timed.totalTimeS, startMs, true);
       set({
         arrival: null,
@@ -957,11 +1009,13 @@ export const useAppStore = create<AppState>()(
         sheet: 'compact',
         alertState: initialDriverAlertState,
         activeAlert: null,
+        weatherReroute: null,
       });
       set({ derived: derive(get()), guidance: computeGuidance(get().derived.maneuvers, s.plan.timed, 0) });
       const m = currentMessages();
       get().say(m.voice.routeStarted(s.plan.timed.route.destination.name, spokenDuration(s.plan.timed.totalTimeS, m, false)), 3);
       loadSpeedLimits();
+      loadRoadHazards();
     },
     pauseSimulation: () => set((s) => ({ sim: { ...s.sim, playing: false } })),
     resumeSimulation: () => {
@@ -985,7 +1039,8 @@ export const useAppStore = create<AppState>()(
       onProgress(vehicle, simProgress(s.plan.timed, step), speedMps, false);
       if (step.arrived) {
         const summary = finishTrip(get(), step.nowMs);
-        set({ arrival: summary, sheet: 'default', activeAlert: null });
+        set({ arrival: summary, sheet: 'default', activeAlert: null, weatherReroute: null });
+        if (get().mode === 'navigating') clearDriveSession();
       }
     },
 
@@ -1014,6 +1069,7 @@ export const useAppStore = create<AppState>()(
         clockMs: Date.now(),
         followVehicle: true,
         activeAlert: null,
+        weatherReroute: null,
       });
       set({ derived: derive(get()) });
     },
@@ -1064,6 +1120,26 @@ export const useAppStore = create<AppState>()(
       else if (s.plan) void s.calculateRoute();
     },
 
+    async acceptWeatherReroute() {
+      const s = get();
+      const offer = s.weatherReroute;
+      if (!offer || s.mode === 'planning') return;
+      set({ weatherReroute: null, recalculating: true });
+      if (trip) trip.reroutes++;
+      let plan = offer.plan;
+      if (plan.warnings.includes('not-enriched')) {
+        // Alternatives are only timed + sampled; add place names/elevation (best effort).
+        plan = await enrichRoute(getProviders(), plan.timed.route, { signal: newPlanTasks(), language: currentMessages().locale }).catch(() => offer.plan);
+      }
+      const cur = get();
+      if (cur.mode === 'planning') return;
+      await adoptRoute(plan, cur.vehicle?.coordinate ?? offer.from, cur.vehicle?.headingDeg ?? offer.headingDeg);
+    },
+    dismissWeatherReroute() {
+      // Don't ask again for a while (unless the user asks for a re-route).
+      rerouteQuietUntil = Date.now() + 30 * 60_000;
+      set({ weatherReroute: null });
+    },
     dismissArrival() {
       const s = get();
       set({ arrival: null });
@@ -1153,6 +1229,51 @@ function loadSpeedLimits() {
     });
 }
 
+let driveSavedAt = 0;
+
+/** Real navigation only: destination + stops ahead, for "Continue to …" after an accidental reload. */
+function rememberDrive() {
+  const s = useAppStore.getState();
+  if (s.mode !== 'navigating' || !s.plan) return;
+  saveDriveSession(s.plan.timed.route.destination, stopsAhead(s));
+  driveSavedAt = Date.now();
+}
+
+/** Stops of the active route the vehicle hasn't reached yet. */
+function stopsAhead(s: AppState): Place[] {
+  const progressM = s.progress?.distanceAlongM ?? 0;
+  return (
+    s.plan?.timed.route.waypoints?.filter((_, i) => {
+      const arrive = s.derived.maneuvers.find((mv) => mv.kind === 'arrive' && mv.legIndex === i);
+      return !arrive || arrive.distanceAlongM > progressM;
+    }) ?? []
+  );
+}
+
+let hazardsFor: PlannedRoute['timed'] | null = null;
+
+/**
+ * Sharp curves (from the route geometry — instant) and railway crossings
+ * (OpenStreetMap), once per route when a drive starts.
+ */
+function loadRoadHazards() {
+  const timed = useAppStore.getState().plan?.timed;
+  if (!timed || !useSettings.getState().roadHazards || hazardsFor === timed) return;
+  hazardsFor = timed;
+  const curves = findSharpCurves(timed);
+  useAppStore.setState({ roadHazards: curves });
+  const provider = getProviders().speedLimits;
+  if (!provider?.getLevelCrossings) return;
+  const signal = planTasks?.signal ?? newPlanTasks();
+  provider
+    .getLevelCrossings(timed.route.geometry, signal)
+    .then((points) => {
+      if (signal.aborted || useAppStore.getState().plan?.timed !== timed) return;
+      useAppStore.setState({ roadHazards: mergeHazards(curves, snapLevelCrossings(points, timed)) });
+    })
+    .catch(() => undefined);
+}
+
 /**
  * THE REAL-TIME LOOP (GPS fix or simulation step):
  * position → map-matched progress → guidance → maneuver voice → speed →
@@ -1219,6 +1340,25 @@ function onProgress(vehicle: VehicleState, progress: RouteProgress, speedMps: nu
     }
   }
 
+  // 3c. Road hazards: sharp curves (with the forecast road surface) and level crossings, ~300 m / 15 s before.
+  if (settings.roadHazards && s.roadHazards.length && simSpeed <= 10) {
+    const hz = dueHazard(s.roadHazards, progress.distanceAlongM, speedMps ?? 14, spokenHazards);
+    if (hz) {
+      spokenHazards.add(hz.id);
+      const text =
+        hz.kind === 'level_crossing'
+          ? m.hazard.voiceLevelCrossing
+          : m.hazard.voiceCurve(hz.side ?? 'right', hazardLabelKind(hz), roadSurface(weatherAtDistance(s.derived.points, hz.distanceAlongM)));
+      queue.enqueue({ id: `hz:${hz.id}`, text, priority: 2, expiresAt: Date.now() + 15_000 / simSpeed, interruptible: true });
+    }
+  }
+
+  // 3c'. Keep "continue after reload" fresh (once a minute).
+  if (live && Date.now() - driveSavedAt > 60_000) rememberDrive();
+
+  // 3d. An offered weather re-route goes stale once the car has driven on.
+  if (s.weatherReroute && progress.distanceAlongM - s.weatherReroute.atProgressM > 1500) store.setState({ weatherReroute: null });
+
   // 4. Weather + route events: throttled (≤1/s real time, or every 30 s of simulated time).
   const due = performance.now() - lastDeriveAt > 1000 || progress.nowMs - lastDeriveSimMs >= 30_000;
   if (!due) return;
@@ -1230,6 +1370,7 @@ function onProgress(vehicle: VehicleState, progress: RouteProgress, speedMps: nu
     m,
   });
   store.setState({ alertState: decision.state, ...(decision.visual ? { activeAlert: decision.visual } : {}) });
+  void maybeOfferWeatherReroute();
   for (const v of decision.voice) {
     queue.enqueue({
       id: v.id,
@@ -1240,6 +1381,139 @@ function onProgress(vehicle: VehicleState, progress: RouteProgress, speedMps: nu
       interruptible: true,
     });
   }
+}
+
+/**
+ * Every ~10 min while driving: if severe weather (or fog) lies ahead at the
+ * times you'd get there, ask for the routes from here and offer one that is
+ * clearly better for a reasonable extra time. `force`: dev tools.
+ */
+export async function maybeOfferWeatherReroute(force = false): Promise<void> {
+  const store = useAppStore;
+  const s = store.getState();
+  if (s.mode === 'planning' || !s.plan || !s.progress || !s.vehicle || s.recalculating || s.weatherReroute || s.arrival || !s.online) return;
+  const realNow = Date.now();
+  if (!force && (realNow - rerouteCheckedAt < 10 * 60_000 || realNow < rerouteQuietUntil)) return;
+  if (rerouteCheck) return;
+  const timed = s.plan.timed;
+  // The public router offers alternatives only between two points.
+  if (timed.route.waypoints?.length) return;
+  const progressM = s.progress.distanceAlongM;
+  const tNow = timeAtDistance(timed, progressM);
+  const remainingS = timed.totalTimeS - tNow;
+  if (timed.totalDistM - progressM < 20_000 || remainingS < 20 * 60) return;
+  rerouteCheckedAt = realNow;
+  const now = clockNow(s);
+  const current = exposureOf(remainingSamples(s.plan.samples, progressM, tNow), lookupFor(s.forecasts), now);
+  const fmt = (e: Exposure | null) => (e ? `${e.score} (severe ${e.severeMinutes}, wet ${e.wetMinutes}, fog ${e.fogMinutes})` : 'no data');
+  rerouteDiag = `current ${fmt(current)} · checking…`;
+  if (!current || !worthChecking(current)) return;
+
+  const ctrl = new AbortController();
+  rerouteCheck = ctrl;
+  const m = currentMessages();
+  const from = s.vehicle.coordinate;
+  const headingDeg = s.vehicle.headingDeg;
+  const routeFor = s.plan.timed; // the plan object is replaced as names arrive; the route isn't
+  try {
+    const providers = getProviders();
+    const origin: Place = { id: `here:${from.join(',')}`, name: m.ui.currentLocation, label: m.ui.currentLocation, coordinate: from };
+    const { primary, alternatives } = await planRouteOptions(providers, origin, timed.route.destination, {
+      signal: ctrl.signal,
+      alternatives: true,
+      startBearingDeg: headingDeg,
+      language: m.locale,
+      placesDeadlineMs: 1500,
+    });
+    const candidates = [primary, ...alternatives];
+    const longest = Math.max(...candidates.map((c) => c.timed.totalTimeS));
+    const lookup = await fetchSampleForecasts(
+      providers,
+      candidates.flatMap((c) => c.samples),
+      now + longest * 1000,
+      { signal: ctrl.signal },
+    );
+    const st = store.getState();
+    if (ctrl.signal.aborted || st.plan?.timed !== routeFor || st.mode === 'planning' || st.weatherReroute) {
+      rerouteDiag += ' · dropped (route changed)';
+      return;
+    }
+    // Shared road is scored with the forecast the drive already shows; only the parts that differ count.
+    const merged = new Map(lookup.forecasts);
+    for (const [k, f] of st.forecasts) merged.set(k, f);
+    const forecastFor = sharedForecastFor(routeFor, st.plan.samples, lookupFor(st.forecasts), forecastLookupFn(providers, merged));
+    const scored = candidates.map((c) => ({ exposure: exposureOf(c.samples, forecastFor, now), durationS: c.timed.totalTimeS }));
+    const choice = pickWeatherReroute(current, remainingS, scored);
+    rerouteDiag = `current ${fmt(current)} · ${scored.map((c) => `${fmt(c.exposure)} ${Math.round((c.durationS - remainingS) / 60)}min`).join(' | ')} → ${choice ? `offer #${choice.index}` : 'no offer'}`;
+    if (!choice) return;
+    const worst = st.derived.upcoming.map((p) => p.weather?.condition);
+    const condition: WeatherRerouteOffer['condition'] = worst.includes('THUNDERSTORM')
+      ? 'storm'
+      : worst.includes('SNOW') || worst.includes('SLEET')
+        ? 'snow'
+        : current.severeMinutes >= 5
+          ? 'heavy'
+          : 'fog';
+    const offer: WeatherRerouteOffer = {
+      plan: candidates[choice.index],
+      extraS: choice.extraS,
+      current: choice.current,
+      alternative: choice.alternative,
+      condition,
+      atProgressM: st.progress?.distanceAlongM ?? progressM,
+      from,
+      headingDeg,
+    };
+    store.setState({ weatherReroute: offer });
+    st.say(m.reroute.voice(m.reroute.condition[condition], Math.round(Math.max(0, choice.extraS) / 60)), 2);
+  } catch (e) {
+    if (!isAbortError(e)) rerouteDiag = `check failed: ${e instanceof Error ? e.message : String(e)}`;
+  } finally {
+    if (rerouteCheck === ctrl) rerouteCheck = null;
+  }
+}
+
+/** Switch the drive to `plan`, a route computed from the vehicle position. */
+async function adoptRoute(plan: PlannedRoute, coordinate: LngLat, headingDeg: number | undefined): Promise<void> {
+  const store = useAppStore;
+  const cur = store.getState();
+  const m = currentMessages();
+  tracker = createProgressTracker(plan.timed);
+  spokenManeuvers.clear();
+  spokenCameras.clear();
+  spokenHazards.clear();
+  // A simulated drive restarts on the new route (its clock keeps running).
+  const simulating = cur.mode === 'simulating';
+  const now = simulating ? cur.sim.nowMs : Date.now();
+  const start = plan.timed.route.geometry[0];
+  const progress = simulating
+    ? simProgress(plan.timed, { nowMs: now, modelTimeS: 0, distanceM: 0, coordinate: start, headingDeg: headingDeg ?? 0, arrived: false })
+    : tracker(coordinate, now, { headingDeg });
+  store.setState({
+    plan,
+    routeOptions: [plan],
+    selectedOption: 0,
+    speedLimits: null,
+    navStartedMs: now,
+    progress,
+    ...(simulating ? { sim: { ...cur.sim, modelTimeS: 0, startMs: now, arrived: false }, vehicle: { coordinate: start, headingDeg, timestampMs: now } } : {}),
+    deviation: initialDeviationState,
+    recalculating: false,
+    weatherReroute: null,
+    mode: cur.mode === 'simulating' ? 'simulating' : 'navigating',
+    navPrompt: null,
+    followVehicle: true,
+    selectedPointId: null,
+    poi: null,
+  });
+  store.setState({ derived: derive(store.getState()) });
+  startPlanTasks(plan);
+  rememberDrive();
+  loadSpeedLimits();
+  loadRoadHazards();
+  store.getState().showNotice('success', m.ui.routeUpdated);
+  store.getState().say(m.voice.rerouted, 3);
+  await store.getState().loadWeather({ reason: 'recalculation' });
 }
 
 /** Off-route (or far-from-route start): re-plan from the vehicle to the destination. */
@@ -1258,12 +1532,7 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
   const origin: Place = { id: `here:${coordinate.join(',')}`, name: m.ui.currentLocation, label: m.ui.currentLocation, coordinate };
   // Keep only stops still ahead of the vehicle.
   const route = s.plan.timed.route;
-  const progressM = s.progress?.distanceAlongM ?? 0;
-  const aheadStops =
-    route.waypoints?.filter((_, i) => {
-      const arrive = s.derived.maneuvers.find((mv) => mv.kind === 'arrive' && mv.legIndex === i);
-      return !arrive || arrive.distanceAlongM > progressM;
-    }) ?? [];
+  const aheadStops = stopsAhead(s);
   try {
     const plan = await planRoute(getProviders(), origin, route.destination, {
       signal: ctrl.signal,
@@ -1271,41 +1540,9 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
       waypoints: [...extraStops, ...aheadStops],
       language: m.locale,
     });
-    const cur = store.getState();
     // Navigation ended while we were re-routing → drop the result (audit race).
-    if (ctrl.signal.aborted || cur.mode === 'planning') return;
-    tracker = createProgressTracker(plan.timed);
-    spokenManeuvers.clear();
-    spokenCameras.clear();
-    // A simulated drive restarts on the new route (its clock keeps running).
-    const simulating = cur.mode === 'simulating';
-    const now = simulating ? cur.sim.nowMs : Date.now();
-    const start = plan.timed.route.geometry[0];
-    const progress = simulating
-      ? simProgress(plan.timed, { nowMs: now, modelTimeS: 0, distanceM: 0, coordinate: start, headingDeg: headingDeg ?? 0, arrived: false })
-      : tracker(coordinate, now, { headingDeg });
-    store.setState({
-      plan,
-      routeOptions: [plan],
-      selectedOption: 0,
-      speedLimits: null,
-      navStartedMs: now,
-      progress,
-      ...(simulating ? { sim: { ...cur.sim, modelTimeS: 0, startMs: now, arrived: false }, vehicle: { coordinate: start, headingDeg, timestampMs: now } } : {}),
-      deviation: initialDeviationState,
-      recalculating: false,
-      mode: cur.mode === 'simulating' ? 'simulating' : 'navigating',
-      navPrompt: null,
-      followVehicle: true,
-      selectedPointId: null,
-      poi: null,
-    });
-    store.setState({ derived: derive(store.getState()) });
-    startPlanTasks(plan);
-    loadSpeedLimits();
-    store.getState().showNotice('success', m.ui.routeUpdated);
-    store.getState().say(m.voice.rerouted, 3);
-    await store.getState().loadWeather({ reason: 'recalculation' });
+    if (ctrl.signal.aborted || store.getState().mode === 'planning') return;
+    await adoptRoute(plan, coordinate, headingDeg);
   } catch (e) {
     if (isAbortError(e)) return;
     store.setState({ recalculating: false });
@@ -1340,11 +1577,16 @@ export function __resetStoreRuntime() {
   namingAttempted.clear();
   spokenManeuvers.clear();
     spokenCameras.clear();
+    spokenHazards.clear();
   voiceQueue = null;
   trip = null;
   speedLimitsFor = null;
+  hazardsFor = null;
   lastDeriveAt = 0;
   lastDeriveSimMs = 0;
   lastRecalcAt = 0;
+  rerouteCheckedAt = 0;
+  rerouteQuietUntil = 0;
+  rerouteCheck?.abort();
 }
 

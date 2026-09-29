@@ -22,6 +22,10 @@
 .sheet--expanded {
   height: calc(100dvh - var(--inset-top, 64px) - 8px);
 }
+/* The default detent leaves the map visible; pull up for everything. */
+.sheet--default {
+  max-height: min(calc(100dvh - var(--inset-top, 64px) - 8px), 62dvh);
+}
 /* Mid-size screens (tablets): a floating card, not edge to edge. */
 @media (min-width: 700px) {
   .sheet {
@@ -32,6 +36,9 @@
     border-radius: var(--r-surface);
     padding-bottom: 8px;
     max-height: calc(100dvh - var(--inset-top, 64px) - 32px);
+  }
+  .sheet--default {
+    max-height: min(calc(100dvh - var(--inset-top, 64px) - 32px), 62dvh);
   }
   .sheet--expanded {
     height: calc(100dvh - var(--inset-top, 64px) - 32px);

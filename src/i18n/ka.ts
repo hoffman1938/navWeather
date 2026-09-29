@@ -267,6 +267,8 @@ export const ka: Messages = {
   },
 
   poi: {
+    chargingUpTo: (kw: string) => `${kw}-მდე`,
+    connectorsUnknown: 'კონექტორები მითითებული არ არის',
     category: {
       fuel: 'ბენზინგასამართი',
       ev_charging: 'ელექტრო დამტენი',
@@ -502,6 +504,8 @@ export const ka: Messages = {
     breakRemindersHint: 'გრძელ გზაზე შესვენებას შეგახსენებთ დაახლოებით ყოველ 2 საათში.',
     speedCameras: 'კამერების გაფრთხილება',
     speedCamerasHint: 'მხოლოდ იქ, სადაც ეს კანონით დაშვებულია. OpenStreetMap-ის მონაცემები — შეიძლება არასრული იყოს.',
+    roadHazards: 'საფრთხეები გზაზე',
+    roadHazardsHint: 'მკვეთრი მოსახვევები (გზის ფორმით, პროგნოზის გათვალისწინებით: სველი ან მოყინული) და სარკინიგზო გადასასვლელები (OpenStreetMap). ხმით დაახლოებით 300 მ-ით ადრე.',
     batterySaver: 'ბატარეის დაზოგვა',
     batterySaverHint: 'ნაკლები ანიმაცია და მდებარეობის განახლება, როცა ეს უსაფრთხოა.',
     vehicle: 'ავტომობილი',
@@ -540,6 +544,11 @@ export const ka: Messages = {
     directions: 'მარშრუტი',
     back: 'უკან',
     droppedPin: 'მონიშნული წერტილი',
+    nearbyLabel: 'ახლოს ძიება',
+    nearbyTitle: (what: string) => `${what} ახლოს`,
+    nearbyWithin: (r: string) => `${r}-ის რადიუსში`,
+    nearbyNone: 'აქ ვერაფერი მოიძებნა. დააშორეთ ან გადაწიეთ რუკა და მოძებნეთ ამ არეში.',
+    searchThisArea: 'ამ არეში ძიება',
     lookingUp: 'ვარკვევთ ადგილს…',
     searchFailed: 'ძიება ახლა მიუწვდომელია. სცადეთ ცოტა ხანში.',
     save: 'შენახვა',
@@ -679,5 +688,57 @@ export const ka: Messages = {
     title: 'გაჩერებული მანქანა',
     save: 'პარკინგის დამახსოვრება',
     saved: 'პარკინგი შენახულია',
+  },
+  elevation: {
+    title: 'სიმაღლე',
+    highest: 'უმაღლესი წერტილი',
+    legend: 'ფერი — ტემპერატურა გავლისას',
+  },
+  layers: {
+    title: 'რუკის ფენები',
+    off: 'ფენის გარეშე',
+    precip: 'ნალექი',
+    temp: 'ტემპერატურა',
+    play: 'მომდევნო 24 საათის ჩვენება',
+    hourLabel: 'პროგნოზის საათი',
+    light: 'სუსტი',
+    heavy: 'ძლიერი',
+    partial: 'არეალის ნაწილი მიუწვდომელია',
+    forecastNote: 'მიახლოებით: პროგნოზი 49 წერტილში (Open-Meteo), არა რადარი.',
+  },
+  hazard: {
+    curve: 'მკვეთრი მოსახვევი',
+    hairpin: 'სერპანტინი',
+    series: 'მოსახვევები',
+    levelCrossing: 'სარკინიგზო გადასასვლელი',
+    left: 'მარცხნივ',
+    right: 'მარჯვნივ',
+    wet: 'გზა შეიძლება სველი იყოს',
+    icy: 'გზაზე შესაძლოა ყინული იყოს',
+    voiceCurve: (side: 'left' | 'right', kind: 'curve' | 'hairpin' | 'series', surface: 'dry' | 'wet' | 'icy') => {
+      const dir = side === 'left' ? 'მარცხნივ' : 'მარჯვნივ';
+      return (
+        (kind === 'series' ? `წინ მკვეთრი მოსახვევების სერიაა, პირველი — ${dir}.` : kind === 'hairpin' ? `წინ სერპანტინია, მოსახვევი ${dir}.` : `წინ მკვეთრი მოსახვევია ${dir}.`) +
+        (surface === 'icy' ? ' გზაზე შესაძლოა ყინული იყოს.' : surface === 'wet' ? ' გზა შეიძლება სველი იყოს.' : '')
+      );
+    },
+    voiceLevelCrossing: 'წინ სარკინიგზო გადასასვლელია.',
+    signLabel: (what: string, dist: string) => `${what} ${dist}-ში`,
+  },
+  reroute: {
+    condition: { storm: 'ჭექა-ქუხილი', snow: 'თოვლი', heavy: 'ძლიერი წვიმა', fog: 'ნისლი' },
+    title: (cond: string) => `${cond} თქვენს მარშრუტზე`,
+    avoids: (min: number) => (min > 0 ? `სხვა მარშრუტი დაახლოებით ${min} წუთით ნაკლებ ცუდ ამინდს გადის` : 'სხვა მარშრუტზე ცუდი ამინდი ნაკლებია'),
+    extra: (min: number) => (min <= 0 ? 'დამატებითი დროის გარეშე' : `+${min} წთ`),
+    basis: 'პროგნოზით იმ დროისთვის, როცა იქ იქნებით.',
+    take: 'ამ გზით წასვლა',
+    keep: 'ჩემი მარშრუტის დატოვება',
+    voice: (cond: string, min: number) => `${cond} თქვენს მარშრუტზე. არსებობს შემოვლითი გზა${min > 0 ? `, ${min} წუთით მეტი` : ''}.`,
+  },
+  resume: {
+    title: (place: string) => `გავაგრძელოთ გზა: ${place}?`,
+    body: 'ნავიგაცია შეწყდა გვერდის გადატვირთვისას.',
+    continue: 'გაგრძელება',
+    dismiss: 'არა, მადლობა',
   },
 };
