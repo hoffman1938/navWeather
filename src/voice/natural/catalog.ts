@@ -2,10 +2,10 @@ import { config } from '../../config';
 import type { Locale } from '../../i18n';
 
 /**
- * The on-device natural voice: one free Piper voice per app language
- * (https://github.com/rhasspy/piper). Models are downloaded once, on
- * request, from Hugging Face and kept on the device; speech is then made
- * locally — no account, no per-use cost, and it works offline.
+ * The on-device natural voices: free Piper voices (https://github.com/rhasspy/piper).
+ * Models are downloaded once, on request, from Hugging Face and kept on the
+ * device; speech is then made locally — no account, no per-use cost, and it
+ * works offline. Each language lists its most natural-sounding voice first.
  */
 export interface NaturalVoice {
   id: string;
@@ -14,13 +14,48 @@ export interface NaturalVoice {
   path: string;
   /** Shown to the user before downloading (the model file; the runtime adds RUNTIME_MB once). */
   sizeMB: number;
+  /** The voice's name in its own language (voices are listed only in their language's UI). */
+  name?: string;
+  male: boolean;
 }
 
-export const NATURAL_VOICES: Record<Locale, NaturalVoice> = {
-  en: { id: 'en_US-hfc_female-medium', locale: 'en', path: 'en/en_US/hfc_female/medium/en_US-hfc_female-medium', sizeMB: 63 },
-  ru: { id: 'ru_RU-irina-medium', locale: 'ru', path: 'ru/ru_RU/irina/medium/ru_RU-irina-medium', sizeMB: 63 },
-  ka: { id: 'ka_GE-natia-medium', locale: 'ka', path: 'ka/ka_GE/natia/medium/ka_GE-natia-medium', sizeMB: 63 },
+const voice = (id: string, path: string, male: boolean, name?: string): NaturalVoice => ({
+  id,
+  locale: path.slice(0, 2) as Locale,
+  path: `${path}/${id}`,
+  sizeMB: 63,
+  name,
+  male,
+});
+
+export const NATURAL_VOICES: Record<Locale, NaturalVoice[]> = {
+  en: [voice('en_US-hfc_female-medium', 'en/en_US/hfc_female/medium', false)],
+  ru: [
+    // 31 hours of a professional audiobook reading (the RUSLAN corpus): the most lifelike Russian voice.
+    voice('ru_RU-ruslan-medium', 'ru/ru_RU/ruslan/medium', true, 'Руслан'),
+    voice('ru_RU-irina-medium', 'ru/ru_RU/irina/medium', false, 'Ирина'),
+  ],
+  ka: [voice('ka_GE-natia-medium', 'ka/ka_GE/natia/medium', false, 'ნათია')],
 };
+
+/** What "natural" meant before a language had more than one voice (kept for saved settings). */
+const FIRST_VOICE: Record<Locale, string> = { en: 'en_US-hfc_female-medium', ru: 'ru_RU-irina-medium', ka: 'ka_GE-natia-medium' };
+
+export function voiceById(id: string): NaturalVoice | undefined {
+  for (const list of Object.values(NATURAL_VOICES)) {
+    const v = list.find((x) => x.id === id);
+    if (v) return v;
+  }
+  return undefined;
+}
+
+/** The natural voice a Settings choice names ("natural:<id>", or "natural" from older versions), if any. */
+export function naturalVoiceFor(locale: Locale, choice: string): NaturalVoice | null {
+  const list = NATURAL_VOICES[locale];
+  if (choice === 'natural') return list.find((v) => v.id === FIRST_VOICE[locale]) ?? list[0];
+  if (!choice.startsWith('natural:')) return null;
+  return list.find((v) => v.id === choice.slice(8)) ?? null;
+}
 
 /** Speech runtime served by this app (ONNX Runtime + phonemizer), fetched with the first voice. */
 export const RUNTIME_MB = 30;
@@ -28,8 +63,11 @@ export const RUNTIME_MB = 30;
 const base = () => config.endpoints.piperVoices.replace(/\/$/, '');
 export const modelUrl = (v: NaturalVoice) => `${base()}/${v.path}.onnx`;
 export const configUrl = (v: NaturalVoice) => `${base()}/${v.path}.onnx.json`;
+const dir = (v: NaturalVoice) => v.path.split('/').slice(0, -1).join('/');
 /** Voice details and license (each voice has its own; all are free to download and use). */
-export const modelCardUrl = (v: NaturalVoice) => `https://huggingface.co/rhasspy/piper-voices/tree/main/${v.path.split('/').slice(0, -1).join('/')}`;
+export const modelCardUrl = (v: NaturalVoice) => `https://huggingface.co/rhasspy/piper-voices/tree/main/${dir(v)}`;
+/** A short recording of the voice, to hear it before downloading. */
+export const sampleUrl = (v: NaturalVoice) => `${config.endpoints.piperSamples.replace(/\/$/, '')}/${dir(v)}/speaker_0.mp3`;
 
 /** "en-US" / "ka-GE" / "ru" → the app language whose voice speaks it. */
 export function localeOf(lang: string): Locale | null {

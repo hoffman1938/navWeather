@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withPostposition } from './ka';
+import { withPostposition } from './kaGrammar';
 import { localizeScript } from './script';
 
 describe('Georgian names in other scripts', () => {

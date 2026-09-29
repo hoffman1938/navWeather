@@ -1,11 +1,15 @@
-import type { Locale } from '../i18n';
 import { useSettings } from '../state/settings';
-import { localeOf } from './natural/catalog';
+import { localeOf, naturalVoiceFor, type NaturalVoice } from './natural/catalog';
 import type { NaturalSpeech } from './natural/NaturalSpeech';
-import { useNaturalVoice } from './natural/state';
+import { readyVoice, useNaturalVoice } from './natural/state';
 import type { BrowserSpeechSynthesis, TextToSpeechProvider } from './providers';
+import { speakable } from './speakable';
 
-/** Settings value per language: 'auto' (best device voice), 'natural' (on-device Piper) or `device:<voiceURI>`. */
+/**
+ * Settings value per language: 'auto' (the most natural voice available),
+ * 'natural:<voice id>' (an on-device Piper voice; plain 'natural' from older
+ * versions) or `device:<voiceURI>`.
+ */
 export type VoiceChoice = string;
 
 /**
@@ -19,6 +23,7 @@ const PREVIEW_BUDGET_MS = 20_000;
 /**
  * The app's voice: the on-device natural voice when chosen and downloaded,
  * otherwise the most natural browser voice (or the one picked in Settings).
+ * Text is spelled out for the ear first ("60 км/ч" → "60 километров в час").
  */
 export class SpeechRouter implements TextToSpeechProvider {
   readonly name = 'speech';
@@ -29,7 +34,7 @@ export class SpeechRouter implements TextToSpeechProvider {
     readonly natural: NaturalSpeech | null,
   ) {
     this.device.preferredVoice = (lang) => {
-      const c = this.choiceFor(localeOf(lang));
+      const c = this.choiceFor(lang);
       return c.startsWith('device:') ? c.slice(7) : null;
     };
     if (natural) {
@@ -41,8 +46,8 @@ export class SpeechRouter implements TextToSpeechProvider {
     }
     // Just downloaded: load it now, so the first spoken sentence isn't late (and it's cached for offline use).
     useNaturalVoice.subscribe((st, prev) => {
-      for (const l of Object.keys(st.status) as Locale[]) {
-        if (st.status[l] === 'ready' && prev.status[l] !== 'ready') void this.natural?.prepare(l).catch(() => undefined);
+      for (const id of Object.keys(st.status)) {
+        if (st.status[id] === 'ready' && prev.status[id] !== 'ready') void this.natural?.prepare(id).catch(() => undefined);
       }
     });
   }
@@ -51,28 +56,29 @@ export class SpeechRouter implements TextToSpeechProvider {
     return this.device.supported || this.natural !== null;
   }
 
-  private choiceFor(locale: Locale | null): VoiceChoice {
+  private choiceFor(lang: string): VoiceChoice {
+    const locale = localeOf(lang);
     return (locale && useSettings.getState().voiceByLang[locale]) || 'auto';
   }
 
-  private naturalReady(locale: Locale | null): locale is Locale {
-    return !!this.natural && !!locale && useNaturalVoice.getState().status[locale] === 'ready';
-  }
-
-  /** Should this language be spoken by the natural voice with this choice? */
-  private useNatural(lang: string, choice: VoiceChoice): Locale | null {
+  /** The downloaded natural voice that should say this language with this choice, if any. */
+  private naturalVoice(lang: string, choice: VoiceChoice): NaturalVoice | null {
     const locale = localeOf(lang);
-    if (!this.naturalReady(locale)) return null;
-    // 'auto' uses it only when the device has no voice for the language at all.
-    return choice === 'natural' || (choice === 'auto' && !this.device.canSpeak(lang)) ? locale : null;
+    if (!this.natural || !locale) return null;
+    const chosen = naturalVoiceFor(locale, choice);
+    if (chosen) return useNaturalVoice.getState().status[chosen.id] === 'ready' ? chosen : null;
+    // 'auto': a downloaded natural voice beats the device's, unless the device has a truly natural one.
+    if (choice === 'auto' && !this.device.hasNaturalVoice(lang)) return readyVoice(locale);
+    return null;
   }
 
   canSpeak(lang: string): boolean {
-    return this.device.canSpeak(lang) || this.naturalReady(localeOf(lang));
+    const locale = localeOf(lang);
+    return this.device.canSpeak(lang) || (!!this.natural && !!locale && readyVoice(locale) !== null);
   }
 
   speak(text: string, opts: { lang: string; onEnd: () => void }): void {
-    this.speakWith(text, opts.lang, this.choiceFor(localeOf(opts.lang)), opts.onEnd);
+    this.speakWith(text, opts.lang, this.choiceFor(opts.lang), opts.onEnd);
   }
 
   /** Settings: hear a voice before choosing it. */
@@ -84,10 +90,11 @@ export class SpeechRouter implements TextToSpeechProvider {
 
   private speakWith(text: string, lang: string, choice: VoiceChoice, onEnd: () => void, budgetMs = NATURAL_BUDGET_MS): void {
     const token = ++this.token;
+    const locale = localeOf(lang);
     const voiceURI = choice.startsWith('device:') ? choice.slice(7) : null;
-    const viaDevice = () => this.device.speak(text, { lang, onEnd, voiceURI });
-    const locale = this.useNatural(lang, choice);
-    if (!locale || !this.natural) {
+    const viaDevice = () => this.device.speak(locale ? speakable(text, locale) : text, { lang, onEnd, voiceURI });
+    const voice = this.naturalVoice(lang, choice);
+    if (!voice || !this.natural || !locale) {
       viaDevice();
       return;
     }
@@ -99,7 +106,7 @@ export class SpeechRouter implements TextToSpeechProvider {
       fn();
     };
     const deadline = setTimeout(() => start(viaDevice), budgetMs);
-    natural.synthesize(text, locale).then(
+    natural.synthesize(speakable(text, locale, { natural: true }), voice.id).then(
       (audio) => {
         clearTimeout(deadline);
         start(() => {
@@ -128,6 +135,7 @@ export class SpeechRouter implements TextToSpeechProvider {
     if (!this.natural) return;
     this.natural.unlock();
     const lang = useSettings.getState().language;
-    if (this.useNatural(lang, choice ?? this.choiceFor(lang))) void this.natural.prepare(lang).catch(() => undefined);
+    const voice = this.naturalVoice(lang, choice ?? this.choiceFor(lang));
+    if (voice) void this.natural.prepare(voice.id).catch(() => undefined);
   }
 }

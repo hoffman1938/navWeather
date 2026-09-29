@@ -18,9 +18,15 @@ const dir: Record<string, string> = {
   straight: 'прямо',
   uturn: 'разворот',
 };
+const PERCENT: PluralForms = { one: 'процент', few: 'процента', many: 'процентов', other: 'процента' };
+/** Nominative ("отклонение 2 минуты"); `plural.minute` is the accusative for "через 1 минуту". */
+const MINUTES: PluralForms = { one: 'минута', few: 'минуты', many: 'минут', other: 'минуты' };
 const side = (d?: string) => (d && d.includes('left') ? 'левее' : 'правее');
 const ordinal = (n: number) =>
-  ['первый', 'второй', 'третий', 'четвёртый', 'пятый', 'шестой', 'седьмой', 'восьмой', 'девятый', 'десятый'][n - 1] ??
+  [
+    'первый', 'второй', 'третий', 'четвёртый', 'пятый', 'шестой', 'седьмой', 'восьмой', 'девятый', 'десятый',
+    'одиннадцатый', 'двенадцатый', 'тринадцатый', 'четырнадцатый', 'пятнадцатый', 'шестнадцатый', 'семнадцатый', 'восемнадцатый', 'девятнадцатый', 'двадцатый',
+  ][n - 1] ??
   `${n}-й`;
 
 export const ru: Messages = {
@@ -86,11 +92,11 @@ export const ru: Messages = {
     then: (first: string, second: string) => `${first.replace(/\.$/, '')}, затем ${lcFirst(second)}`,
     distance: {
       meters: (n: number) => `${n} ${plural(n, ru_plural.meter, 'ru')}`,
-      km: (n: number) => `${String(n).replace('.', ',')} ${plural(n, ru_plural.kilometer, 'ru')}`,
+      km: (n: number) => (n === 1.5 ? 'полтора километра' : n === 2.5 ? 'два с половиной километра' : `${n} ${plural(n, ru_plural.kilometer, 'ru')}`),
       feet: (n: number) => `${n} ${plural(n, ru_plural.foot, 'ru')}`,
       quarterMile: 'четверть мили',
       halfMile: 'полмили',
-      miles: (n: number) => `${String(n).replace('.', ',')} ${plural(n, ru_plural.mile, 'ru')}`,
+      miles: (n: number) => (n === 1.5 ? 'полторы мили' : n === 2.5 ? 'две с половиной мили' : `${n} ${plural(n, ru_plural.mile, 'ru')}`),
     },
     routeStarted: (destination: string, duration: string) => `Маршрут до ${destination}. В пути ${duration}.`,
     rerouted: 'Маршрут обновлён.',
@@ -206,7 +212,7 @@ export const ru: Messages = {
       incident: (what: string, when: string, reported: boolean) => `${what} впереди${reported ? ' (по сообщениям)' : ''}, ${when}.`,
       fuelStop: (name: string, distance: string) => `Рекомендуется заправка: ${name}, через ${distance}.`,
       chargeStop: (distance: string) => `Рекомендуется зарядка: примерно через ${distance}.`,
-      restBreak: (place?: string) => `Около 2 часов за рулём${place ? `, около ${place}` : ''} — хорошее время для перерыва.`,
+      restBreak: (place?: string) => `Около двух часов за рулём${place ? `, около ${place}` : ''} — хорошее время для перерыва.`,
       sunGlare: (when: string, place?: string) => `Низкое солнце впереди ${when}${place ? `, около ${place}` : ''} — возможно ослепление.`,
       speedCamera: (limit?: string) => (limit ? `Впереди камера. Ограничение ${limit}.` : 'Впереди камера контроля скорости.'),
     },
@@ -227,16 +233,16 @@ export const ru: Messages = {
     rainNow: (clears?: string) => (clears ? `Сейчас идёт дождь. Он должен ослабнуть ${clears}.` : 'Сейчас идёт дождь.'),
     noRain: 'Дождя на маршруте не ожидается.',
     weatherAtOnRoute: (place: string, time: string, condition: string, temp: string, chance?: number) =>
-      `Около ${time} в ${place}: ${condition.toLowerCase()}, ${temp}${chance ? `, вероятность осадков ${chance} процентов` : ''}.`,
+      `${place}, примерно в ${time}: ${condition.toLowerCase()}, ${temp}${chance ? `, вероятность осадков ${chance} ${plural(chance, PERCENT, 'ru')}` : ''}.`,
     weatherAtNow: (place: string, condition: string, temp: string) =>
       `${place} не на вашем маршруте. Сейчас там ${temp}, ${condition.toLowerCase()}.`,
     trafficUnavailable: 'Информация о пробках пока недоступна.',
     recalculating: 'Пересчитываю маршрут.',
     poiFound: (category: string, name: string, ahead: string, detour: string) =>
       `Лучший вариант (${category}) на маршруте — ${name}, через ${ahead}, ${detour}.`,
-    poiNone: (category: string, km: string) => `На ближайших ${km} маршрута не найдено: ${category}.`,
+    poiNone: (category: string, km: string) => `В пределах ${km} маршрута не найдено: ${category}.`,
     poiSearching: (category: string) => `Ищу на маршруте: ${category}…`,
-    detour: (minutes: number) => (minutes <= 1 ? 'почти без отклонения' : `отклонение около ${minutes} мин`),
+    detour: (minutes: number) => (minutes <= 1 ? 'почти без отклонения' : `отклонение примерно ${minutes} ${plural(minutes, MINUTES, 'ru')}`),
     alternatives: (n: number) => (n ? 'Вот варианты маршрута.' : 'Других маршрутов сейчас нет.'),
     avoidUnsupported: (what: string) => `Текущий сервис маршрутов не умеет объезжать ${what}.`,
     avoid: { tolls: 'платные дороги', highways: 'автомагистрали', ferries: 'паромы' },
@@ -473,17 +479,21 @@ export const ru: Messages = {
     voiceGuidance: 'Голосовые подсказки',
     voiceChoice: 'Голос',
     voiceAuto: 'Лучший голос устройства',
-    voiceNatural: (mb: number) => `Естественный голос — бесплатно (${mb} МБ один раз)`,
+    voiceNatural: (name: string | undefined, male: boolean, mb: number) =>
+      `Естественный ${male ? 'мужской' : 'женский'} голос${name ? ` «${name}»` : ''} — бесплатно (${mb} МБ один раз)`,
     voiceNaturalTag: 'естественный',
     voiceNeedsInternet: 'нужен интернет',
     voiceSample: 'Прослушать',
+    voiceSampleRecorded: 'Послушать запись голоса',
+    voiceSampleFailed: 'Не удалось включить запись — нужен интернет.',
+    voiceEdgeTip: 'Совет: в браузере Microsoft Edge на компьютере есть бесплатные, очень естественные голоса для этого языка (нужен интернет).',
     voiceSampleText: 'Через 300 метров поверните направо. Примерно через 20 минут вероятен небольшой дождь.',
     naturalAbout: 'Бесплатный голос с открытым кодом (Piper). Речь создаётся на вашем устройстве — ничего никуда не отправляется — и работает без интернета.',
     naturalDownloading: (pct: number) => `Загрузка голоса… ${pct}%`,
     naturalReady: 'Загружен · работает без интернета',
     naturalError: 'Не удалось загрузить голос. Проверьте подключение и повторите — пока говорит голос устройства.',
     naturalUnsupported: 'Этот браузер не поддерживает естественный голос.',
-    naturalDownload: 'Загрузить',
+    naturalDownload: (mb: number) => `Загрузить (${mb} МБ)`,
     naturalRetry: 'Повторить',
     naturalRemove: 'Удалить загрузку',
     naturalLicense: 'Об этом голосе',

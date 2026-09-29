@@ -19,7 +19,7 @@ class FakeCache {
 }
 
 let cache: FakeCache;
-const voice = NATURAL_VOICES.ka;
+const voice = NATURAL_VOICES.ka[0];
 const model = new Uint8Array(3_000_000);
 const config = JSON.stringify({ espeak: { voice: 'ka' }, audio: { sample_rate: 22050 }, inference: { noise_scale: 0.667, length_scale: 1, noise_w: 0.8 }, num_speakers: 1 });
 

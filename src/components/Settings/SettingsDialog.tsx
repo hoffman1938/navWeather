@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LOCALES, type Locale } from '../../i18n';
-import { modelCardUrl, NATURAL_VOICES, RUNTIME_MB } from '../../voice/natural/catalog';
-import { useNaturalVoice } from '../../voice/natural/state';
+import { modelCardUrl, NATURAL_VOICES, naturalVoiceFor, RUNTIME_MB, sampleUrl } from '../../voice/natural/catalog';
+import { statusOf, useNaturalVoice } from '../../voice/natural/state';
 import { voiceQuality, voicesFor } from '../../voice/voices';
 import { useMessages, useSettings, type Settings } from '../../state/settings';
 import { loadDriveExtras, useAppStore } from '../../state/store';
@@ -228,37 +228,61 @@ function VoiceSettings() {
   const m = useMessages();
   const S = m.settings;
   const locale = useSettings((st) => st.language);
-  const choice = useSettings((st) => st.voiceByLang[locale] ?? 'auto');
+  const saved = useSettings((st) => st.voiceByLang[locale] ?? 'auto');
   const voices = useDeviceVoices(m.speechLang);
   const supported = useNaturalVoice((st) => st.supported);
-  const status = useNaturalVoice((st) => st.status[locale]);
+  const chosen = naturalVoiceFor(locale, saved);
+  // A value saved by an older version ('natural') shows as the voice it meant.
+  const choice = chosen ? `natural:${chosen.id}` : saved;
+  const status = useNaturalVoice((st) => (chosen ? statusOf(st, chosen.id) : 'unknown'));
   const progress = useNaturalVoice((st) => st.progress);
-  const natural = NATURAL_VOICES[locale];
+  const [sampleFailed, setSampleFailed] = useState(false);
+  const recording = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
     void useNaturalVoice.getState().check(locale);
   }, [locale]);
+  useEffect(() => setSampleFailed(false), [choice]);
+  // Closing Settings stops a recording that is still playing.
+  useEffect(() => () => recording.current?.pause(), []);
 
   const choose = (value: string) => {
     const st = useSettings.getState();
     st.update({ voiceByLang: { ...st.voiceByLang, [locale]: value } });
-    if (value === 'natural') void useNaturalVoice.getState().download(locale);
   };
   const label = (v: SpeechSynthesisVoice) => {
     const tags = [voiceQuality(v) === 'natural' ? S.voiceNaturalTag : null, v.localService ? null : S.voiceNeedsInternet].filter(Boolean);
     return tags.length ? `${v.name} (${tags.join(', ')})` : v.name;
   };
-  const known = choice === 'auto' || choice === 'natural' || voices.some((v) => `device:${v.voiceURI}` === choice);
   const options: [string, string][] = [
     ['auto', S.voiceAuto],
     ...voices.map((v): [string, string] => [`device:${v.voiceURI}`, label(v)]),
-    ...(supported ? [['natural', S.voiceNatural(natural.sizeMB + RUNTIME_MB)] as [string, string]] : []),
+    ...(supported ? NATURAL_VOICES[locale].map((v): [string, string] => [`natural:${v.id}`, S.voiceNatural(v.name, v.male, v.sizeMB + RUNTIME_MB)]) : []),
   ];
+  const known = options.some(([v]) => v === choice);
+  // Not downloaded yet: hear a recording of it first (a few dozen KB instead of the whole voice).
+  const recorded = !!chosen && status !== 'ready';
+
+  const playSample = () => {
+    recording.current?.pause();
+    setSampleFailed(false);
+    const tts = getProviders().tts;
+    if (!chosen || !recorded) {
+      tts.preview?.(S.voiceSampleText, m.speechLang, choice);
+      return;
+    }
+    tts.cancel();
+    const audio = new Audio(sampleUrl(chosen));
+    recording.current = audio;
+    audio.onerror = () => setSampleFailed(true);
+    audio.play().catch(() => setSampleFailed(true));
+  };
 
   return (
     <>
       <Select label={S.voiceChoice} value={known ? choice : 'auto'} options={options} onChange={choose} />
-      {!voices.length && choice !== 'natural' ? <p className="set-note set-note--warn">{supported ? S.noDeviceVoice : m.ui.noVoice}</p> : null}
-      {choice === 'natural' ? (
+      {!voices.length && !chosen ? <p className="set-note set-note--warn">{supported ? S.noDeviceVoice : m.ui.noVoice}</p> : null}
+      {!chosen && voices.length && !voices.some((v) => voiceQuality(v) === 'natural') ? <p className="set-note">{S.voiceEdgeTip}</p> : null}
+      {chosen ? (
         <div className="set-natural" aria-live="polite">
           {!supported ? (
             <p className="set-note">{S.naturalUnsupported}</p>
@@ -273,30 +297,31 @@ function VoiceSettings() {
           ) : status === 'ready' ? (
             <>
               <p className="set-note">{S.naturalReady}</p>
-              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().remove(locale)}>
+              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().remove(chosen.id)}>
                 {S.naturalRemove}
               </button>
             </>
           ) : status === 'error' || status === 'none' ? (
             <>
               {status === 'error' ? <p className="set-note set-note--warn">{S.naturalError}</p> : null}
-              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().download(locale)}>
-                {status === 'error' ? S.naturalRetry : `${S.naturalDownload} (${natural.sizeMB + RUNTIME_MB} MB)`}
+              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().download(chosen.id)}>
+                {status === 'error' ? S.naturalRetry : S.naturalDownload(chosen.sizeMB + RUNTIME_MB)}
               </button>
             </>
           ) : null}
           <p className="set-note">
             {S.naturalAbout}{' '}
-            <a href={modelCardUrl(natural)} target="_blank" rel="noopener noreferrer">
+            <a href={modelCardUrl(chosen)} target="_blank" rel="noopener noreferrer">
               {S.naturalLicense}
             </a>
           </p>
         </div>
       ) : null}
-      <button className="btn btn-quiet set-sample" onClick={() => getProviders().tts.preview?.(S.voiceSampleText, m.speechLang, choice)}>
+      <button className="btn btn-quiet set-sample" onClick={playSample}>
         <SpeakerIcon size={18} />
-        {S.voiceSample}
+        {recorded ? S.voiceSampleRecorded : S.voiceSample}
       </button>
+      {sampleFailed ? <p className="set-note set-note--warn">{S.voiceSampleFailed}</p> : null}
     </>
   );
 }

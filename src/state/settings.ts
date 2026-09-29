@@ -10,7 +10,7 @@ export interface Settings {
   theme: 'auto' | 'light' | 'dark';
   /** Spoken turn-by-turn and alerts. */
   voice: boolean;
-  /** Which voice speaks each language: 'auto', 'natural' (on-device) or 'device:<voiceURI>'. */
+  /** Which voice speaks each language: 'auto', 'natural:<voice id>' (on-device; 'natural' from older versions) or 'device:<voiceURI>'. */
   voiceByLang: Partial<Record<Locale, string>>;
   alertOutput: AlertOutput;
   alertTiming: AlertTiming;
@@ -67,7 +67,7 @@ function voiceChoices(value: unknown): Partial<Record<Locale, string>> {
   if (!value || typeof value !== 'object') return out;
   for (const l of LOCALES) {
     const v = (value as Record<string, unknown>)[l.id];
-    if (typeof v === 'string' && (v === 'auto' || v === 'natural' || /^device:.{1,300}$/.test(v))) out[l.id] = v;
+    if (typeof v === 'string' && (v === 'auto' || v === 'natural' || /^natural:[\w-]{1,80}$/.test(v) || /^device:.{1,300}$/.test(v))) out[l.id] = v;
   }
   return out;
 }
