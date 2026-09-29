@@ -21,7 +21,7 @@ Worker route instead (see `worker/`).
 | `VITE_ELEVATION_PROVIDER` | `open-meteo` | `open-meteo`, `none` |
 | `VITE_MAP_PROVIDER` | `openfreemap` | `openfreemap` |
 | `VITE_TRAFFIC_PROVIDER` | `none` | `none` (interface ready) |
-| `VITE_INCIDENT_PROVIDER` | `none` | `none` (interface ready) |
+| `VITE_INCIDENT_PROVIDER` | `reports` | `reports` (driver reports via this app's Worker), `none` |
 | `VITE_AIR_QUALITY_PROVIDER` | `open-meteo` | `open-meteo`, `none` |
 | `VITE_SPEECH_PROVIDER` | `browser` | `browser` |
 
@@ -34,6 +34,7 @@ Worker route instead (see `worker/`).
 | `VITE_OPEN_METEO_AIR_URL` | `https://air-quality-api.open-meteo.com` |
 | `VITE_NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` |
 | `VITE_PHOTON_BASE_URL` | `https://photon.komoot.io` |
+| `VITE_REPORTS_URL` | `/api/reports` (same origin — no CSP change needed) |
 | `VITE_OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` |
 | `VITE_MAP_STYLE_LIGHT` / `VITE_MAP_STYLE_DARK` | OpenFreeMap Positron / Dark |
 
@@ -74,7 +75,11 @@ Configured in `wrangler.toml`; no secrets are required.
 | `ASSETS` | the built app (`dist/`) |
 | `LIVE_SHARE` | Durable Object class `LiveShare` (SQLite-backed, Free plan) |
 | `CREATE_LIMITER` | rate limit for creating shares (6 per minute per IP) |
+| `REPORTS` | Durable Object class `Reports` (SQLite-backed, one object; migration `v2`) |
+| `REPORT_LIMITER` | rate limit for sending reports and votes (10 per minute per IP) |
+| `REPORT_LIST_LIMITER` | rate limit for reading reports (120 per minute per IP) |
 
 Local development: `npm run dev:api` starts the Worker on port 8787, and the
 Vite dev server proxies `/api` to it (`vite.config.ts`). Without it, the app
-works normally and "Share live location" explains that the server is missing.
+works normally, "Share live location" explains that the server is missing,
+and driver reports show as "unavailable" in the Data panel.

@@ -13,6 +13,33 @@ i18n, CSP). This document records round 3 and the resulting state.
 > chip, compass, low-sun glare, time-zone changes, speed cameras (opt-in),
 > parking spot.
 
+## Round 5 — end-to-end audit (summary; details in PLAN.md §7)
+
+**Completed from the plan:** the driver-reports client (4.11: provider,
+store, Report button + voice command, "still there?", map, Heads-up,
+data-sources row, Settings switch), the ka/ru self-check (4.12) and the
+screenshot/test/docs pass (4.13).
+
+**Bugs fixed:** stale speed cameras after a re-route (announced at the
+wrong places); cameras never loaded with speed-limit warnings off, and
+toggles mid-drive did nothing; cameras left on the map after closing a
+route; un-favouriting removed the wrong place; no app-wide error boundary
+(white screen); unvalidated stored settings; a Save menu that never closed;
+no retry for a failed place forecast; no feedback while a typed search
+runs; a one-shot reload guard that never reset; departure times in the
+past; bare "Unable to calculate route" on 5xx; ETA bar and route actions
+overflowing at 320–375 px (and a CSS rule that never applied); English
+screen-reader labels in ka/ru; Russian agreement errors.
+
+**Security:** `GET /api/reports` reached the single Reports object with no
+limit → `REPORT_LIST_LIMITER`. Reports carry only kind + position (5
+decimals); the relay stores a daily-salted hash, never the IP. The CSP is
+unchanged (the relay is same-origin) and was verified on the production
+build.
+
+**Accessibility:** axe-core, 10 states × light/dark: 0 violations after
+fixes. Keyboard: dialogs trap focus, close on Escape, return focus.
+
 ## Round 3 — findings (and fixes)
 
 **Reported by the user**
@@ -73,7 +100,7 @@ simulation steps; English provider descriptions leaked into ka/ru UIs.
 | Speed limits | Existing | OSM, best effort, labelled |
 | Fuel / EV advice | Existing | from user-entered range only |
 | Break reminders | New | every ~2 h of driving, low severity (never interrupts) |
-| Incidents | New (architecture) | provider interface → events; unverified = "reported" |
+| Incidents | **Driver reports (round 5)** | report / "still there?" / expiry through the Worker; always labelled "reported"; official feeds can plug into the same interface |
 | Traffic | Architecture only | no free source → "Not available" |
 | Arrival summary | New | distance, time vs plan, weather encountered; not stored |
 | Live location sharing | New | Worker + Durable Object; latest position only |
@@ -90,14 +117,14 @@ simulation steps; English provider descriptions leaked into ka/ru UIs.
 | --- | --- | --- | --- | --- |
 | Live traffic speeds / congestion | **Blocked by provider** | ETA accuracy | No free source | P2 (needs paid provider) |
 | Official incidents / closures | **Blocked by provider** | safety | Some countries publish feeds; none for Georgia found | P2 |
-| Community incident reports | Missing | coverage where no feed exists | Yes (Worker + D1) — needs moderation, abuse controls, legal review | P2 |
+| Community incident reports | **Done (round 5)** — moderation tools and legal review still open | coverage where no feed exists | Yes (Worker + Durable Object) | P2 (moderation) |
 | Avoid tolls / highways / ferries | **Blocked by provider** | preference | Self-hosted OSRM/Valhalla with profiles | P2 |
-| Weather map layers / radar | Missing | context | Radar tiles are not reliably free for this use | P3 |
+| Weather map layers / radar | Forecast layer done; radar missing | context | Radar tiles are not reliably free for this use | P3 |
 | Browser notifications when backgrounded | Missing | alerts while in another app | Yes, but browsers throttle background pages; limited value | P3 |
 | Background navigation / locked screen | **Blocked by platform** | real driving | Native app only | P3 |
 | CarPlay / Android Auto | **Blocked by platform** | in-car use | Native app only | P3 |
 | Offline map tiles | Missing | tunnels / roaming | PMTiles regions possible, large downloads | P3 |
-| Persisting the active route across reloads | Missing | reload mid-drive | Yes (session storage); deliberately not done yet — privacy trade-off | P2 |
+| Persisting the active route across reloads | Partly done | reload mid-drive | "Continue to …" keeps only the destination and stops ahead (tab session) | P3 |
 | Native review of ka/ru text | Missing | quality | Needs native speakers | P1 |
 | Real-device testing (iOS Safari, Android Chrome) | Not done | the target platform | Needs devices | P1 |
 | Sender over WebSocket instead of HTTP PUT | Future | Free-plan request budget | Yes | P3 |

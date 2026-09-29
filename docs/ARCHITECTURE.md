@@ -16,11 +16,12 @@ src/
   voice/         TTS/recognition providers, prioritised voice queue, command parser, assistant
   services/      provider interfaces + implementations, WeatherService, route planner, location
   share/         live-location protocol (shared with the Worker), sharer, viewer, links
+  reports/       driver-reports protocol and rules (shared with the Worker)
   state/         zustand stores: app (route/nav), explore (map app), settings, saved places, layout
   components/    UI (map, sheets, search, place card, drive mode, arrival, share, live viewer…)
   dev/           development-only diagnostics + simulation controls (not in production builds)
   i18n/          en (built in), ka and ru (loaded on demand)
-worker/          Cloudflare Worker + Durable Object: the live-location relay
+worker/          Cloudflare Worker + Durable Objects: live-location relay, driver reports
 public/          PWA manifest, icons, service worker, _headers (CSP)
 ```
 
@@ -78,7 +79,7 @@ that names implementations, chosen by `VITE_*` variables.
 | `PlacesProvider`, `PoiProvider`, `SpeedLimitProvider` | Overpass | one shared sequential queue with endpoint fallback |
 | `ElevationProvider` | Open-Meteo | pass detection |
 | `TrafficProvider` | none | hook for live traffic (sets segment durations) |
-| `IncidentProvider` | none | normalized incidents (`verified` flag) → route events |
+| `IncidentProvider` | driver reports (`/api/reports`) | normalized incidents (`verified` flag) → route events; reports are never verified; `report()`/`vote()` when the source accepts them |
 | `TextToSpeechProvider` / `SpeechRecognitionProvider` | browser | push-to-talk only |
 | `MapProvider` | OpenFreeMap | style URLs |
 
@@ -91,6 +92,7 @@ that names implementations, chosen by `VITE_*` variables.
 | `share/liveShare.ts` / `share/viewer.ts` | live sharing (sender) / watching a shared link |
 | `state/settings.ts` | preferences (localStorage) |
 | `state/savedPlaces.ts` | Home/Work/favourites + recent destinations (localStorage, opt-out) |
+| app store (reports part) | incidents on the route, relay status, "still there?" prompt; own/asked report ids in memory only |
 
 `derive()` is a pure function of the app state and returns everything the UI
 shows; components read narrow selectors.
@@ -122,6 +124,26 @@ viewer app ◀──WebSocket snapshots (or 12 s polling)──────┘ a
   ETA, the weather where they are and at the destination on arrival.
 - Browsers pause location in the background, so the app keeps the screen on
   while sharing (Wake Lock) and tells both sides when updates stop.
+
+## Driver reports
+
+```
+car (real GPS) ──POST /api/reports {kind, lat, lon}──▶ Worker ──▶ Reports DO (SQLite, one object)
+route boxes    ──GET  /api/reports?bbox=…  (≤24 boxes, every 5 min driving)──┘   expired rows removed hourly
+passing a report ──POST /api/reports/:id/vote {still|gone}──┘
+```
+
+- Kinds: accident, hazard, road works, closure, dangerous weather. Lifetime by
+  kind (45 min … 12 h); "still there" extends (max 3× lifetime), two "gone"
+  outnumbering confirmations remove it; the same kind reported within 150 m
+  is a confirmation. Rules live in `src/reports/protocol.ts` (shared, tested).
+- The relay keeps a daily-salted hash of the client IP (never the IP) to
+  refuse double votes, voting on your own report and floods; three rate
+  limits (create/vote, list, share creation).
+- Client (`ReportsIncidentProvider`, store): reports become unverified route
+  events ("Accident · reported"), a "still there?" card appears 30–400 m after
+  passing someone else's report on a real drive; nothing is sent from a
+  simulation. The Report button and prompt disappear when turned off in Settings.
 
 ## PWA and offline
 
