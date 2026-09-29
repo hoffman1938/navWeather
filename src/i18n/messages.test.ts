@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { en } from './en';
-import { ka } from './ka';
 import { ru } from './ru';
 
 describe('message grammar', () => {
@@ -23,12 +22,10 @@ describe('message grammar', () => {
     expect(ru.alert.reportConfirmed(21)).toBe('По сообщениям · подтвердил 21 водитель');
     expect(en.alert.reportConfirmed(1)).toBe('Reported · 1 driver confirmed');
     expect(en.alert.reportConfirmed(3)).toBe('Reported · 3 drivers confirmed');
-    // Georgian nouns stay singular after numerals.
-    expect(ka.alert.reportConfirmed(3)).toBe('შეტყობინება · დაადასტურა 3 მძღოლმა');
   });
 
   it('every report kind has a name and a hint in every language', () => {
-    for (const m of [en, ka, ru]) {
+    for (const m of [en, ru]) {
       for (const k of ['accident', 'hazard', 'roadworks', 'closure', 'weather']) {
         expect(m.reports.kinds[k]).toBeTruthy();
         expect(m.reports.hints[k]).toBeTruthy();

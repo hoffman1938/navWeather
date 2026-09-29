@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserSpeechSynthesis } from './providers';
 
-/** The browser voice: natural voice first; a network voice that fails is repeated on the device. */
+/** The browser voice: a Google voice; one that fails (no connection) is repeated on the device. */
 
 interface FakeUtterance {
   text: string;
@@ -42,17 +42,18 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   delete (window as unknown as { speechSynthesis?: unknown }).speechSynthesis;
 });
 
 describe('browser speech', () => {
-  it('speaks with the most natural voice, not the default', () => {
+  it('speaks with the Google voice, not the default', () => {
     new BrowserSpeechSynthesis().speak('Turn left.', { lang: 'en-US', onEnd: () => undefined });
     expect(spoken[0].voice?.name).toBe('Google US English');
   });
 
-  it('a network voice that fails (no signal) is repeated with a device voice', () => {
+  it('a Google voice that fails (no signal) is repeated with a device voice', () => {
     const onEnd = vi.fn();
     new BrowserSpeechSynthesis().speak('Turn left.', { lang: 'en-US', onEnd });
     spoken[0].onerror?.({ error: 'network' });
@@ -82,8 +83,18 @@ describe('browser speech', () => {
   it('knows when there is no voice for a language (but not before the list has loaded)', () => {
     const tts = new BrowserSpeechSynthesis();
     expect(tts.canSpeak('en-US')).toBe(true);
-    expect(tts.canSpeak('ka-GE')).toBe(false);
+    expect(tts.canSpeak('ru-RU')).toBe(false);
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { getVoices: () => [], speak: vi.fn(), cancel: vi.fn() } });
-    expect(tts.canSpeak('ka-GE')).toBe(true);
+    expect(tts.canSpeak('ru-RU')).toBe(true);
+  });
+
+  it('Russian text is spelled out for the ear', () => {
+    new BrowserSpeechSynthesis().speak('Впереди ограничение 60 км/ч.', { lang: 'ru-RU', onEnd: () => undefined });
+    expect(spoken[0].text).toBe('Впереди ограничение 60 километров в час.');
+  });
+
+  it('Settings sample: the Google voice picked there', () => {
+    new BrowserSpeechSynthesis().preview('Hello.', 'en-US', 'device:google');
+    expect(spoken.at(-1)?.voice?.name).toBe('Google US English');
   });
 });

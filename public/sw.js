@@ -9,7 +9,9 @@
  *   the app instead of being served from a hidden cache.
  */
 const PREFIX = 'navweather-shell-';
-const VERSION = `${PREFIX}v3`;
+const VERSION = `${PREFIX}v4`;
+/** The downloadable voice was removed; free the space it took (~93 MB) on devices that had it. */
+const RETIRED = ['navweather-voices-v1'];
 const SHELL = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -20,8 +22,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      // Only older app shells: the downloaded natural voice (navweather-voices-*) must survive updates.
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== VERSION).map((k) => caches.delete(k))))
+      // Older app shells and retired caches; anything else is not ours to delete.
+      .then((keys) => Promise.all(keys.filter((k) => (k.startsWith(PREFIX) && k !== VERSION) || RETIRED.includes(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });

@@ -25,7 +25,7 @@ import { isAbortError, mapWithConcurrency } from '../services/http';
 import type { IncidentKind } from '../services/traffic/IncidentProvider';
 import { reportFailure, reportToIncident } from '../services/traffic/ReportsIncidentProvider';
 import type { ReportKind, Vote } from '../reports/protocol';
-import { locateOnce, LocationError } from '../services/location';
+import { LocationError, tripStart } from '../services/location';
 import type { PoiCategory } from '../services/places/PoiProvider';
 import { searchAlongRoute, type PoiResult } from '../services/placesAlongRoute';
 import { getProviders } from '../services/providers';
@@ -381,7 +381,7 @@ function newPlanTasks(): AbortSignal {
   return planTasks.signal;
 }
 
-/** Once per session: guidance is on but nothing on this device can speak the language (e.g. Georgian in Chrome). */
+/** Once per session: guidance is on but nothing on this device can speak the language. */
 function voiceHint() {
   if (voiceHintShown || !useSettings.getState().voice) return;
   if (getProviders().tts.canSpeak?.(currentMessages().speechLang) !== false) return;
@@ -546,12 +546,24 @@ export const useAppStore = create<AppState>()(
       const ctrl = new AbortController();
       routeAbort = ctrl;
       const m = currentMessages();
+      const empty = (f: PlaceField) => !f.place && !f.text.trim();
+      if (empty(get().origin) || empty(get().destination)) {
+        set({ routeStatus: 'error', routeError: empty(get().origin) ? m.ui.enterStart : m.ui.enterDestination });
+        return;
+      }
       set({ routeStatus: 'geocoding', routeError: null, poi: null, arrival: null, simulatedData: false });
       const providers = getProviders();
       try {
-        // "Your location" (in any field — it can be swapped) is resolved now, with a fresh fix.
-        const resolveHere = async (f: PlaceField): Promise<PlaceField> =>
-          f.place?.kind === 'here' ? { ...f, place: { ...f.place, coordinate: (await locateOnce(undefined, ctrl.signal)).coordinate } } : f;
+        // "Your location" (in any field — it can be swapped) is resolved now, with a fresh fix —
+        // or, if the device can't give one, the connection's rough area (said so in the field and a notice).
+        let approximateCity: string | null | undefined;
+        const resolveHere = async (f: PlaceField): Promise<PlaceField> => {
+          if (f.place?.kind !== 'here') return f;
+          const start = await tripStart(ctrl.signal);
+          if (start.approximate) approximateCity = start.approximate.city;
+          const name = start.approximate ? m.location.approxName : m.ui.currentLocation;
+          return { text: name, place: { ...f.place, name, label: name, coordinate: start.coordinate } };
+        };
         const originField = await resolveHere(get().origin);
         const destinationField = await resolveHere(get().destination);
         const waypointFields = await Promise.all(get().waypoints.map(resolveHere));
@@ -608,12 +620,13 @@ export const useAppStore = create<AppState>()(
         useSavedPlaces.getState().addRecent(destination);
         startPlanTasks(primary);
         if (primary.warnings.includes('places-unavailable')) get().showNotice('info', m.ui.placesLimited);
+        if (approximateCity !== undefined) get().showNotice('info', m.location.approximate(approximateCity), true);
         await get().loadWeather({ reason: 'initial' });
       } catch (e) {
         if (isAbortError(e)) return;
         const msg =
           e instanceof LocationError
-            ? locationErrorText(e.kind)
+            ? tripLocationErrorText(e.kind)
             : (e as Error)?.message === 'same-place'
               ? m.ui.samePlace
               : describeError(e, m.ui.unableRoute, m);
@@ -1741,6 +1754,12 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
   } finally {
     if (routeAbort === ctrl) routeAbort = null;
   }
+}
+
+/** "Your location" couldn't be used for a trip: what's wrong, and to type a start instead. */
+export function tripLocationErrorText(kind: LocationError['kind']): string {
+  const m = currentMessages();
+  return kind === 'timeout' ? m.location.notFound : `${locationErrorText(kind)} ${m.location.typeStart}`;
 }
 
 /** Same wording as the explore layer (platform-specific help for "denied"). */

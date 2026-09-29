@@ -52,10 +52,8 @@ export const config = {
     photon: str('VITE_PHOTON_BASE_URL', 'https://photon.komoot.io'),
     /** Driver reports relay (same origin as the app: the Worker in worker/). */
     reports: str('VITE_REPORTS_URL', '/api/reports'),
-    /** Free Piper voice models (downloaded once, on request, for the on-device natural voice). */
-    piperVoices: str('VITE_PIPER_VOICES_URL', 'https://huggingface.co/rhasspy/piper-voices/resolve/main'),
-    /** Recorded samples of those voices, to listen to before downloading. */
-    piperSamples: str('VITE_PIPER_SAMPLES_URL', 'https://raw.githubusercontent.com/rhasspy/piper-samples/master/samples'),
+    /** Rough area of the connection, when the device can't give a position (same Worker). */
+    whereami: str('VITE_WHEREAMI_URL', '/api/whereami'),
     overpass: list('VITE_OVERPASS_URLS', [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter',

@@ -1,3 +1,4 @@
+import { config } from '../config';
 import type { LngLat } from '../types/geo';
 
 /**
@@ -67,7 +68,9 @@ export function rememberFix(fix: LocationFix | null) {
 
 /**
  * One position, fast: a recent cached/network fix first (Wi-Fi is enough to
- * start a route), then a precise attempt if that times out.
+ * start a route), then a precise (GPS) attempt if that times out or can't
+ * work out a position — phones with Wi-Fi scanning off, desktops whose
+ * network lookup fails.
  */
 export function locateOnce(env: Env = defaultEnv(), signal?: AbortSignal): Promise<LocationFix> {
   const recent = latestFix(60_000);
@@ -93,7 +96,9 @@ export function locateOnce(env: Env = defaultEnv(), signal?: AbortSignal): Promi
       ),
     );
   const located = attempt({ enableHighAccuracy: false, maximumAge: 120_000, timeout: 10_000 })
-    .catch((e: LocationError) => (e.kind === 'timeout' ? attempt({ enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 }) : Promise.reject(e)))
+    .catch((e: LocationError) =>
+      e.kind === 'timeout' || e.kind === 'unavailable' ? attempt({ enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 }) : Promise.reject(e),
+    )
     .then((fix) => {
       rememberFix(fix);
       return fix;
@@ -103,6 +108,69 @@ export function locateOnce(env: Env = defaultEnv(), signal?: AbortSignal): Promi
 
 /** Upper bound for a one-shot position, including an unanswered permission prompt. */
 const LOCATE_OVERALL_MS = 35_000;
+
+export interface ApproximateLocation {
+  coordinate: LngLat;
+  city: string | null;
+}
+
+let approx: { at: number; value: ApproximateLocation } | null = null;
+/** The device just couldn't give a position: don't make the next tap wait for the same failure. */
+let failed: { at: number; kind: LocationErrorKind } | null = null;
+const FAILED_MS = 60_000;
+
+/**
+ * The connection's rough area (city level), from our own Worker — for when the
+ * device can't give a position at all (location off or blocked, no GPS on a
+ * desktop), so a trip can still start from the right city. Asks nothing of
+ * the device and involves no third party; kept in memory for 10 minutes.
+ */
+export async function approximateLocation(signal?: AbortSignal): Promise<ApproximateLocation> {
+  if (approx && Date.now() - approx.at < 10 * 60_000) return approx.value;
+  const res = await fetch(config.endpoints.whereami, { signal, headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error(`whereami ${res.status}`);
+  const b = (await res.json()) as { lat?: unknown; lon?: unknown; city?: unknown };
+  const lat = Number(b.lat);
+  const lon = Number(b.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new Error('whereami: no position');
+  const value = { coordinate: [lon, lat] as LngLat, city: typeof b.city === 'string' && b.city.trim() ? b.city.trim().slice(0, 80) : null };
+  approx = { at: Date.now(), value };
+  return value;
+}
+
+/**
+ * Where a trip from "Your location" starts: the device's position, else —
+ * location off, blocked or unavailable — the connection's rough area
+ * (`approximate` says so, with the reason). Rejects with the device's
+ * LocationError only when neither works.
+ */
+export async function tripStart(
+  signal?: AbortSignal,
+  env?: Env,
+): Promise<{ coordinate: LngLat; approximate: { city: string | null; reason: LocationErrorKind } | null }> {
+  try {
+    if (failed && Date.now() - failed.at < FAILED_MS && !latestFix(60_000)) throw new LocationError(failed.kind);
+    const fix = await locateOnce(env, signal);
+    failed = null;
+    return { coordinate: fix.coordinate, approximate: null };
+  } catch (e) {
+    if (!(e instanceof LocationError)) throw e;
+    if (!failed || Date.now() - failed.at >= FAILED_MS) failed = { at: Date.now(), kind: e.kind };
+    try {
+      const a = await approximateLocation(signal);
+      return { coordinate: a.coordinate, approximate: { city: a.city, reason: e.kind } };
+    } catch (e2) {
+      if (signal?.aborted) throw e2;
+      throw e;
+    }
+  }
+}
+
+/** Test helper. */
+export function __resetApproximate() {
+  approx = null;
+  failed = null;
+}
 
 export interface WatcherHandlers {
   onFix(fix: LocationFix): void;
@@ -121,6 +189,7 @@ export class LocationWatcher {
   private watchId: number | null = null;
   private precise = false;
   private coarseFallback = false;
+  private preciseRetry = false;
   private hadFix = false;
 
   constructor(
@@ -161,6 +230,7 @@ export class LocationWatcher {
     if (!this.reasonSet.size) {
       this.stop();
       this.coarseFallback = false;
+      this.preciseRetry = false;
       return;
     }
     const precise = (this.reasonSet.has('navigate') || this.reasonSet.has('share')) && !this.coarseFallback;
@@ -190,6 +260,13 @@ export class LocationWatcher {
           this.coarseFallback = true;
           this.stop();
           this.start(false);
+          return;
+        }
+        if (kind === 'unavailable' && !this.precise && !this.hadFix && !this.preciseRetry) {
+          // No network position (Wi-Fi scanning off, a desktop lookup that failed): try the GPS once.
+          this.preciseRetry = true;
+          this.stop();
+          this.start(true);
           return;
         }
         this.handlers.onError(kind, this.hadFix);

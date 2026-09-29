@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { isAbortError } from '../services/http';
-import { latestFix, locateOnce, LocationError, LocationWatcher, rememberFix, type LocationErrorKind, type LocationFix } from '../services/location';
+import { latestFix, LocationError, LocationWatcher, rememberFix, tripStart, type LocationErrorKind, type LocationFix } from '../services/location';
 import { getProviders } from '../services/providers';
 import type { LayerKind } from '../algorithms/weatherGrid';
 import type { Poi, PoiCategory } from '../services/places/PoiProvider';
@@ -13,7 +13,7 @@ import type { LocationForecast } from '../types/weather';
 import { haversineM } from '../utils/distance';
 import { currentMessages } from './settings';
 import { chargingSummary } from '../services/places/evCharging';
-import { useAppStore, type SheetState } from './store';
+import { tripLocationErrorText, useAppStore, type SheetState } from './store';
 
 /**
  * EXPLORE — the "map app" side: where am I, what is this place, what will
@@ -315,15 +315,26 @@ export const useExplore = create<ExploreState>()(
     },
 
     useMyLocationAsOrigin(warm = true) {
-      useAppStore.getState().setOriginPlace(herePlace());
+      const here = herePlace();
+      useAppStore.getState().setOriginPlace(here);
       if (!warm) return;
       // Ask now, inside the user's tap, so the permission prompt appears right away.
-      locateOnce().catch((e) => {
-        if (!(e instanceof LocationError)) return;
-        const app = useAppStore.getState();
-        if (app.origin.place?.kind === 'here') app.setOriginPlace(null);
-        app.showNotice('warning', locationMessage(e.kind), true);
-      });
+      tripStart().then(
+        (start) => {
+          const app = useAppStore.getState();
+          // Only if "Your location" is still the start (not replaced meanwhile).
+          if (!start.approximate || app.origin.place !== here) return;
+          const m = currentMessages();
+          app.setOriginPlace({ ...here, name: m.location.approxName, label: m.location.approxName, coordinate: start.coordinate });
+          app.showNotice('info', m.location.approximate(start.approximate.city), true);
+        },
+        (e) => {
+          if (!(e instanceof LocationError)) return;
+          const app = useAppStore.getState();
+          if (app.origin.place === here) app.setOriginPlace(null);
+          app.showNotice('warning', tripLocationErrorText(e.kind), true);
+        },
+      );
     },
   })),
 );

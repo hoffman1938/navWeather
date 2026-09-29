@@ -80,9 +80,9 @@ export function parseOverpassElements(elements: OverpassElement[], language: str
     seen.add(e.id);
     const kind = e.tags.place as PlaceKind;
     if (kind !== 'city' && kind !== 'town' && kind !== 'village') continue;
-    // Russian UI: a Georgian name in Cyrillic (Хашури) before the English one — like the street names, and read naturally by a Russian voice.
+    // Russian UI: a Georgian name in Cyrillic (Хашури) before the English one — like the street names.
     const own = e.tags.name;
-    const local = own && (language === 'ka' || (language === 'ru' && hasGeorgian(own))) ? localizeScript(own, language) : undefined;
+    const local = own && language === 'ru' && hasGeorgian(own) ? localizeScript(own, language) : undefined;
     const name = e.tags[`name:${language}`] ?? local ?? e.tags['int_name'] ?? e.tags['name:en'] ?? localizeScript(e.tags.name ?? '', language);
     if (!name) continue;
     const pop = Number(String(e.tags.population ?? '').replace(/[^\d]/g, ''));

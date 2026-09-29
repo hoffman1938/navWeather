@@ -73,10 +73,10 @@ describe('service worker: live data', () => {
 });
 
 describe('service worker: updates', () => {
-  it('removes old app shells but keeps the downloaded voices', async () => {
-    const { caches, activate } = loadWorker(['navweather-shell-v1', 'navweather-shell-v2', 'navweather-shell-v3', 'navweather-voices-v1']);
+  it('removes old app shells and the retired voice download, nothing else', async () => {
+    const { caches, activate } = loadWorker(['navweather-shell-v2', 'navweather-shell-v3', 'navweather-shell-v4', 'navweather-voices-v1', 'someone-else']);
     await activate();
     const deleted = caches.delete.mock.calls.map((c: unknown[]) => c[0]);
-    expect(deleted.sort()).toEqual(['navweather-shell-v1', 'navweather-shell-v2']);
+    expect(deleted.sort()).toEqual(['navweather-shell-v2', 'navweather-shell-v3', 'navweather-voices-v1']);
   });
 });

@@ -129,7 +129,6 @@ export async function planRoute(
 
 /** Street names and road numbers in the UI's script (OSM often has Georgian only). */
 export function localizeRouteNames(route: Route, language: string): Route {
-  if (language === 'ka') return route;
   const fix = (s?: string) => (s ? localizeScript(s, language) : s);
   return {
     ...route,

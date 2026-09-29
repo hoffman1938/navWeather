@@ -31,6 +31,8 @@ export interface Env {
  *   GET    /api/reports?bbox=w,s,e,n       active driver reports in an area
  *   POST   /api/reports                    report { kind, lat, lon }
  *   POST   /api/reports/:id/vote           { vote: 'still' | 'gone' }
+ *
+ *   GET    /api/whereami           approximate location of the connection (city level)
  */
 export default {
   async fetch(request, env): Promise<Response> {
@@ -42,6 +44,20 @@ export default {
     if (request.method !== 'GET' && site && site !== 'same-origin' && site !== 'none') return json({ error: 'forbidden' }, 403);
 
     if (url.pathname === '/api/reports' || url.pathname.startsWith('/api/reports/')) return reports(request, url, env);
+
+    // When the device can't say where it is (location off, no GPS on a desktop), a trip can
+    // still start from the right city: Cloudflare already knows the connection's rough area.
+    // Nothing is stored; no CORS headers, so other sites can't read it.
+    if (url.pathname === '/api/whereami') {
+      if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405);
+      const cf = request.cf as { latitude?: string; longitude?: string; city?: string; country?: string; asn?: number; clientTcpRtt?: number } | undefined;
+      const lat = Number(cf?.latitude);
+      const lon = Number(cf?.longitude);
+      // `wrangler dev` offline fills in a made-up Austin, TX (asn 395747, no round trip): not a location.
+      const placeholder = cf?.city === 'Austin' && cf.asn === 395747 && !cf.clientTcpRtt;
+      if (!cf?.latitude || !cf?.longitude || !Number.isFinite(lat) || !Number.isFinite(lon) || placeholder) return json({ error: 'unknown' }, 404);
+      return json({ lat, lon, city: cf.city ?? null, country: cf.country ?? null });
+    }
 
     if (url.pathname === '/api/share') {
       if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
