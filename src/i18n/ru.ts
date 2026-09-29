@@ -151,7 +151,10 @@ export const ru: Messages = {
     },
     unconfirmed: 'Неподтверждённое сообщение',
     level: { high: 'Важно', critical: 'Срочно' },
-    reportConfirmed: (n: number) => `По сообщениям · подтвердили ${n} ${plural(n, { one: 'водитель', few: 'водителя', many: 'водителей', other: 'водителя' }, 'ru')}`,
+    reportConfirmed: (n: number) =>
+      plural(n, { one: 'x', other: 'y' }, 'ru') === 'x'
+        ? `По сообщениям · подтвердил ${n} водитель`
+        : `По сообщениям · подтвердили ${n} ${plural(n, { one: 'водитель', few: 'водителя', many: 'водителей', other: 'водителя' }, 'ru')}`,
     title: {
       RAIN_AHEAD: 'Дождь',
       HEAVY_RAIN_AHEAD: 'Сильный дождь',
@@ -197,7 +200,7 @@ export const ru: Messages = {
         `Около нуля и осадки ${when}${place ? `, около ${place}` : ''}. Возможен гололёд.`,
       WEATHER_CLEARING: (when: string) => `Погода улучшится ${when}.`,
       combined: (titles: string[], when: string) =>
-        `${titles.length > 1 ? `${titles.slice(0, -1).join(', ')} и ${lcFirst(titles[titles.length - 1])}` : titles[0]} ожидаются впереди ${when}.`,
+        `${titles.length > 1 ? `${titles.slice(0, -1).join(', ')} и ${lcFirst(titles[titles.length - 1])}` : titles[0]} ${titles.length > 1 || /[ыи]$/.test(titles[0]) ? 'ожидаются' : 'ожидается'} впереди ${when}.`,
       recurring: (title: string, span: string) => `${title} временами в ближайшие ${span}.`,
       speedLimit: (limit: string) => `Впереди ограничение ${limit}.`,
       incident: (what: string, when: string, reported: boolean) => `${what} впереди${reported ? ' (по сообщениям)' : ''}, ${when}.`,
@@ -215,7 +218,7 @@ export const ru: Messages = {
     notNavigating: 'Сначала постройте маршрут.',
     unsupported: 'Голосовые команды не поддерживаются этим браузером.',
     micDenied: 'Нет доступа к микрофону.',
-    eta: (time: string, duration: string) => `Прибытие в ${time}, ${duration}.`,
+    eta: (time: string, duration: string) => `Прибытие в ${time}, ${duration.startsWith('через') ? duration : `через ${duration}`}.`,
     distanceTo: (place: string, distance: string, duration: string) => `До ${place} ${distance}, ${duration}.`,
     placeNotOnRoute: (place: string) => `${place} не на вашем маршруте.`,
     nextTurn: (voice: string) => voice,
@@ -385,7 +388,7 @@ export const ru: Messages = {
     km: (n: string) => `${n} км`,
     near: (p: string) => `Около ${p}`,
     routes: 'Маршруты',
-    fastest: 'Быстрейший',
+    fastest: 'Самый быстрый',
     alternative: 'Альтернативный',
     longer: (d: string) => `дольше на ${d}`,
     same: 'То же время',
