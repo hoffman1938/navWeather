@@ -8,12 +8,13 @@ import { NATURAL_BUDGET_MS, SpeechRouter } from './speech';
 
 /** Which voice speaks, and what happens when the natural voice is slow, missing or silent. */
 
-function fakeDevice(canSpeak = true) {
+function fakeDevice(canSpeak = true, natural = false) {
   const said: { text: string; voiceURI: string | null | undefined }[] = [];
   const device = {
     supported: true,
     preferredVoice: (_lang: string): string | null => null,
     canSpeak: () => canSpeak,
+    hasNaturalVoice: () => natural,
     speak: vi.fn((text: string, o: { onEnd: () => void; voiceURI?: string | null }) => {
       said.push({ text, voiceURI: o.voiceURI });
       o.onEnd();
@@ -28,7 +29,7 @@ function fakeNatural(opts: { delayMs?: number; fail?: boolean; output?: boolean 
   const played: string[] = [];
   const natural = {
     synthesize: vi.fn(
-      (text: string) =>
+      (text: string, _voiceId: string) =>
         new Promise<NaturalAudio>((resolve, reject) =>
           setTimeout(() => (opts.fail ? reject(new Error('boom')) : resolve({ pcm: new Float32Array([text.length]), sampleRate: 22050 })), opts.delayMs ?? 100),
         ),
@@ -46,8 +47,9 @@ function fakeNatural(opts: { delayMs?: number; fail?: boolean; output?: boolean 
   return { natural: natural as unknown as NaturalSpeech, played, raw: natural };
 }
 
+const EN = 'en_US-hfc_female-medium';
 const choose = (en: string) => useSettings.getState().update({ language: 'en', voiceByLang: { en } });
-const setReady = (ready: boolean) => useNaturalVoice.setState({ status: { en: ready ? 'ready' : 'none', ru: 'none', ka: 'none' } });
+const setReady = (ready: boolean) => useNaturalVoice.setState({ status: { [EN]: ready ? 'ready' : 'none' } });
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -57,8 +59,8 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('speech router', () => {
-  it('auto: the best device voice (the natural voice is for when the device has none)', async () => {
-    const { device, said } = fakeDevice();
+  it('auto: a device voice that is truly natural (Edge "Natural", Siri) beats the downloaded voice', async () => {
+    const { device, said } = fakeDevice(true, true);
     const { natural, raw } = fakeNatural();
     setReady(true);
     choose('auto');
@@ -67,6 +69,30 @@ describe('speech router', () => {
     expect(said).toEqual([{ text: 'Turn right.', voiceURI: null }]);
     expect(raw.synthesize).not.toHaveBeenCalled();
     expect(onEnd).toHaveBeenCalled();
+  });
+
+  it('auto: nothing downloaded → the best device voice', () => {
+    const { device, said } = fakeDevice();
+    setReady(false);
+    choose('auto');
+    new SpeechRouter(device, fakeNatural().natural).speak('Turn right.', { lang: 'en-US', onEnd: () => undefined });
+    expect(said.map((s) => s.text)).toEqual(['Turn right.']);
+  });
+
+  it('auto: the downloaded natural voice beats ordinary device voices (and speaks when the device has none)', async () => {
+    for (const canSpeak of [true, false]) {
+      const { device, said } = fakeDevice(canSpeak);
+      const { natural, played, raw } = fakeNatural();
+      setReady(true);
+      choose('auto');
+      const onEnd = vi.fn();
+      new SpeechRouter(device, natural).speak('Hello', { lang: 'en-US', onEnd });
+      await vi.advanceTimersByTimeAsync(200);
+      expect(raw.synthesize).toHaveBeenCalledWith('Hello', EN);
+      expect(played).toEqual(['5']);
+      expect(said).toEqual([]);
+      expect(onEnd).toHaveBeenCalled();
+    }
   });
 
   it('auto with no device voice for the language: the downloaded natural voice speaks', async () => {
@@ -171,6 +197,41 @@ describe('speech router', () => {
     const { natural, raw } = fakeNatural();
     new SpeechRouter(fakeDevice().device, natural);
     setReady(true);
-    expect(raw.prepare).toHaveBeenCalledWith('en');
+    expect(raw.prepare).toHaveBeenCalledWith(EN);
+  });
+
+  it('a language with several natural voices: the chosen one speaks, only once it is downloaded', async () => {
+    await loadLocale('ru');
+    useSettings.getState().update({ language: 'ru', voiceByLang: { ru: 'natural:ru_RU-ruslan-medium' } });
+    useNaturalVoice.setState({ status: { 'ru_RU-irina-medium': 'ready', 'ru_RU-ruslan-medium': 'none' } });
+    const { device, said } = fakeDevice();
+    const { natural, raw } = fakeNatural();
+    const router = new SpeechRouter(device, natural);
+    router.speak('Маршрут обновлён.', { lang: 'ru-RU', onEnd: () => undefined });
+    expect(said.map((s) => s.text)).toEqual(['Маршрут обновлён.']);
+    useNaturalVoice.setState({ status: { 'ru_RU-irina-medium': 'ready', 'ru_RU-ruslan-medium': 'ready' } });
+    router.speak('Маршрут обновлён.', { lang: 'ru-RU', onEnd: () => undefined });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(raw.synthesize).toHaveBeenLastCalledWith('Маршрут обновлён.', 'ru_RU-ruslan-medium');
+    // "natural" saved by an older version still means the voice it downloaded then.
+    useSettings.getState().update({ voiceByLang: { ru: 'natural' } });
+    router.speak('Пересчитываю маршрут.', { lang: 'ru-RU', onEnd: () => undefined });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(raw.synthesize).toHaveBeenLastCalledWith('Пересчитываю маршрут.', 'ru_RU-irina-medium');
+  });
+
+  it('both voices get the text spelled out; the natural one also gets names in its own script', async () => {
+    await loadLocale('ru');
+    useSettings.getState().update({ language: 'ru', voiceByLang: { ru: 'natural:ru_RU-ruslan-medium' } });
+    useNaturalVoice.setState({ status: { 'ru_RU-ruslan-medium': 'ready' } });
+    const { device, said } = fakeDevice();
+    const { natural, raw } = fakeNatural();
+    const router = new SpeechRouter(device, natural);
+    router.speak('Вы на С2, около Khashuri. Впереди ограничение 60 км/ч.', { lang: 'ru-RU', onEnd: () => undefined });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(raw.synthesize).toHaveBeenLastCalledWith('Вы на эс 2, около Хашури. Впереди ограничение 60 километров в час.', 'ru_RU-ruslan-medium');
+    useNaturalVoice.setState({ status: {} });
+    router.speak('Впереди ограничение 60 км/ч, около Khashuri.', { lang: 'ru-RU', onEnd: () => undefined });
+    expect(said.at(-1)!.text).toBe('Впереди ограничение 60 километров в час, около Khashuri.');
   });
 });

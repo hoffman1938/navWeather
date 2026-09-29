@@ -8,6 +8,7 @@
  */
 import type { Messages } from './en';
 import type { PluralForms } from './plural';
+import { withPostposition } from './kaGrammar';
 
 const dir: Record<string, string> = {
   left: 'მარცხნივ',
@@ -20,29 +21,11 @@ const dir: Record<string, string> = {
   uturn: 'შემობრუნება',
 };
 const sideOf = (d?: string) => (d && d.includes('left') ? 'მარცხენა მხარე' : 'მარჯვენა მხარე');
-type Postposition = 'tan' | 'shi' | 'ze' | 'mde' | 'is';
-const SUFFIX: Record<Postposition, string> = { tan: 'თან', shi: 'ში', ze: 'ზე', mde: 'მდე', is: 'ის' };
-
-/** A name with a postposition, declined like a Georgian noun (last word only). */
-export function withPostposition(name: string, pp: Postposition): string {
-  const last = name.slice(-1);
-  if (!/[\u10D0-\u10FA]/.test(last)) return `${name}-${SUFFIX[pp]}`; // S12-ზე, Khunevi-თან
-  if (last === 'ი') {
-    // Consonant stem: the nominative -ი drops.
-    const stem = name.slice(0, -1);
-    return pp === 'mde' ? `${stem}ამდე` : `${stem}${SUFFIX[pp]}`;
-  }
-  if ('აეოუ'.includes(last)) {
-    if (pp === 'tan') return `${name}სთან`;
-    if (pp === 'is') return last === 'ა' || last === 'ე' ? `${name.slice(0, -1)}ის` : `${name}ს`;
-    return `${name}${SUFFIX[pp]}`;
-  }
-  return pp === 'mde' ? `${name}ამდე` : `${name}${SUFFIX[pp]}`;
-}
-
 const near = (p: string) => `${withPostposition(p, 'tan')} ახლოს`;
 const onto = (road?: string) => (road ? `, ${withPostposition(road, 'ze')}` : '');
 const toward = (d: string) => `${withPostposition(d, 'is')} მიმართულებით`;
+/** Spoken 1.5 / 2.5: "ერთნახევარ", "ორნახევარ" (one and a half), not "one point five". */
+const halves = (n: number) => (n === 1.5 ? 'ერთნახევარ' : n === 2.5 ? 'ორნახევარ' : String(n));
 const ordinal = (n: number) =>
   ['პირველ', 'მეორე', 'მესამე', 'მეოთხე', 'მეხუთე', 'მეექვსე', 'მეშვიდე', 'მერვე', 'მეცხრე', 'მეათე'][n - 1] ?? `მე-${n}`;
 
@@ -107,13 +90,13 @@ export const ka: Messages = {
     then: (first: string, second: string) => `${first.replace(/\.$/, '')}, შემდეგ ${second}`,
     distance: {
       meters: (n: number) => `${n} მეტრში`,
-      km: (n: number) => `${n} კილომეტრში`,
+      km: (n: number) => `${halves(n)} კილომეტრში`,
       feet: (n: number) => `${n} ფუტში`,
       quarterMile: 'მეოთხედ მილში',
       halfMile: 'ნახევარ მილში',
-      miles: (n: number) => `${n} მილში`,
+      miles: (n: number) => `${halves(n)} მილში`,
     },
-    routeStarted: (destination: string, duration: string) => `მარშრუტი: ${destination}. გზაში დაახლოებით ${duration}.`,
+    routeStarted: (destination: string, duration: string) => `მარშრუტი: ${destination}. ჩახვალთ დაახლოებით ${duration}.`,
     rerouted: 'მარშრუტი განახლდა.',
     arrived: (destination: string) => `მიხვედით: ${destination}.`,
   },
@@ -234,7 +217,9 @@ export const ka: Messages = {
     unsupported: 'ხმოვანი ბრძანებები ამ ბრაუზერში არ მუშაობს.',
     micDenied: 'მიკროფონზე წვდომა უარყოფილია.',
     eta: (time: string, duration: string) => `ჩახვალთ ${time}-ზე, ${duration}.`,
-    distanceTo: (place: string, distance: string, duration: string) => `${withPostposition(place, 'mde')} ${distance}, ${duration}.`,
+    // distance/duration come in the "in …" form (16 კილომეტრში, 20 წუთში).
+    distanceTo: (place: string, distance: string, duration: string) =>
+      `${withPostposition(place, 'mde')} ${distance.replace(/ში$/, 'ია')}, ჩახვალთ ${duration}.`,
     placeNotOnRoute: (place: string) => `${place} თქვენს მარშრუტზე არ არის.`,
     nextTurn: (voice: string) => voice,
     noMoreTurns: (destination: string) => `გააგრძელეთ ამ გზით ${withPostposition(destination, 'mde')}.`,
@@ -242,14 +227,14 @@ export const ka: Messages = {
     rainNow: (clears?: string) => (clears ? `ახლა წვიმს. შესუსტდება ${clears}.` : 'ახლა წვიმს.'),
     noRain: 'მარშრუტზე წვიმა არ არის მოსალოდნელი.',
     weatherAtOnRoute: (place: string, time: string, condition: string, temp: string, chance?: number) =>
-      `${place}, დაახლოებით ${time}: ${condition}, ${temp}${chance ? `, ნალექის ალბათობა ${chance} პროცენტი` : ''}.`,
+      `${place}, დაახლოებით ${time}-ზე: ${condition}, ${temp}${chance ? `, ნალექის ალბათობა ${chance} პროცენტი` : ''}.`,
     weatherAtNow: (place: string, condition: string, temp: string) =>
       `${place} თქვენს მარშრუტზე არ არის. ახლა იქ ${temp}-ია, ${condition}.`,
     trafficUnavailable: 'საცობების შესახებ ინფორმაცია ჯერ მიუწვდომელია.',
     recalculating: 'მარშრუტს თავიდან ვითვლი.',
     poiFound: (category: string, name: string, ahead: string, detour: string) =>
       `საუკეთესო ვარიანტი (${category}) მარშრუტზე: ${name}, ${ahead} წინ, ${detour}.`,
-    poiNone: (category: string, km: string) => `მარშრუტის მომდევნო ${km}-ზე ვერ ვიპოვე: ${category}.`,
+    poiNone: (category: string, km: string) => `მარშრუტის მომდევნო ${km.replace(/ში$/, 'ზე')} ვერ ვიპოვე: ${category}.`,
     poiSearching: (category: string) => `ვეძებ მარშრუტზე: ${category}…`,
     detour: (minutes: number) => (minutes <= 1 ? 'თითქმის გზაზე' : `დაახლოებით ${minutes} წუთის გადახვევა`),
     alternatives: (n: number) => (n ? 'აი, მარშრუტის ვარიანტები.' : 'სხვა მარშრუტი ახლა არ არის.'),
@@ -494,17 +479,21 @@ export const ka: Messages = {
     voiceGuidance: 'ხმოვანი მითითებები',
     voiceChoice: 'ხმა',
     voiceAuto: 'მოწყობილობის საუკეთესო ხმა',
-    voiceNatural: (mb: number) => `ბუნებრივი ხმა — უფასო (${mb} მბ ერთხელ)`,
+    voiceNatural: (name: string | undefined, male: boolean, mb: number) =>
+      `ბუნებრივი ${male ? 'მამაკაცის' : 'ქალის'} ხმა${name ? ` „${name}“` : ''} — უფასო (${mb} მბ ერთხელ)`,
     voiceNaturalTag: 'ბუნებრივი',
     voiceNeedsInternet: 'საჭიროებს ინტერნეტს',
     voiceSample: 'მოსმენა',
+    voiceSampleRecorded: 'ხმის ჩანაწერის მოსმენა',
+    voiceSampleFailed: 'ჩანაწერი ვერ ჩაირთო — საჭიროა ინტერნეტი.',
+    voiceEdgeTip: 'რჩევა: კომპიუტერზე Microsoft Edge-ს აქვს ამ ენის უფასო, ძალიან ბუნებრივი ხმები (საჭიროა ინტერნეტი).',
     voiceSampleText: '300 მეტრში მოუხვიეთ მარჯვნივ. დაახლოებით 20 წუთში მოსალოდნელია მცირე წვიმა.',
     naturalAbout: 'უფასო, ღია კოდის ხმა (Piper). მეტყველება იქმნება თქვენს მოწყობილობაზე — არაფერი იგზავნება — და მუშაობს ინტერნეტის გარეშე.',
     naturalDownloading: (pct: number) => `ხმა იტვირთება… ${pct}%`,
     naturalReady: 'ჩამოტვირთულია · მუშაობს ინტერნეტის გარეშე',
     naturalError: 'ხმა ვერ ჩამოიტვირთა. შეამოწმეთ კავშირი და სცადეთ ხელახლა — მანამდე მოწყობილობის ხმა ისაუბრებს.',
     naturalUnsupported: 'ეს ბრაუზერი ბუნებრივ ხმას ვერ უშვებს.',
-    naturalDownload: 'ჩამოტვირთვა',
+    naturalDownload: (mb: number) => `ჩამოტვირთვა (${mb} მბ)`,
     naturalRetry: 'ხელახლა ცდა',
     naturalRemove: 'ჩამოტვირთულის წაშლა',
     naturalLicense: 'ამ ხმის შესახებ',

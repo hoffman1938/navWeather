@@ -33,8 +33,12 @@ describe('stored settings', () => {
   });
 
   it('keeps valid voice choices per language and drops anything else', () => {
-    const s = parseSettings(JSON.stringify({ voiceByLang: { en: 'natural', ka: 'device:Microsoft Eka Online (Natural)', ru: 'robot', fr: 'natural' } }), base);
-    expect(s.voiceByLang).toEqual({ en: 'natural', ka: 'device:Microsoft Eka Online (Natural)' });
+    const s = parseSettings(
+      JSON.stringify({ voiceByLang: { en: 'natural', ka: 'device:Microsoft Eka Online (Natural)', ru: 'natural:ru_RU-ruslan-medium', fr: 'natural' } }),
+      base,
+    );
+    expect(s.voiceByLang).toEqual({ en: 'natural', ka: 'device:Microsoft Eka Online (Natural)', ru: 'natural:ru_RU-ruslan-medium' });
+    expect(parseSettings(JSON.stringify({ voiceByLang: { ru: 'robot', en: 'natural:../x' } }), base).voiceByLang).toEqual({});
     expect(parseSettings(JSON.stringify({ voiceByLang: 'natural' }), base).voiceByLang).toEqual({});
   });
 

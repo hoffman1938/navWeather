@@ -38,7 +38,7 @@ npm run test:reports  # end-to-end checks of the driver-reports relay
 | Drive extras | `state/driveExtras.test.ts` | cameras without limit warnings, loading when switched on mid-drive, never the old route's cameras after a re-route |
 | Settings, saved places | `state/settings.test.ts`, `state/savedPlaces.test.ts` | stored values validated; toggling a favourite removes that place only |
 | Messages | `i18n/messages.test.ts`, `voice/parser.test.ts` | Russian agreement, report kinds named in every language; voice "report …" commands vs. questions |
-| Voice | `voice/voices.test.ts`, `voice/providers.test.ts`, `voice/speech.test.ts`, `voice/natural/storage.test.ts` | natural voices ranked above robotic defaults (Windows/Edge/iPhone/Linux lists), offline never picks a network voice, a failed network voice is repeated on the device; router: auto/device/natural, 2.5 s deadline fallback (late audio never played), errors/no audio output/not downloaded → device voice, cancel; downloads stored only when complete |
+| Voice | `voice/voices.test.ts`, `voice/providers.test.ts`, `voice/speech.test.ts`, `voice/speakable.test.ts`, `voice/natural/audio.test.ts`, `voice/natural/storage.test.ts`, `services/places/OverpassPlacesProvider.test.ts` | natural voices ranked above robotic defaults (Windows/Edge/iPhone/Linux lists), offline never picks a network voice, a failed network voice is repeated on the device; router: auto (device Natural > downloaded > device), a chosen Russian voice speaks only once downloaded, the older `natural` setting still works, 2.5 s deadline fallback (late audio never played), errors/no audio output/not downloaded → device voice, cancel; text spelled out for ru/ka (units, temperatures, times with Georgian endings, street types by case, road numbers, Latin names in the voice's script, declined); sentences joined with even pauses and level, no clicks; downloads stored only when complete; town names in Cyrillic in the Russian UI |
 
 The critical path from the brief (plan → sample → ETA → weather → events →
 alerts → simulate → deviate → recalculate → stale data gone) is
@@ -86,6 +86,19 @@ production build under the real CSP, and a simulated drive **offline** after the
 download. Not verified: how the real Piper voices sound, and synthesis speed on
 real phones (measured 26–363 ms per sentence on the stand-in on a desktop CPU;
 real voices are larger).
+
+Also checked in the browser (production build):
+- The speech worker for a whole drive: 160 Russian phrases (with Latin names
+  and several sentences) and 120 Georgian ones, all synthesized (median 33 ms
+  on the stand-in). The same run on the previous build: the phonemizer aborted
+  ("OOM") on the second phrase and every later phrase failed.
+- Russian and Georgian Settings: the voices listed, nothing downloaded until
+  "Download", the recorded sample plays under the CSP, then the downloaded
+  voice speaks the sample; a simulated Russian drive offline speaks only with
+  the natural voice. axe-core: no violations (ru/ka, light/dark).
+- Every phrase the app speaks in ru and ka (collected from a simulated drive and
+  the assistant) was run through the real eSpeak NG phonemizer to find what it
+  misreads; `voice/speakable.ts` fixes those.
 
 ## Not tested (be explicit)
 

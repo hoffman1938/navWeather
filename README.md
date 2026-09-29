@@ -80,11 +80,15 @@ simulated weather and incidents (always labelled as simulated).
 your device has (Edge "Natural" voices, Chrome "Google" voices, Apple
 "Enhanced/Premium" voices) instead of the robotic default, and repeats a
 sentence with an on-device voice if a network voice fails. For a human-like
-voice everywhere — including Georgian, which most browsers can't speak — pick
-**Settings → Voice → Natural voice**: a free, open-source neural voice
-([Piper](https://github.com/rhasspy/piper)) downloaded once (~93 MB), then made
-entirely on your device and working offline. If it is ever too slow for a turn
-instruction, the device voice says that sentence so guidance is never late.
+voice everywhere — including Georgian, which most browsers can't speak — pick a
+**natural voice in Settings → Voice** (Russian: male «Руслан» or female
+«Ирина»; Georgian: «ნათია»): a free, open-source neural voice
+([Piper](https://github.com/rhasspy/piper)). Listen to a recording of it first,
+then download it once (~93 MB); speech is then made entirely on your device and
+works offline. Everything it says is spelled out the way a person reads it
+(«60 километров в час», «თორმეტ საათსა და ორმოცდათხუთმეტ წუთზე», names in its
+own alphabet). If it is ever too slow for a turn instruction, the device voice
+says that sentence so guidance is never late.
 
 English, Georgian and Russian; metric/imperial; light/dark/automatic (day/night
 by the sun at the car while driving); installable PWA.
@@ -101,7 +105,7 @@ Every part runs on free services or free tiers, with no API keys and no card:
 | Weather, air quality, elevation | Open-Meteo | free for **non-commercial** use (≈10 000 calls/day) |
 | Search | Nominatim (1 request/s) and Photon | fair use |
 | Places, speed limits, cameras | Overpass (OpenStreetMap) | fair use, often slow |
-| Natural voice | Piper voices from Hugging Face; runs on your device | free download; each voice has its own license (see "About this voice" in Settings) |
+| Natural voice | Piper voices from Hugging Face; runs on your device | free download; each voice has its own license (see "About this voice" in Settings) — «Руслан» is for non-commercial use |
 | Device voices, speech recognition | built into the browser | free |
 
 If you ever make it a paid/commercial product, Open-Meteo needs a paid plan
@@ -128,9 +132,10 @@ your own — the provider interfaces make that a configuration change.
   only opened when you press it.
 - **Natural voice:** the first download is large (~93 MB, Wi-Fi recommended)
   and the first sentence after starting may take a moment on older phones.
-  Piper voices are clear and natural but not quite a studio voice; the best
-  free *online* voices are Microsoft Edge's "Natural" voices, which the app
-  picks automatically in Edge.
+  Piper voices are clear and natural but not quite a studio voice, and a
+  Russian voice may stress an unfamiliar Georgian place name wrongly; the best
+  free *online* voices are Microsoft Edge's "Natural" voices (including
+  Russian and Georgian), which the app picks automatically in Edge.
 
 ## Privacy
 

@@ -400,6 +400,14 @@
   background: var(--surface);
   box-shadow: var(--shadow-float);
 }
+/* Wide screens and landscape phones: the sheet is at the top (under the turn banner / docked at the side),
+   so the menu opens downwards — upwards it hid behind the banner or went off screen. */
+@media (min-width: 900px), (orientation: landscape) and (max-height: 520px) {
+  .speedmenu__pop {
+    top: calc(100% + 8px);
+    bottom: auto;
+  }
+}
 .speedmenu__opt {
   min-height: var(--tap);
   border-radius: var(--r-control);

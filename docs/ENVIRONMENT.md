@@ -36,6 +36,7 @@ Worker route instead (see `worker/`).
 | `VITE_PHOTON_BASE_URL` | `https://photon.komoot.io` |
 | `VITE_REPORTS_URL` | `/api/reports` (same origin — no CSP change needed) |
 | `VITE_PIPER_VOICES_URL` | `https://huggingface.co/rhasspy/piper-voices/resolve/main` (natural voice models; downloaded only when the user picks that voice) |
+| `VITE_PIPER_SAMPLES_URL` | `https://raw.githubusercontent.com/rhasspy/piper-samples/master/samples` (short recordings of those voices, played before downloading; list the host in `media-src` in `public/_headers`) |
 | `VITE_OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` |
 | `VITE_MAP_STYLE_LIGHT` / `VITE_MAP_STYLE_DARK` | OpenFreeMap Positron / Dark |
 

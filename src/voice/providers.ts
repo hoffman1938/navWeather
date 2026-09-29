@@ -1,4 +1,4 @@
-import { pickLocalVoice, pickVoice, voicesFor } from './voices';
+import { pickLocalVoice, pickVoice, voiceQuality, voicesFor } from './voices';
 
 /**
  * Speech provider contracts. Browser implementations below; a native shell
@@ -61,6 +61,11 @@ export class BrowserSpeechSynthesis implements TextToSpeechProvider {
     // Chrome/Safari fill the list asynchronously: an empty list means "not known yet", not "none".
     if (!window.speechSynthesis.getVoices().length) return true;
     return this.voices(lang).length > 0;
+  }
+
+  /** Does the device have a truly natural voice for the language (Edge "Natural", Siri, premium) usable right now? */
+  hasNaturalVoice(lang: string): boolean {
+    return this.voices(lang).some((v) => voiceQuality(v) === 'natural' && (v.localService || isOnline()));
   }
 
   speak(text: string, opts: { lang: string; onEnd: () => void; voiceURI?: string | null }): void {

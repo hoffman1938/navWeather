@@ -150,31 +150,52 @@ passing a report ──POST /api/reports/:id/vote {still|gone}──┘
 
 ```
 VoiceQueue (priorities, interruptions, expiry)
-  └─ SpeechRouter ── choice per language (Settings): auto · device:<voice> · natural
+  └─ SpeechRouter ── choice per language (Settings): auto · device:<voice> · natural:<voice id>
+       │   text spelled out for the ear first (speakable.ts): "60 км/ч" → "60 километров в час",
+       │   "12:55-ზე" → "თორმეტ საათსა და ორმოცდათხუთმეტ წუთზე", "ул." by case, "-3°" → "минус 3 градуса"
        ├─ BrowserSpeechSynthesis  voices ranked by naturalness (Natural/Neural/Enhanced/
        │                          Google > default/Desktop/eSpeak); network voices skipped
        │                          offline and repeated on a device voice if they fail
        └─ NaturalSpeech (optional, downloaded once)
-            worker: text ─▶ eSpeak NG phonemizer (WASM) ─▶ Piper voice (ONNX Runtime, WASM) ─▶ PCM
+            worker: sentences ─▶ eSpeak NG phonemizer (WASM) ─▶ Piper voice (ONNX Runtime, WASM)
+                    ─▶ joined: silences trimmed, 0.28 s between sentences, soft edges, even level
             main:   Web Audio playback · last 24 phrases cached · audio unlocked in the Start tap
 ```
 
-- Natural voices: `en_US-hfc_female`, `ru_RU-irina`, `ka_GE-natia` (medium, ~63 MB
-  each) from `rhasspy/piper-voices` on Hugging Face, stored in Cache Storage
-  (`navweather-voices-v1`, which the service worker never clears). The runtime
-  (ONNX Runtime 11 MB, phonemizer 19 MB) is served by the app and loads only
-  when the natural voice is used.
-- A sentence gets 2.5 s to synthesize; after that the device voice says it, so
+- Natural voices (medium, ~63 MB each, from `rhasspy/piper-voices` on Hugging
+  Face): en `hfc_female`; ru `ruslan` (male, trained on 31 h of a professional
+  audiobook reading — listed first) and `irina` (female); ka `natia`. Stored in
+  Cache Storage (`navweather-voices-v1`, which the service worker never
+  clears). The runtime (ONNX Runtime 11 MB, phonemizer 19 MB) is served by the
+  app and loads only when a natural voice is used.
+- Settings lists every voice of the language; picking one downloads nothing —
+  "Listen to a recording" plays the voice's official sample (~80 KB,
+  `rhasspy/piper-samples` on GitHub) and "Download" fetches it. A saved
+  `natural` from older versions means the voice it downloaded then.
+- "Auto" = the device's truly natural voice (Edge "Natural", Siri, Premium) if
+  it has one, else a downloaded natural voice, else the best device voice.
+- Text for the natural voice is also written in the voice's own script
+  (Latin names → Хашури / ხაშურთან, declined) and rephrased where eSpeak's
+  dictionary stresses a word wrongly ("с кольца" → "с круга"). eSpeak ignores
+  stress marks, so rephrasing is the only fix.
+- eSpeak NG leaks memory on every run and aborts after ~80 sentences — at once
+  after a sentence that switches language (a Latin name). The worker starts a
+  fresh phonemizer from the already-fetched files (~20 ms) every 30 sentences,
+  after a Latin word, and on any failure. Before this fix the natural voice
+  stopped after the first sentence with a Latin name and the device voice
+  spoke for the rest of the drive.
+- A phrase gets 2.5 s to synthesize; after that the device voice says it, so
   a turn instruction is never late. The voice is loaded ahead of time when it
   finishes downloading and when a drive starts.
 - Single-threaded WebAssembly (threads would need cross-origin isolation, which
   would block the map tiles). CSP: `'wasm-unsafe-eval'` (WebAssembly only, no
-  JS eval) and `connect-src` for Hugging Face.
+  JS eval), `connect-src` for Hugging Face, `media-src` for the recorded samples.
 - Licenses: ONNX Runtime Web (MIT); the piper-phonemize WebAssembly build
   (`@diffusionstudio/piper-wasm`, MIT) contains eSpeak NG and its data
   (GPL-3.0, free software); Piper voices each carry their own license in their
-  model card (linked from Settings → "About this voice"). All free to use; check
-  the voice's card before any commercial use.
+  model card (linked from Settings → "About this voice") — `ruslan` is trained
+  on a CC BY-NC-SA dataset (non-commercial use, like Open-Meteo). All free to
+  use; check the voice's card before any commercial use.
 
 ## PWA and offline
 

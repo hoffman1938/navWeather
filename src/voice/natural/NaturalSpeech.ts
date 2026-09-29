@@ -5,7 +5,6 @@ import ortMjsUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-
 import ortWasmUrl from '../../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
 import phonemizeDataUrl from '@diffusionstudio/piper-wasm/build/piper_phonemize.data?url';
 import phonemizeWasmUrl from '@diffusionstudio/piper-wasm/build/piper_phonemize.wasm?url';
-import type { Locale } from '../../i18n';
 import type { WorkerRequest, WorkerResponse } from './natural.worker';
 
 export const RUNTIME_URLS = [ortMjsUrl, ortWasmUrl, phonemizeWasmUrl, phonemizeDataUrl];
@@ -74,7 +73,7 @@ export class NaturalSpeech {
     return w;
   }
 
-  private request(msg: { type: 'load'; locale: Locale } | { type: 'synth'; locale: Locale; text: string }): Promise<NaturalAudio | null> {
+  private request(msg: { type: 'load'; voiceId: string } | { type: 'synth'; voiceId: string; text: string }): Promise<NaturalAudio | null> {
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -83,19 +82,19 @@ export class NaturalSpeech {
   }
 
   /** Load the voice ahead of time (at drive start) so the first sentence isn't late. */
-  prepare(locale: Locale): Promise<void> {
-    return this.request({ type: 'load', locale }).then(() => undefined);
+  prepare(voiceId: string): Promise<void> {
+    return this.request({ type: 'load', voiceId }).then(() => undefined);
   }
 
-  async synthesize(text: string, locale: Locale): Promise<NaturalAudio> {
-    const key = `${locale}|${text}`;
+  async synthesize(text: string, voiceId: string): Promise<NaturalAudio> {
+    const key = `${voiceId}|${text}`;
     const hit = this.recent.get(key);
     if (hit) {
       this.recent.delete(key);
       this.recent.set(key, hit);
       return hit;
     }
-    const audio = await this.request({ type: 'synth', locale, text });
+    const audio = await this.request({ type: 'synth', voiceId, text });
     if (!audio) throw new Error('No audio');
     this.recent.set(key, audio);
     if (this.recent.size > RECENT_MAX) this.recent.delete(this.recent.keys().next().value!);
