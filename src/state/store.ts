@@ -310,10 +310,11 @@ const spokenCameras = new Set<string>();
 const spokenHazards = new Set<string>();
 let voiceQueue: VoiceQueue | null = null;
 let trip: TripTracker | null = null;
-/** Reports sent from this tab (never asked "still there?" about) and ones already asked about. Memory only. */
-const ownReports = new Set<string>();
+/** Reports never to ask "still there?" about: sent from this tab, or asked once already. Memory only. */
 const askedReports = new Set<string>();
 let incidentsLoadedAt = 0;
+/** The incident load in flight (a newer one supersedes it). */
+let incidentsLoad = 0;
 let incidentsLoading = false;
 const INCIDENT_REFRESH_MS = 5 * 60_000;
 
@@ -1219,8 +1220,7 @@ export const useAppStore = create<AppState>()(
       set({ reportSending: true, reportDialogOpen: false });
       try {
         const res = await provider.report(kind, at);
-        ownReports.add(res.id);
-        askedReports.add(res.id);
+        askedReports.add(res.id); // your own report: never "still there?"
         // Show it right away; the next refresh brings it back from the relay.
         const cur = get();
         if (cur.plan) {
@@ -1305,6 +1305,7 @@ function loadIncidents(timed: PlannedRoute['timed'], signal: AbortSignal) {
   if (provider.name === 'reports' && !useSettings.getState().driverReports) return;
   incidentsLoading = true;
   incidentsLoadedAt = Date.now();
+  const load = ++incidentsLoad;
   provider
     .getIncidents(timed.route, signal)
     .then((list) => {
@@ -1322,7 +1323,7 @@ function loadIncidents(timed: PlannedRoute['timed'], signal: AbortSignal) {
       if (!isAbortError(e)) useAppStore.setState({ reportsStatus: 'unavailable' });
     })
     .finally(() => {
-      incidentsLoading = false;
+      if (load === incidentsLoad) incidentsLoading = false;
     });
 }
 
@@ -1750,7 +1751,6 @@ export function __resetStoreRuntime() {
   spokenManeuvers.clear();
   spokenCameras.clear();
   spokenHazards.clear();
-  ownReports.clear();
   askedReports.clear();
   incidentsLoadedAt = 0;
   incidentsLoading = false;
