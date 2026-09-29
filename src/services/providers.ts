@@ -17,6 +17,8 @@ import {
   type SpeechRecognitionProvider,
   type TextToSpeechProvider,
 } from '../voice/providers';
+import { NaturalSpeech, naturalSupported } from '../voice/natural/NaturalSpeech';
+import { SpeechRouter } from '../voice/speech';
 import { OSRMProvider } from './routing/OSRMProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
 import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
@@ -142,7 +144,8 @@ export function createProviders(cfg: AppConfig = config): Providers {
       minForecastHours: cfg.weather.minForecastHours,
       updateCheckMs: cfg.weather.updateCheckMinutes * 60000,
     }),
-    tts: new BrowserSpeechSynthesis(),
+    // Browser voices (the most natural one available) + the free on-device natural voice.
+    tts: new SpeechRouter(new BrowserSpeechSynthesis(), naturalSupported() ? new NaturalSpeech() : null),
     speechRecognition: new BrowserSpeechRecognition(),
   };
 }

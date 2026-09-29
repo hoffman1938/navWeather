@@ -10,6 +10,8 @@ export interface Settings {
   theme: 'auto' | 'light' | 'dark';
   /** Spoken turn-by-turn and alerts. */
   voice: boolean;
+  /** Which voice speaks each language: 'auto', 'natural' (on-device) or 'device:<voiceURI>'. */
+  voiceByLang: Partial<Record<Locale, string>>;
   alertOutput: AlertOutput;
   alertTiming: AlertTiming;
   weatherAlerts: WeatherAlertPrefs;
@@ -36,6 +38,7 @@ export function defaultSettings(): Settings {
     units: defaultUnits(),
     theme: 'auto',
     voice: true,
+    voiceByLang: {},
     alertOutput: 'both',
     alertTiming: 'auto',
     weatherAlerts: { level: 'all', types: { rain: true, snow: true, fog: true, wind: true, temperature: true } },
@@ -59,6 +62,16 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+function voiceChoices(value: unknown): Partial<Record<Locale, string>> {
+  const out: Partial<Record<Locale, string>> = {};
+  if (!value || typeof value !== 'object') return out;
+  for (const l of LOCALES) {
+    const v = (value as Record<string, unknown>)[l.id];
+    if (typeof v === 'string' && (v === 'auto' || v === 'natural' || /^device:.{1,300}$/.test(v))) out[l.id] = v;
+  }
+  return out;
+}
+
 /** Preferences only — no routes, places or positions are ever persisted. */
 export function parseSettings(raw: string | null, base = defaultSettings()): Settings {
   if (!raw) return base;
@@ -78,6 +91,7 @@ export function parseSettings(raw: string | null, base = defaultSettings()): Set
       },
       theme: oneOf(s.theme, ['auto', 'light', 'dark'] as const, base.theme),
       voice: bool(s.voice, base.voice),
+      voiceByLang: voiceChoices(s.voiceByLang),
       alertOutput: oneOf(s.alertOutput, ['both', 'visual', 'voice', 'off'] as const, base.alertOutput),
       alertTiming: oneOf(s.alertTiming, ['auto', 'early', 'standard', 'minimal'] as const, base.alertTiming),
       weatherAlerts: {

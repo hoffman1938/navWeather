@@ -52,6 +52,8 @@ export const config = {
     photon: str('VITE_PHOTON_BASE_URL', 'https://photon.komoot.io'),
     /** Driver reports relay (same origin as the app: the Worker in worker/). */
     reports: str('VITE_REPORTS_URL', '/api/reports'),
+    /** Free Piper voice models (downloaded once, on request, for the on-device natural voice). */
+    piperVoices: str('VITE_PIPER_VOICES_URL', 'https://huggingface.co/rhasspy/piper-voices/resolve/main'),
     overpass: list('VITE_OVERPASS_URLS', [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter',

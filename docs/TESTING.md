@@ -38,6 +38,7 @@ npm run test:reports  # end-to-end checks of the driver-reports relay
 | Drive extras | `state/driveExtras.test.ts` | cameras without limit warnings, loading when switched on mid-drive, never the old route's cameras after a re-route |
 | Settings, saved places | `state/settings.test.ts`, `state/savedPlaces.test.ts` | stored values validated; toggling a favourite removes that place only |
 | Messages | `i18n/messages.test.ts`, `voice/parser.test.ts` | Russian agreement, report kinds named in every language; voice "report …" commands vs. questions |
+| Voice | `voice/voices.test.ts`, `voice/providers.test.ts`, `voice/speech.test.ts`, `voice/natural/storage.test.ts` | natural voices ranked above robotic defaults (Windows/Edge/iPhone/Linux lists), offline never picks a network voice, a failed network voice is repeated on the device; router: auto/device/natural, 2.5 s deadline fallback (late audio never played), errors/no audio output/not downloaded → device voice, cancel; downloads stored only when complete |
 
 The critical path from the brief (plan → sample → ETA → weather → events →
 alerts → simulate → deviate → recalculate → stale data gone) is
@@ -72,6 +73,19 @@ and fixes: `docs/PLAN.md` §3 and §7.
   (simulated drive and real GPS), stop sharing, arrival summary.
 - Production build served by Cloudflare's runtime (`wrangler dev`): headers,
   SPA fallback, service worker offline reload.
+
+## Natural voice in the browser
+
+Real voice models can't be downloaded in the CI sandbox (Hugging Face is
+blocked there), so the browser check uses a **stand-in ONNX model with the exact
+Piper interface** (`input`, `input_lengths`, `scales` → `output`) served in
+place of Hugging Face. Everything else is real: download into Cache Storage with
+progress, the eSpeak NG phonemizer on English, Russian **and Georgian** text,
+ONNX Runtime in the worker, Web Audio playback, the Settings flow, the
+production build under the real CSP, and a simulated drive **offline** after the
+download. Not verified: how the real Piper voices sound, and synthesis speed on
+real phones (measured 26–363 ms per sentence on the stand-in on a desktop CPU;
+real voices are larger).
 
 ## Not tested (be explicit)
 

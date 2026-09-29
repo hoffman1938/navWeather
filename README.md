@@ -76,8 +76,37 @@ server, and it is deleted when you stop or the link expires.
 leaving your desk; in development a diagnostics panel adds jumps, deviation,
 simulated weather and incidents (always labelled as simulated).
 
+**Voice** — by default the app speaks with the most natural-sounding voice
+your device has (Edge "Natural" voices, Chrome "Google" voices, Apple
+"Enhanced/Premium" voices) instead of the robotic default, and repeats a
+sentence with an on-device voice if a network voice fails. For a human-like
+voice everywhere — including Georgian, which most browsers can't speak — pick
+**Settings → Voice → Natural voice**: a free, open-source neural voice
+([Piper](https://github.com/rhasspy/piper)) downloaded once (~93 MB), then made
+entirely on your device and working offline. If it is ever too slow for a turn
+instruction, the device voice says that sentence so guidance is never late.
+
 English, Georgian and Russian; metric/imperial; light/dark/automatic (day/night
 by the sun at the car while driving); installable PWA.
+
+## What it costs: nothing
+
+Every part runs on free services or free tiers, with no API keys and no card:
+
+| Part | Service | Free terms to keep in mind |
+| --- | --- | --- |
+| App + live sharing + driver reports | Cloudflare Workers **Free plan** (static assets, 2 SQLite Durable Objects, rate limits) | 100 000 Worker requests/day (static files don't count); plenty for personal use |
+| Map tiles | OpenFreeMap | free, no key |
+| Routing | OSRM public demo server | fair use, no uptime guarantee |
+| Weather, air quality, elevation | Open-Meteo | free for **non-commercial** use (≈10 000 calls/day) |
+| Search | Nominatim (1 request/s) and Photon | fair use |
+| Places, speed limits, cameras | Overpass (OpenStreetMap) | fair use, often slow |
+| Natural voice | Piper voices from Hugging Face; runs on your device | free download; each voice has its own license (see "About this voice" in Settings) |
+| Device voices, speech recognition | built into the browser | free |
+
+If you ever make it a paid/commercial product, Open-Meteo needs a paid plan
+(or self-hosting) and the public OSRM/Nominatim servers should be replaced by
+your own — the provider interfaces make that a configuration change.
 
 ## Honest limits
 
@@ -97,6 +126,11 @@ by the sun at the car while driving); installable PWA.
 - **Translations:** Georgian and Russian are drafts that need native review.
 - Chrome's speech recognition sends audio to the browser vendor; the mic is
   only opened when you press it.
+- **Natural voice:** the first download is large (~93 MB, Wi-Fi recommended)
+  and the first sentence after starting may take a moment on older phones.
+  Piper voices are clear and natural but not quite a studio voice; the best
+  free *online* voices are Microsoft Edge's "Natural" voices, which the app
+  picks automatically in Edge.
 
 ## Privacy
 
@@ -105,7 +139,10 @@ destinations (can be turned off and cleared in Settings), and — while you shar
 — the share's own link/key so you can stop it after a reload. Positions and
 routes are never stored. Live sharing sends your position only while you share.
 A driver report sends only its kind and your position at that moment; the
-relay keeps a daily-salted hash instead of your IP address.
+relay keeps a daily-salted hash instead of your IP address. The natural voice
+downloads its model once and then speaks on the device — no text is sent
+anywhere (device voices marked "needs internet" are the browser vendor's
+online voices).
 
 ## Deploy (Cloudflare, Free plan)
 

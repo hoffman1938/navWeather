@@ -8,7 +8,8 @@
  *   would amount to storing location history. Live data is labelled stale in
  *   the app instead of being served from a hidden cache.
  */
-const VERSION = 'navweather-shell-v2';
+const PREFIX = 'navweather-shell-';
+const VERSION = `${PREFIX}v3`;
 const SHELL = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -19,7 +20,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      // Only older app shells: the downloaded natural voice (navweather-voices-*) must survive updates.
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });

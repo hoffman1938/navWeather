@@ -32,6 +32,12 @@ describe('stored settings', () => {
     expect(s.fuelRangeKm).toBeNull();
   });
 
+  it('keeps valid voice choices per language and drops anything else', () => {
+    const s = parseSettings(JSON.stringify({ voiceByLang: { en: 'natural', ka: 'device:Microsoft Eka Online (Natural)', ru: 'robot', fr: 'natural' } }), base);
+    expect(s.voiceByLang).toEqual({ en: 'natural', ka: 'device:Microsoft Eka Online (Natural)' });
+    expect(parseSettings(JSON.stringify({ voiceByLang: 'natural' }), base).voiceByLang).toEqual({});
+  });
+
   it('survives missing or broken storage', () => {
     expect(parseSettings(null, base)).toEqual(base);
     expect(parseSettings('{not json', base)).toEqual(base);

@@ -309,6 +309,7 @@ const spokenManeuvers = new Set<string>();
 const spokenCameras = new Set<string>();
 const spokenHazards = new Set<string>();
 let voiceQueue: VoiceQueue | null = null;
+let voiceHintShown = false;
 let trip: TripTracker | null = null;
 /** Reports never to ask "still there?" about: sent from this tab, or asked once already. Memory only. */
 const askedReports = new Set<string>();
@@ -380,11 +381,23 @@ function newPlanTasks(): AbortSignal {
   return planTasks.signal;
 }
 
+/** Once per session: guidance is on but nothing on this device can speak the language (e.g. Georgian in Chrome). */
+function voiceHint() {
+  if (voiceHintShown || !useSettings.getState().voice) return;
+  if (getProviders().tts.canSpeak?.(currentMessages().speechLang) !== false) return;
+  voiceHintShown = true;
+  useAppStore.getState().showNotice('info', currentMessages().ui.noVoice);
+}
+
 /** The app's single voice channel (created lazily from the speech provider). */
 export function getVoiceQueue(): VoiceQueue {
   if (!voiceQueue) {
     voiceQueue = new VoiceQueue(getProviders().tts, () => currentMessages().speechLang);
     voiceQueue.setMuted(!useSettings.getState().voice);
+    // Voice guidance switched off in Settings (not only with the map button) mutes at once.
+    useSettings.subscribe((st, prev) => {
+      if (st.voice !== prev.voice) voiceQueue?.setMuted(!st.voice);
+    });
   }
   return voiceQueue;
 }
@@ -942,7 +955,10 @@ export const useAppStore = create<AppState>()(
         });
         return;
       }
-      if (!s.progress) set({ notice: null });
+      if (!s.progress) {
+        set({ notice: null });
+        voiceHint();
+      }
 
       const deviation = updateDeviation(
         s.deviation,
@@ -1060,6 +1076,7 @@ export const useAppStore = create<AppState>()(
       set({ derived: derive(get()), guidance: computeGuidance(get().derived.maneuvers, s.plan.timed, 0) });
       const m = currentMessages();
       get().say(m.voice.routeStarted(s.plan.timed.route.destination.name, spokenDuration(s.plan.timed.totalTimeS, m, false)), 3);
+      voiceHint();
       loadDriveExtras();
     },
     pauseSimulation: () => set((s) => ({ sim: { ...s.sim, playing: false } })),
@@ -1755,6 +1772,7 @@ export function __resetStoreRuntime() {
   incidentsLoadedAt = 0;
   incidentsLoading = false;
   voiceQueue = null;
+  voiceHintShown = false;
   trip = null;
   speedLimitsFor = null;
   camerasFor = null;

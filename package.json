@@ -18,7 +18,9 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "@diffusionstudio/piper-wasm": "1.0.0",
     "maplibre-gl": "^6.11.2",
+    "onnxruntime-web": "1.22.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zustand": "^5.0.15"

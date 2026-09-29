@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [react()],
   // MapLibre's worker is an ES module that imports shared chunks.
   worker: { format: 'es' },
+  // On-device natural voice (dev server only): ONNX Runtime locates its own
+  // .wasm (we pass the URL), and the phonemizer glue is CommonJS.
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
+    include: ['@diffusionstudio/piper-wasm/build/piper_phonemize.js'],
+  },
   // Live location relay: `npm run dev:api` runs the Worker locally.
   server: { proxy: { '/api': { target: 'http://127.0.0.1:8787', ws: true } } },
   preview: { proxy: { '/api': { target: 'http://127.0.0.1:8787', ws: true } } },
