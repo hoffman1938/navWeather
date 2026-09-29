@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:live": "LIVE_API_TESTS=1 vitest run src/integration/live.test.ts",
     "test:share": "node scripts/share-smoke.mjs",
+    "test:reports": "node scripts/reports-smoke.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

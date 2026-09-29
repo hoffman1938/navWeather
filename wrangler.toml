@@ -37,6 +37,13 @@ name = "REPORT_LIMITER"
 namespace_id = "1002"
 simple = { limit = 10, period = 60 }
 
+# Abuse guard for reading reports (per client IP). A route asks for up to
+# 24 boxes, every 5 minutes while driving — this leaves plenty of headroom.
+[[ratelimits]]
+name = "REPORT_LIST_LIMITER"
+namespace_id = "1003"
+simple = { limit = 120, period = 60 }
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["LiveShare"]
