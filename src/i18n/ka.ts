@@ -348,6 +348,7 @@ export const ka: Messages = {
     presetIn3h: '3 საათში',
     presetTomorrow: 'ხვალ 08:00',
     customTime: (place: string, offset: string) => `${withPostposition(place, 'is')} დრო (${offset})`,
+    departurePassed: 'გასვლის დრო გავიდა — ამინდი ნაჩვენებია ახლავე გასვლისთვის.',
     horizonHint: 'პროგნოზი დაახლოებით ორი კვირით ადრე ხელმისაწვდომია და შორეული დღეებისთვის ნაკლებად ზუსტია.',
     start: 'დაწყება',
     simulate: 'მგზავრობის სიმულაცია',

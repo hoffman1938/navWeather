@@ -324,6 +324,7 @@ export const ru: Messages = {
     presetIn3h: 'Через 3 часа',
     presetTomorrow: 'Завтра в 08:00',
     customTime: (place: string, offset: string) => `Время ${place} (${offset})`,
+    departurePassed: 'Выбранное время выезда прошло — погода показана для выезда сейчас.',
     horizonHint: 'Прогноз доступен примерно на две недели вперёд и менее точен в отдалении.',
     start: 'Поехали',
     simulate: 'Симуляция поездки',

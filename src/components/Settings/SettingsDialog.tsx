@@ -1,6 +1,6 @@
 import { LOCALES, type Locale } from '../../i18n';
 import { useMessages, useSettings, type Settings } from '../../state/settings';
-import { useAppStore } from '../../state/store';
+import { loadDriveExtras, useAppStore } from '../../state/store';
 import { useSavedPlaces } from '../../state/savedPlaces';
 import { Dialog } from '../Common/Dialog';
 import { CloseIcon } from '../Icons/Icons';
@@ -44,6 +44,8 @@ export function SettingsDialog() {
   const close = () => useAppStore.getState().setSettingsOpen(false);
   const up = (patch: Partial<Settings>) => {
     s.update(patch);
+    // Switched on mid-drive: fetch what it needs now, not on the next drive.
+    if (patch.speedWarnings || patch.speedCameras || patch.roadHazards) loadDriveExtras();
     useAppStore.getState().rederive();
   };
   const types = s.weatherAlerts.types;

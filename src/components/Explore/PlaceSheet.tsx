@@ -114,12 +114,7 @@ function SaveMenu({ place }: { place: Place }) {
   useDismiss(ref, open, () => setOpen(false));
   useSavedPlaces((s) => s.saved); // re-render on change
   const slots = useSavedPlaces.getState().slotsOf(place);
-  const toggle = (slot: SavedSlot) => {
-    const st = useSavedPlaces.getState();
-    const existing = st.saved.find((x) => x.slot === slot && st.slotsOf(place).includes(slot));
-    if (existing) st.remove(existing.id, slot);
-    else st.save(place, slot);
-  };
+  const toggle = (slot: SavedSlot) => useSavedPlaces.getState().toggle(place, slot);
   const rows: [SavedSlot, string, React.ReactNode][] = [
     ['favorite', m.explore.favorites, <StarIcon key="f" size={18} filled={slots.includes('favorite')} />],
     ['home', m.explore.home, <HomeIcon key="h" size={18} />],

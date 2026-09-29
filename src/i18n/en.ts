@@ -340,6 +340,7 @@ export const en = {
     presetIn3h: 'In 3 hours',
     presetTomorrow: 'Tomorrow 08:00',
     customTime: (place: string, offset: string) => `${place} time (${offset})`,
+    departurePassed: 'Your departure time has passed — showing the weather if you leave now.',
     horizonHint: 'Forecasts reach about two weeks ahead and get less certain further out.',
     start: 'Start',
     simulate: 'Simulate drive',

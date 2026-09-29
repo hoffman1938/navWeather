@@ -817,6 +817,13 @@ export const useAppStore = create<AppState>()(
 
     tickClock() {
       set({ clockMs: Date.now() });
+      const pre = get();
+      // A chosen departure that has long passed (tab left open) means "now" — say so once.
+      if (pre.mode === 'planning' && pre.plan && pre.departure.mode === 'at' && pre.departure.utcMs < Date.now() - 60 * 60_000) {
+        pre.setDeparture({ mode: 'now' });
+        pre.showNotice('info', currentMessages().ui.departurePassed);
+        return;
+      }
       const s = get();
       if (s.plan && (s.mode === 'planning' ? s.departure.mode === 'now' : s.mode === 'navigating')) {
         set({ derived: derive(s) });
@@ -909,8 +916,7 @@ export const useAppStore = create<AppState>()(
       });
       get().showNotice('info', currentMessages().ui.waitingForLocation, true);
       rememberDrive();
-      loadSpeedLimits();
-      loadRoadHazards();
+      loadDriveExtras();
     },
 
     handlePosition(pos) {
@@ -1053,8 +1059,7 @@ export const useAppStore = create<AppState>()(
       set({ derived: derive(get()), guidance: computeGuidance(get().derived.maneuvers, s.plan.timed, 0) });
       const m = currentMessages();
       get().say(m.voice.routeStarted(s.plan.timed.route.destination.name, spokenDuration(s.plan.timed.totalTimeS, m, false)), 3);
-      loadSpeedLimits();
-      loadRoadHazards();
+      loadDriveExtras();
     },
     pauseSimulation: () => set((s) => ({ sim: { ...s.sim, playing: false } })),
     resumeSimulation: () => {
@@ -1322,6 +1327,38 @@ function loadIncidents(timed: PlannedRoute['timed'], signal: AbortSignal) {
 }
 
 let speedLimitsFor: PlannedRoute['timed'] | null = null;
+let camerasFor: PlannedRoute['timed'] | null = null;
+
+/**
+ * What a drive needs from OpenStreetMap beyond the route: speed limits,
+ * cameras (if enabled) and road hazards — once per route, when a drive
+ * starts or when one of them is switched on mid-drive.
+ */
+export function loadDriveExtras() {
+  if (useAppStore.getState().mode === 'planning') return;
+  loadSpeedLimits();
+  loadSpeedCameras();
+  loadRoadHazards();
+}
+
+/** Mapped speed cameras (only when enabled — not legal everywhere). */
+function loadSpeedCameras() {
+  const provider = getProviders().speedLimits;
+  const timed = useAppStore.getState().plan?.timed;
+  if (!provider?.getSpeedCameras || !timed || !useSettings.getState().speedCameras || camerasFor === timed) return;
+  camerasFor = timed;
+  const signal = planTasks?.signal ?? newPlanTasks();
+  provider
+    .getSpeedCameras(timed.route.geometry, signal)
+    .then((cams) => {
+      if (signal.aborted || useAppStore.getState().plan?.timed !== timed) return;
+      useAppStore.setState({ speedCameras: snapCamerasToRoute(cams, timed) });
+      useAppStore.getState().rederive();
+    })
+    .catch(() => {
+      if (camerasFor === timed) camerasFor = null;
+    });
+}
 
 /**
  * OSM speed limits, fetched once per route and only when a drive starts
@@ -1334,16 +1371,6 @@ function loadSpeedLimits() {
   if (!provider || !timed || !useSettings.getState().speedWarnings || speedLimitsFor === timed) return;
   speedLimitsFor = timed;
   const signal = planTasks?.signal ?? newPlanTasks();
-  if (useSettings.getState().speedCameras && provider.getSpeedCameras) {
-    provider
-      .getSpeedCameras(timed.route.geometry, signal)
-      .then((cams) => {
-        if (signal.aborted || useAppStore.getState().plan?.timed !== timed) return;
-        useAppStore.setState({ speedCameras: snapCamerasToRoute(cams, timed) });
-        useAppStore.getState().rederive();
-      })
-      .catch(() => undefined);
-  }
   provider
     .getSpeedLimits(timed.route.geometry, signal)
     .then((ways) => {
@@ -1655,8 +1682,7 @@ async function adoptRoute(plan: PlannedRoute, coordinate: LngLat, headingDeg: nu
   store.setState({ derived: derive(store.getState()) });
   startPlanTasks(plan);
   rememberDrive();
-  loadSpeedLimits();
-  loadRoadHazards();
+  loadDriveExtras();
   store.getState().showNotice('success', m.ui.routeUpdated);
   store.getState().say(m.voice.rerouted, 3);
   await store.getState().loadWeather({ reason: 'recalculation' });
@@ -1731,6 +1757,7 @@ export function __resetStoreRuntime() {
   voiceQueue = null;
   trip = null;
   speedLimitsFor = null;
+  camerasFor = null;
   hazardsFor = null;
   lastDeriveAt = 0;
   lastDeriveSimMs = 0;
