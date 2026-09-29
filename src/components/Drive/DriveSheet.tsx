@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useDismiss } from '../../hooks/useDismiss';
 import { config } from '../../config';
 import { formatDistance, formatDuration } from '../../i18n/format';
 import { useMessages, useSettings } from '../../state/settings';
@@ -17,12 +18,13 @@ import './Drive.css';
 
 /** Driving: ETA bar + the next important thing; "Ahead" when pulled up. */
 export function DriveSheet() {
+  const m = useMessages();
   const sheet = useAppStore((s) => s.sheet);
   return (
     <BottomSheet
       state={sheet}
       onChange={(v) => useAppStore.getState().setSheet(v)}
-      label="Navigation"
+      label={m.ui.navigation}
       header={<EtaBar />}
       body={<AheadList />}
       extra={
@@ -119,17 +121,7 @@ function SpeedMenu() {
   const speed = useAppStore((s) => s.sim.speed);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [open]);
+  useDismiss(ref, open, () => setOpen(false));
   return (
     <div className="speedmenu" ref={ref}>
       <button className="roundbtn tabular" aria-haspopup="menu" aria-expanded={open} aria-label={m.ui.speed(speed)} onClick={() => setOpen((o) => !o)}>

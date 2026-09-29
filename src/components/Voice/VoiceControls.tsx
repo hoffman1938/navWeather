@@ -7,6 +7,7 @@ import { useLiveShare } from '../../share/liveShare';
 import { LiveIcon, MicIcon, SpeakerIcon } from '../Icons/Icons';
 import { LocateButton } from '../Map/LocateButton';
 import { LayersButton } from '../Map/WeatherLayerControls';
+import { ReportButton } from '../Drive/Reports';
 import './Voice.css';
 
 /**
@@ -80,6 +81,7 @@ export function VoiceControls() {
       ) : null}
       {!driving ? <LayersButton /> : null}
       {!driving ? <LocateButton /> : null}
+      <ReportButton />
       <button
         className={`fab${sharing ? ' fab--on' : ''}`}
         onClick={() => useLiveShare.getState().openDialog()}

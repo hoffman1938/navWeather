@@ -114,3 +114,20 @@
 .set-clear {
   margin-left: -12px;
 }
+/* Title + close, kept in view while the long list scrolls. */
+.set-head {
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -20px -20px 8px;
+  padding: 14px 12px 10px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.set-head h2 {
+  margin: 0;
+}

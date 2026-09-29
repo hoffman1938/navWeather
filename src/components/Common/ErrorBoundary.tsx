@@ -13,6 +13,7 @@ export class ErrorBoundary extends Component<{ fallback: ReactNode; children: Re
   }
 
   componentDidCatch(error: unknown) {
+    if (import.meta.env.DEV) console.error('[navWeather]', error);
     const msg = String((error as Error)?.message ?? error);
     if (/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(msg)) {
       try {

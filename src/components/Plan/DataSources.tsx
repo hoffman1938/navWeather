@@ -1,6 +1,6 @@
 import { formatAgo } from '../../i18n/format';
 import { getProviders } from '../../services/providers';
-import { useMessages } from '../../state/settings';
+import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { deviceTimeZone, formatLocalTime } from '../../utils/timezone';
 
@@ -19,7 +19,10 @@ export function DataSources() {
   const simulated = useAppStore((s) => s.simulatedData);
   const driving = useAppStore((s) => s.mode !== 'planning');
   const speedLoaded = useAppStore((s) => s.speedLimits !== null);
+  const reportsStatus = useAppStore((s) => s.reportsStatus);
+  const reportsOn = useSettings((s) => s.driverReports);
   const p = getProviders();
+  const reports = p.incidents.name === 'reports';
   const old = weatherUpdatedAt !== null && Date.now() - weatherUpdatedAt > 60 * 60_000;
   const weatherStatus: Status = simulated ? 'simulated' : stale || !online || old ? 'stale' : weatherUpdatedAt ? 'forecast' : 'unavailable';
   const rows: [string, Status, string][] = [
@@ -32,7 +35,9 @@ export function DataSources() {
     ],
     [D.eta, 'estimated', D.etaDetail],
     [D.traffic, p.traffic.name === 'none' ? 'unavailable' : 'forecast', p.traffic.name === 'none' ? D.noProvider : p.traffic.name],
-    [D.incidents, p.incidents.name === 'none' ? 'unavailable' : 'forecast', p.incidents.name === 'none' ? D.noProvider : p.incidents.name],
+    reports
+      ? [D.incidents, reportsOn && reportsStatus !== 'unavailable' ? 'community' : 'unavailable', !reportsOn ? D.reportsOff : reportsStatus === 'unavailable' ? D.reportsDown : D.reports]
+      : [D.incidents, p.incidents.name === 'none' ? 'unavailable' : 'forecast', p.incidents.name === 'none' ? D.noProvider : p.incidents.name],
     [D.speed, p.speedLimits ? 'community' : 'unavailable', p.speedLimits ? (speedLoaded || !driving ? D.osm : D.loading) : D.noProvider],
   ];
   return (

@@ -82,6 +82,9 @@ export async function answer(text: string): Promise<string> {
       const incident = s.derived.intelligence.events.find((e) => e.category === 'incident');
       return incident ? incident.voiceMessage : A.trafficUnavailable;
     }
+    case 'report':
+      // Hands-free reporting: the same checks as the button (real drives only, online, position known).
+      return (await s.reportIncident(intent.kind, { notify: false })).message;
     case 'avoid':
       // The demo OSRM server rejects every exclude flag; a provider that
       // declares `capabilities.avoid` can be wired to re-route here.

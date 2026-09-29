@@ -270,12 +270,13 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
           category: 'incident',
           severity: inc.severity,
           title: what,
-          shortMessage: inc.verified ? inc.source : m.alert.unconfirmed,
+          shortMessage: inc.verified ? inc.source : inc.confirmations ? m.alert.reportConfirmed(inc.confirmations) : m.alert.unconfirmed,
           voiceMessage: m.alert.voice.incident(what, spokenDuration(minutes * 60, m), !inc.verified),
           icon: 'incident',
           source: inc.source,
-          // Unconfirmed reports rank lower and are gated by the alert engine's confidence threshold.
-          confidence: inc.verified ? 0.9 : 0.55,
+          // Unconfirmed reports rank lower (a little higher once other drivers confirm them)
+          // and are gated by the alert engine's confidence threshold.
+          confidence: inc.verified ? 0.9 : 0.55 + Math.min(0.2, 0.05 * (inc.confirmations ?? 0)),
         },
         timed,
         inc.distanceAlongM,

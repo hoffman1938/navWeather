@@ -3,6 +3,8 @@ import { useMessages, useSettings, type Settings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { useSavedPlaces } from '../../state/savedPlaces';
 import { Dialog } from '../Common/Dialog';
+import { CloseIcon } from '../Icons/Icons';
+import { getProviders } from '../../services/providers';
 import './Settings.css';
 
 function Select<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange(v: T): void }) {
@@ -49,7 +51,12 @@ export function SettingsDialog() {
 
   return (
     <Dialog label={S.title} onClose={close} size="large">
-      <h2>{S.title}</h2>
+      <div className="set-head">
+        <h2>{S.title}</h2>
+        <button className="icon-btn" onClick={close} aria-label={m.ui.close}>
+          <CloseIcon size={20} />
+        </button>
+      </div>
       <div className="set-group">
         <Select<Locale> label={S.language} value={s.language} options={LOCALES.map((l) => [l.id, l.name])} onChange={(language) => up({ language })} />
         <Select
@@ -141,6 +148,21 @@ export function SettingsDialog() {
         <Switch label={S.breakReminders} checked={s.breakReminders} onChange={(breakReminders) => up({ breakReminders })} hint={S.breakRemindersHint} />
         <Switch label={S.roadHazards} checked={s.roadHazards} onChange={(roadHazards) => up({ roadHazards })} hint={S.roadHazardsHint} />
         <Switch label={S.speedCameras} checked={s.speedCameras} onChange={(speedCameras) => up({ speedCameras })} hint={S.speedCamerasHint} />
+        {getProviders().incidents.name === 'reports' ? (
+          <Switch
+            label={S.driverReports}
+            checked={s.driverReports}
+            onChange={(driverReports) => {
+              up({ driverReports });
+              const app = useAppStore.getState();
+              // Off: forget the reports on screen now; on: fetch them for the current route.
+              if (!driverReports) useAppStore.setState({ incidents: app.incidents.filter((i) => !i.reportId), reportPrompt: null, reportDialogOpen: false });
+              else app.refreshIncidents();
+              useAppStore.getState().rederive();
+            }}
+            hint={S.driverReportsHint}
+          />
+        ) : null}
         <Switch label={S.batterySaver} checked={s.batterySaver} onChange={(batterySaver) => up({ batterySaver })} hint={S.batterySaverHint} />
         <Select
           label={S.vehicle}

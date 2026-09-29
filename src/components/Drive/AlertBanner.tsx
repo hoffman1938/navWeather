@@ -34,7 +34,7 @@ export function AlertBanner() {
           {alert.message ? ` · ${alert.message}` : ''}
         </span>
       </p>
-      {severe ? <span className="sr-only">{alert.severity}</span> : null}
+      {severe ? <span className="sr-only">{m.alert.level[alert.severity]}</span> : null}
       <button className="icon-btn" onClick={() => useAppStore.getState().dismissAlert()} aria-label={m.ui.close}>
         <CloseIcon size={18} />
       </button>

@@ -57,3 +57,40 @@ describe('route and safety commands', () => {
     expect(parseCommand('Где ближайшая больница?')).toMatchObject({ type: 'find_poi', category: 'hospital' });
   });
 });
+
+describe('driver reports by voice', () => {
+  it.each([
+    ['Report an accident', 'accident'],
+    ['report a crash', 'accident'],
+    ['Report road works', 'roadworks'],
+    ['report construction', 'roadworks'],
+    ['Report the road is closed', 'closure'],
+    ['Report ice on the road', 'weather'],
+    ['Report fog', 'weather'],
+    ['Report a hazard', 'hazard'],
+    ['report a pothole', 'hazard'],
+    ['I want to report an accident', 'accident'],
+    ['Сообщи о ДТП', 'accident'],
+    ['Сообщить о гололёде', 'weather'],
+    ['Отметь ремонт дороги', 'roadworks'],
+    ['Сообщи, что дорога перекрыта', 'closure'],
+    ['Сообщи о яме на дороге', 'hazard'],
+    ['შეატყობინე ავარია', 'accident'],
+    ['შეატყობინე ნისლი', 'weather'],
+  ])('%s', (text, kind) => {
+    expect(parseCommand(text)).toEqual({ type: 'report', kind });
+  });
+
+  it('keeps questions about reports as questions', () => {
+    expect(parseCommand('Any accident reports ahead?').type).not.toBe('report');
+    expect(parseCommand('Is there an accident ahead?').type).toBe('traffic');
+    expect(parseCommand('Есть сообщения о ДТП?').type).not.toBe('report');
+    // Russian word pieces must not trigger a report ("следующий" contains "лед", "прямая" contains "яма").
+    expect(parseCommand('Сообщи следующий поворот').type).not.toBe('report');
+    expect(parseCommand('Сообщи, дорога прямая').type).not.toBe('report');
+  });
+
+  it('a report without a recognisable kind is not guessed', () => {
+    expect(parseCommand('Report something').type).toBe('unknown');
+  });
+});

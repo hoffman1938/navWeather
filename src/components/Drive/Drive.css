@@ -537,3 +537,81 @@
   font-size: 14px;
   line-height: 1.3;
 }
+
+/* ---- Driver reports ---- */
+.fab--report {
+  color: var(--sev-high);
+}
+.report__sim {
+  padding: 8px 12px;
+  border-radius: var(--r-control);
+  background: var(--sev-high-soft);
+  color: var(--text);
+}
+.report__kinds {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 420px) {
+  .report__kinds {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.report__kind {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+}
+.report__kind:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.report__kind:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.report__kind--accident,
+.report__kind--closure {
+  color: var(--sev-critical);
+}
+.report__kind--hazard,
+.report__kind--roadworks {
+  color: var(--sev-high);
+}
+.report__kind--weather {
+  color: var(--rain);
+}
+.report__kindText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text);
+}
+.report__kindText strong {
+  font-size: 16px;
+}
+.report__kindText small {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.dialog p.report__note {
+  font-size: 13px;
+}
+.report-prompt {
+  border-left-color: var(--accent);
+}
+.report-prompt .reroute__text {
+  flex: 1;
+}
+.report-prompt__close {
+  margin: -6px -6px 0 0;
+}

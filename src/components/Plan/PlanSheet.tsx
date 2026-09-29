@@ -192,7 +192,10 @@ function WeatherHeadline() {
 function HeadsUp() {
   const m = useMessages();
   const events = useAppStore((s) => s.derived.intelligence.events);
-  const notable = events.filter((e) => (e.category === 'weather' && e.severity !== 'low') || e.type === 'TIMEZONE_CHANGE').slice(0, 6);
+  // Weather worth knowing, clock changes, and reports on the road (a closure matters before you leave).
+  const notable = events
+    .filter((e) => (e.category === 'weather' && e.severity !== 'low') || e.type === 'TIMEZONE_CHANGE' || e.category === 'incident')
+    .slice(0, 6);
   if (!notable.length) return null;
   return (
     <section>

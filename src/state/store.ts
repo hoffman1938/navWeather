@@ -22,6 +22,9 @@ import {
 import { dueManeuverPrompt, markSpoken, spokenPrompt } from '../navigation/instructions';
 import { computeGuidance, type Guidance } from '../navigation/maneuvers';
 import { isAbortError, mapWithConcurrency } from '../services/http';
+import type { IncidentKind } from '../services/traffic/IncidentProvider';
+import { reportFailure, reportToIncident } from '../services/traffic/ReportsIncidentProvider';
+import type { ReportKind, Vote } from '../reports/protocol';
 import { locateOnce, LocationError } from '../services/location';
 import type { PoiCategory } from '../services/places/PoiProvider';
 import { searchAlongRoute, type PoiResult } from '../services/placesAlongRoute';
@@ -85,6 +88,13 @@ export interface NavPrompt {
   headingDeg?: number;
 }
 
+/** "Still there?" for another driver's report the car just passed. */
+export interface ReportPrompt {
+  incidentId: string;
+  reportId: string;
+  kind: IncidentKind;
+}
+
 export interface PoiSearchState {
   category: PoiCategory;
   status: 'loading' | 'ready' | 'error';
@@ -143,6 +153,11 @@ export interface AppState {
   speedLimits: SpeedLimitProfile | null;
   /** Incidents on the current route (empty without an incident provider). */
   incidents: RouteIncident[];
+  /** Driver reports relay: reachable (`ready`) or not, for the data-sources panel. */
+  reportsStatus: 'idle' | 'ready' | 'unavailable';
+  reportDialogOpen: boolean;
+  reportSending: boolean;
+  reportPrompt: ReportPrompt | null;
   /** Mapped speed cameras on the route (only when enabled in Settings). */
   speedCameras: RouteCamera[];
   /** Sharp curves + railway crossings on the route being driven. */
@@ -242,6 +257,13 @@ export interface AppState {
   addStop(place: Place): Promise<void>;
 
   dismissArrival(): void;
+  /** Driver reports: re-fetch the ones on the route (every few minutes while driving). */
+  refreshIncidents(): void;
+  setReportDialogOpen(open: boolean): void;
+  /** Report what's on the road at the car's position (real drives only). `notify: false` → caller shows the result. */
+  reportIncident(kind: ReportKind, opts?: { notify?: boolean }): Promise<{ ok: boolean; message: string }>;
+  /** Answer (or, with null, dismiss) the "still there?" prompt. */
+  answerReportPrompt(vote: Vote | null): void;
   acceptWeatherReroute(): Promise<void>;
   dismissWeatherReroute(): void;
   /** Re-plan: from the vehicle while driving, else the current request. */
@@ -288,6 +310,12 @@ const spokenCameras = new Set<string>();
 const spokenHazards = new Set<string>();
 let voiceQueue: VoiceQueue | null = null;
 let trip: TripTracker | null = null;
+/** Reports sent from this tab (never asked "still there?" about) and ones already asked about. Memory only. */
+const ownReports = new Set<string>();
+const askedReports = new Set<string>();
+let incidentsLoadedAt = 0;
+let incidentsLoading = false;
+const INCIDENT_REFRESH_MS = 5 * 60_000;
 
 function startTrip(plannedDurationS: number, startedAt: number, simulated: boolean) {
   trip = {
@@ -436,6 +464,10 @@ export const useAppStore = create<AppState>()(
     selectedOption: 0,
     speedLimits: null,
     incidents: [],
+    reportsStatus: 'idle',
+    reportDialogOpen: false,
+    reportSending: false,
+    reportPrompt: null,
     speedCameras: [],
     roadHazards: [],
     forecasts: new Map(),
@@ -535,8 +567,8 @@ export const useAppStore = create<AppState>()(
         tracker = null;
         namingAttempted.clear();
         spokenManeuvers.clear();
-    spokenCameras.clear();
-    spokenHazards.clear();
+        spokenCameras.clear();
+        spokenHazards.clear();
         set({
           plan: primary,
           routeOptions: [primary, ...alternatives],
@@ -554,6 +586,7 @@ export const useAppStore = create<AppState>()(
           alertState: initialDriverAlertState,
           activeAlert: null,
           weatherReroute: null,
+          reportPrompt: null,
           derived: emptyDerived,
           sheet: 'default',
         });
@@ -616,6 +649,11 @@ export const useAppStore = create<AppState>()(
         routeOptions: [],
         selectedOption: 0,
         speedLimits: null,
+        incidents: [],
+        speedCameras: [],
+        roadHazards: [],
+        reportPrompt: null,
+        reportDialogOpen: false,
         simulatedData: false,
         routeStatus: 'idle',
         routeError: null,
@@ -846,8 +884,8 @@ export const useAppStore = create<AppState>()(
       if (!s.plan) return;
       tracker = createProgressTracker(s.plan.timed);
       spokenManeuvers.clear();
-    spokenCameras.clear();
-    spokenHazards.clear();
+      spokenCameras.clear();
+      spokenHazards.clear();
       // The route was just chosen with its weather in view: first weather re-route check in ~10 min.
       rerouteCheckedAt = Date.now();
       rerouteQuietUntil = 0;
@@ -932,7 +970,6 @@ export const useAppStore = create<AppState>()(
         get().stopNavigation(); // clears the voice queue — announce after it
         get().say(m.voice.arrived(st.plan!.timed.route.destination.name), 1);
         set({ arrival: summary, sheet: 'default', activeAlert: null, weatherReroute: null });
-        if (get().mode === 'navigating') clearDriveSession();
       }
     },
 
@@ -974,6 +1011,8 @@ export const useAppStore = create<AppState>()(
         clockMs: Date.now(),
         activeAlert: null,
         weatherReroute: null,
+        reportPrompt: null,
+        reportDialogOpen: false,
         speeding: { speeding: false, since: null },
         notice: get().notice?.persistent ? null : get().notice,
       });
@@ -987,8 +1026,8 @@ export const useAppStore = create<AppState>()(
       getVoiceQueue();
       getProviders().tts.unlock();
       spokenManeuvers.clear();
-    spokenCameras.clear();
-    spokenHazards.clear();
+      spokenCameras.clear();
+      spokenHazards.clear();
       const startMs = departureMsOf({ ...s, clockMs: Date.now() });
       const first = advanceSimulation(s.plan.timed, { nowMs: startMs, modelTimeS: 0 }, startMs, 0, 1);
       // The route was just chosen with its weather in view: first weather re-route check in ~10 min.
@@ -1039,8 +1078,7 @@ export const useAppStore = create<AppState>()(
       onProgress(vehicle, simProgress(s.plan.timed, step), speedMps, false);
       if (step.arrived) {
         const summary = finishTrip(get(), step.nowMs);
-        set({ arrival: summary, sheet: 'default', activeAlert: null, weatherReroute: null });
-        if (get().mode === 'navigating') clearDriveSession();
+        set({ arrival: summary, sheet: 'default', activeAlert: null, weatherReroute: null, reportPrompt: null, reportDialogOpen: false });
       }
     },
 
@@ -1070,6 +1108,7 @@ export const useAppStore = create<AppState>()(
         followVehicle: true,
         activeAlert: null,
         weatherReroute: null,
+        reportDialogOpen: false,
       });
       set({ derived: derive(get()) });
     },
@@ -1147,6 +1186,72 @@ export const useAppStore = create<AppState>()(
       get().clearRoute();
     },
 
+    // ---------------- Driver reports ----------------
+    refreshIncidents() {
+      const s = get();
+      if (!s.plan || !s.online) return;
+      incidentsLoadedAt = Date.now(); // also paces retries after a failure
+      loadIncidents(s.plan.timed, planTasks && !planTasks.signal.aborted ? planTasks.signal : newPlanTasks());
+    },
+    setReportDialogOpen: (reportDialogOpen) => set({ reportDialogOpen }),
+
+    async reportIncident(kind, { notify = true } = {}) {
+      const s = get();
+      const m = currentMessages();
+      const provider = getProviders().incidents;
+      const done = (ok: boolean, message: string, tone: Notice['kind']) => {
+        if (notify) get().showNotice(tone, message);
+        return { ok, message };
+      };
+      if (!provider.report) return done(false, m.reports.unavailable, 'warning');
+      // Only what a driver sees on a real road: never from a simulation or a planning screen.
+      if (s.mode === 'simulating') return done(false, m.reports.simulated, 'info');
+      if (s.mode !== 'navigating') return done(false, m.assistant.reportNeedsDrive, 'info');
+      if (!s.vehicle || !s.progress) return done(false, m.reports.noPosition, 'info');
+      if (!s.online) return done(false, m.reports.offline, 'warning');
+      if (s.reportSending) return { ok: false, message: m.reports.sending };
+      const at = s.vehicle.coordinate;
+      set({ reportSending: true, reportDialogOpen: false });
+      try {
+        const res = await provider.report(kind, at);
+        ownReports.add(res.id);
+        askedReports.add(res.id);
+        // Show it right away; the next refresh brings it back from the relay.
+        const cur = get();
+        if (cur.plan) {
+          const now = Date.now();
+          const [inc] = snapIncidentsToRoute(
+            [reportToIncident({ id: res.id, kind, lat: at[1], lon: at[0], createdAt: now, expiresAt: res.expiresAt, confirms: 0, denies: 0 }, 0)],
+            cur.plan.timed,
+          );
+          if (inc && !cur.incidents.some((i) => i.id === inc.id)) {
+            set({ incidents: [...cur.incidents, inc].sort((a, b) => a.distanceAlongM - b.distanceAlongM) });
+            get().rederive();
+          }
+        }
+        return done(true, m.reports.sent(m.reports.kinds[kind]), 'success');
+      } catch (e) {
+        const f = reportFailure(e);
+        return done(false, f === 'offline' ? m.reports.offline : f === 'busy' ? m.reports.busy : m.reports.unavailable, 'warning');
+      } finally {
+        set({ reportSending: false });
+      }
+    },
+
+    answerReportPrompt(vote) {
+      const p = get().reportPrompt;
+      set({ reportPrompt: null });
+      const provider = getProviders().incidents;
+      if (!p || !vote || !provider.vote) return;
+      if (vote === 'gone') {
+        set({ incidents: get().incidents.filter((i) => i.id !== p.incidentId) });
+        get().rederive();
+      }
+      get().showNotice('success', currentMessages().reports.thanks);
+      // Best effort: already voted, taken down meanwhile or offline all need nothing more.
+      provider.vote(p.reportId, vote).catch(() => undefined);
+    },
+
     // ---------------- Voice ----------------
     setAssistant: (patch) => set((s) => ({ assistant: { ...s.assistant, ...patch } })),
     say(text, priority = 3) {
@@ -1172,18 +1277,9 @@ function replacePlan(next: PlannedRoute) {
 /** Background work for a route: late place names, incidents (and, on drive start, OSM speed limits). */
 function startPlanTasks(plan: PlannedRoute, keepSignal = false) {
   const signal = keepSignal && planTasks && !planTasks.signal.aborted ? planTasks.signal : newPlanTasks();
-  useAppStore.setState({ incidents: [] });
-  const incidents = getProviders().incidents;
-  if (incidents.name !== 'none') {
-    incidents
-      .getIncidents(plan.timed.route, signal)
-      .then((list) => {
-        if (signal.aborted || useAppStore.getState().plan?.timed !== plan.timed) return;
-        useAppStore.setState({ incidents: snapIncidentsToRoute(list, plan.timed) });
-        useAppStore.getState().rederive();
-      })
-      .catch(() => undefined); // incidents are optional; the route works without them
-  }
+  useAppStore.setState({ incidents: [], reportPrompt: null });
+  incidentsLoading = false;
+  loadIncidents(plan.timed, signal);
   if (plan.latePlaces) {
     void plan.latePlaces.then((places) => {
       const cur = useAppStore.getState().plan;
@@ -1192,6 +1288,37 @@ function startPlanTasks(plan: PlannedRoute, keepSignal = false) {
       useAppStore.getState().rederive();
     });
   }
+}
+
+/**
+ * Incidents on the route (driver reports by default). Optional: the route
+ * works without them, and a failure only marks the source unavailable.
+ */
+function loadIncidents(timed: PlannedRoute['timed'], signal: AbortSignal) {
+  const provider = getProviders().incidents;
+  if (provider.name === 'none' || incidentsLoading) return;
+  if (provider.name === 'reports' && !useSettings.getState().driverReports) return;
+  incidentsLoading = true;
+  incidentsLoadedAt = Date.now();
+  provider
+    .getIncidents(timed.route, signal)
+    .then((list) => {
+      if (signal.aborted || useAppStore.getState().plan?.timed !== timed) return;
+      // Dev-tools test incidents stay until the route changes.
+      const simulated = useAppStore.getState().incidents.filter((i) => i.source === 'Simulation');
+      const snapped = snapIncidentsToRoute(list, timed);
+      useAppStore.setState({
+        incidents: [...snapped, ...simulated].sort((a, b) => a.distanceAlongM - b.distanceAlongM),
+        reportsStatus: 'ready',
+      });
+      useAppStore.getState().rederive();
+    })
+    .catch((e) => {
+      if (!isAbortError(e)) useAppStore.setState({ reportsStatus: 'unavailable' });
+    })
+    .finally(() => {
+      incidentsLoading = false;
+    });
 }
 
 let speedLimitsFor: PlannedRoute['timed'] | null = null;
@@ -1359,6 +1486,21 @@ function onProgress(vehicle: VehicleState, progress: RouteProgress, speedMps: nu
   // 3d. An offered weather re-route goes stale once the car has driven on.
   if (s.weatherReroute && progress.distanceAlongM - s.weatherReroute.atProgressM > 1500) store.setState({ weatherReroute: null });
 
+  // 3e. Driver reports: fresh ones every few minutes; "still there?" just after
+  //     passing someone else's report (real drives only — a simulation saw nothing).
+  if (s.online && Date.now() - incidentsLoadedAt > INCIDENT_REFRESH_MS) s.refreshIncidents();
+  if (live && settings.driverReports && !s.reportPrompt && s.incidents.length) {
+    const passed = s.incidents.find((inc) => {
+      if (!inc.reportId || askedReports.has(inc.reportId)) return false;
+      const behind = progress.distanceAlongM - inc.distanceAlongM;
+      return behind >= 30 && behind <= 400;
+    });
+    if (passed?.reportId) {
+      askedReports.add(passed.reportId);
+      store.setState({ reportPrompt: { incidentId: passed.id, reportId: passed.reportId, kind: passed.kind } });
+    }
+  }
+
   // 4. Weather + route events: throttled (≤1/s real time, or every 30 s of simulated time).
   const due = performance.now() - lastDeriveAt > 1000 || progress.nowMs - lastDeriveSimMs >= 30_000;
   if (!due) return;
@@ -1494,6 +1636,10 @@ async function adoptRoute(plan: PlannedRoute, coordinate: LngLat, headingDeg: nu
     routeOptions: [plan],
     selectedOption: 0,
     speedLimits: null,
+    // Positions on the old route mean nothing on the new one (they are reloaded below).
+    speedCameras: [],
+    roadHazards: [],
+    reportPrompt: null,
     navStartedMs: now,
     progress,
     ...(simulating ? { sim: { ...cur.sim, modelTimeS: 0, startMs: now, arrived: false }, vehicle: { coordinate: start, headingDeg, timestampMs: now } } : {}),
@@ -1576,8 +1722,12 @@ export function __resetStoreRuntime() {
   tracker = null;
   namingAttempted.clear();
   spokenManeuvers.clear();
-    spokenCameras.clear();
-    spokenHazards.clear();
+  spokenCameras.clear();
+  spokenHazards.clear();
+  ownReports.clear();
+  askedReports.clear();
+  incidentsLoadedAt = 0;
+  incidentsLoading = false;
   voiceQueue = null;
   trip = null;
   speedLimitsFor = null;

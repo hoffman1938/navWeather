@@ -1,3 +1,4 @@
+import type { ReportKind } from '../reports/protocol';
 import type { PoiCategory } from '../services/places/PoiProvider';
 
 export type Intent =
@@ -17,6 +18,7 @@ export type Intent =
   | { type: 'mute' }
   | { type: 'unmute' }
   | { type: 'repeat' }
+  | { type: 'report'; kind: ReportKind }
   | { type: 'unknown'; text: string };
 
 export interface ParseContext {
@@ -82,6 +84,24 @@ export function parseCommand(utterance: string, ctx: ParseContext = {}): Intent 
     /\b(stop|end|cancel|exit|finish)\b.*\b(navigation|navigating|route|guidance|trip)\b|^(stop|stop it)$|останови навигацию|заверши маршрут|ნავიგაცი.*შეწყვიტე|შეწყვიტე ნავიგაცია/.test(t)
   ) {
     return { type: 'stop_navigation' };
+  }
+
+  // Driver reports ("Report an accident") — before "traffic", which also knows the word "accident".
+  // Only commands: "any accident reports?" / "есть сообщения о ДТП?" stay questions.
+  const reportVerb = /^(please )?(report|flag|mark)\b|\b(i want to|let me|i'd like to|can you) (report|flag)\b|(?<![а-яё])(сообщи|сообщить|отметь|отметить)(?![а-яё])|შეატყობინე|მონიშნე/;
+  if (reportVerb.test(t) && !/\?$/.test(utterance.trim())) {
+    const kind: ReportKind | null = /\b(accident|crash|collision|wreck)\b|(?<![а-яё])(дтп|авари[яиюей])|ავარი/.test(t)
+      ? 'accident'
+      : /\b(clos(ed|ure)|blocked)\b|перекрыт|закрыт|დაკეტ|ჩაკეტ/.test(t)
+        ? 'closure'
+        : /\b(road ?works?|construction)\b|(?<![а-яё])ремонт|дорожн[а-яё]* работ|სამუშაო|შეკეთებ/.test(t)
+          ? 'roadworks'
+          : /\b(ice|icy|flood\w*|fog|snow\w*)\b|гололё?д|(?<![а-яё])(лё?д|туман|подтоп[а-яё]*|снег)|ყინ|ნისლ|დატბორ|თოვლ/.test(t)
+            ? 'weather'
+            : /\b(hazard|danger\w*|object|debris|obstacle|pothole|animal)\b|опасн|препятстви|(?<![а-яё])(предмет|ям[аеуы]|животн)|საფრთხ|დაბრკოლ|ორმო|ცხოველ/.test(t)
+              ? 'hazard'
+              : null;
+    if (kind) return { type: 'report', kind };
   }
 
   // Route changes

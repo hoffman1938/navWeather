@@ -22,6 +22,8 @@ interface Props {
   autoFocus?: boolean;
   /** Offer saved places and recent destinations while the field is empty. */
   quick?: boolean;
+  /** A lookup for the typed text is running (shows the spinner, announces it). */
+  busy?: boolean;
 }
 
 /** Autocomplete input following the WAI-ARIA combobox pattern. */
@@ -147,7 +149,12 @@ export function PlaceInput(props: Props) {
           }
         }}
       />
-      {loading && open ? <span className="spinner place-input__spinner" aria-hidden="true" /> : null}
+      {(loading && open) || props.busy ? <span className="spinner place-input__spinner" aria-hidden="true" /> : null}
+      {props.busy ? (
+        <span className="sr-only" role="status">
+          {m.ui.searching}
+        </span>
+      ) : null}
       {expanded ? (
         <ul className="suggestions" id={listId} role="listbox" aria-label={m.ui.suggestions(label)}>
           {options.map((o, i) => (

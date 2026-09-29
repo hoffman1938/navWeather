@@ -67,6 +67,8 @@ export interface ExploreState {
   layerHour: number;
   /** `partial`: some grid points failed; those areas stay blank (never filled in). */
   layerStatus: 'idle' | 'loading' | 'ready' | 'partial' | 'error';
+  /** A typed search is being looked up (Enter in the search field). */
+  searching: boolean;
 
   locateMe(): void;
   stopLocate(): void;
@@ -75,6 +77,8 @@ export interface ExploreState {
   openDirections(open: boolean): void;
   searchSubmit(text: string): Promise<void>;
   selectPlace(place: Place, source: PlaceCard['source']): void;
+  /** Load the open card's weather, air quality and drive time again (after a failure). */
+  retryCard(): void;
   dropPin(coordinate: LngLat): void;
   closeCard(): void;
   setCardSheet(s: SheetState): void;
@@ -145,6 +149,7 @@ export const useExplore = create<ExploreState>()(
     layer: 'off',
     layerHour: 0,
     layerStatus: 'idle',
+    searching: false,
 
     locateMe() {
       const s = get();
@@ -191,12 +196,19 @@ export const useExplore = create<ExploreState>()(
         return;
       }
       const m = currentMessages();
+      if (get().searching) return; // Enter pressed again while the first lookup runs
+      set({ searching: true });
+      const typed = get().query;
       try {
         const place = await getProviders().geocoding.geocode(q, { language: m.locale });
+        // Typed something else meanwhile: that newer intent wins.
+        if (get().query !== typed) return;
         if (place) get().selectPlace(place, 'search');
         else useAppStore.getState().showNotice('warning', m.ui.notFound(q));
       } catch {
         useAppStore.getState().showNotice('warning', m.explore.searchFailed);
+      } finally {
+        set({ searching: false });
       }
     },
 
@@ -215,6 +227,11 @@ export const useExplore = create<ExploreState>()(
       void loadCardAir(place, ctrl.signal);
       void loadCardDrive(place, ctrl.signal);
       if (source === 'pin') void nameCardPlace(place, ctrl.signal);
+    },
+
+    retryCard() {
+      const card = get().card;
+      if (card) get().selectPlace(card.place, card.source);
     },
 
     dropPin(coordinate) {

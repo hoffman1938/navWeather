@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { AlertBanner } from './components/Drive/AlertBanner';
 import { RerouteOffer } from './components/Drive/RerouteOffer';
+import { ReportDialog, ReportPrompt } from './components/Drive/Reports';
 import { ArrivalSheet } from './components/Drive/ArrivalSheet';
 import { DriveSheet } from './components/Drive/DriveSheet';
 import { ManeuverBanner } from './components/Drive/ManeuverBanner';
@@ -44,7 +45,21 @@ const DevPanel = import.meta.env.DEV ? lazy(() => import('./dev/DevPanel')) : nu
 const liveId = typeof location !== 'undefined' ? parseLiveUrl(location.pathname) : null;
 
 export default function App() {
-  return liveId ? <LiveApp id={liveId} /> : <MainApp />;
+  // Last line of defence: an unexpected error shows a way back instead of a blank page.
+  return <ErrorBoundary fallback={<CrashScreen />}>{liveId ? <LiveApp id={liveId} /> : <MainApp />}</ErrorBoundary>;
+}
+
+function CrashScreen() {
+  const m = useMessages();
+  return (
+    <div className="crash" role="alert">
+      <h1>{m.ui.crashTitle}</h1>
+      <p>{m.ui.crashBody}</p>
+      <button className="btn btn-primary" onClick={() => location.reload()}>
+        {m.ui.reload}
+      </button>
+    </div>
+  );
 }
 
 function MainApp() {
@@ -90,6 +105,7 @@ function MainApp() {
       <NavPrompt />
       <SharePlaceDialog />
       <LiveShareDialog />
+      <ReportDialog />
       {DevPanel ? (
         <Suspense fallback={null}>
           <DevPanel />
@@ -175,6 +191,7 @@ function DriveTop() {
       <ManeuverBanner />
       <AlertBanner />
       <RerouteOffer />
+      <ReportPrompt />
     </div>
   );
 }
