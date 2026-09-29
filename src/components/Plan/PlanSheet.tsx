@@ -29,6 +29,7 @@ export function PlanSheet() {
   const hasPlan = useAppStore((s) => s.plan !== null);
   const routeStatus = useAppStore((s) => s.routeStatus);
   const sheet = useAppStore((s) => s.sheet);
+  const destination = useAppStore((s) => s.plan?.timed.route.destination.name ?? '');
   const m = useMessages();
 
   if (!hasPlan) {
@@ -57,7 +58,7 @@ export function PlanSheet() {
     <BottomSheet
       state={sheet}
       onChange={(v) => useAppStore.getState().setSheet(v)}
-      label={m.ui.weatherAlongRoute}
+      label={m.ui.routeSheet(destination)}
       header={<RouteHeader />}
       body={
         <>

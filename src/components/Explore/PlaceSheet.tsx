@@ -218,7 +218,8 @@ function PlaceWeather() {
       ) : null}
       <section className="pw-hours" aria-label={m.explore.hourly}>
         <h3 className="label">{m.explore.hourly}</h3>
-        <ol className="pw-hours__row">
+        {/* Focusable so keyboard users can scroll the hours too. */}
+        <ol className="pw-hours__row" tabIndex={0} aria-label={m.explore.hourly}>
           {hours.map((h) => (
             <li key={h.timeMs} className="pw-hour">
               <span className="pw-hour__time tabular">{formatLocalTime(h.timeMs, f.timezone)}</span>

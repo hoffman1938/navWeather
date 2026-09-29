@@ -447,6 +447,8 @@ export const en = {
     unmute: 'Unmute voice guidance',
     settings: 'Settings',
     navigation: 'Navigation',
+    routeSheet: (destination: string) => `Route to ${destination}`,
+    roadSigns: 'Road signs',
     retry: 'Try again',
     searching: 'Searching…',
     sheetMore: 'Show more',

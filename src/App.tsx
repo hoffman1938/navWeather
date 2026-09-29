@@ -89,10 +89,10 @@ function MainApp() {
       </ErrorBoundary>
       {driving && !arrived ? <DriveTop /> : arrived ? null : <SearchPanel />}
       {driving && !arrived ? (
-        <div className="drive-signs">
+        <section className="drive-signs" aria-label={m.ui.roadSigns}>
           <HazardSign />
           <SpeedSign />
-        </div>
+        </section>
       ) : null}
       <VoiceControls />
       {!driving ? <MapWeatherChip /> : null}

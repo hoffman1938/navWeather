@@ -434,6 +434,8 @@ export const ru: Messages = {
     unmute: 'Включить голос',
     settings: 'Настройки',
     navigation: 'Навигация',
+    routeSheet: (destination: string) => `Маршрут до ${destination}`,
+    roadSigns: 'Дорожные знаки',
     retry: 'Повторить',
     searching: 'Поиск…',
     sheetMore: 'Подробнее',

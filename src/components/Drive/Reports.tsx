@@ -98,7 +98,7 @@ export function ReportPrompt() {
   const what = m.reports.kinds[prompt.kind] ?? m.alert.incident[prompt.kind] ?? m.alert.title.INCIDENT;
   const answer = (v: 'still' | 'gone' | null) => useAppStore.getState().answerReportPrompt(v);
   return (
-    <section className="reroute report-prompt" role="group" aria-label={m.reports.stillThere(what)}>
+    <section className="reroute report-prompt" aria-label={m.reports.stillThere(what)}>
       <div className="reroute__head">
         <EventIcon icon="incident" size={28} />
         <p className="reroute__text">

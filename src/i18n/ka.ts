@@ -455,6 +455,8 @@ export const ka: Messages = {
     unmute: 'ხმის ჩართვა',
     settings: 'პარამეტრები',
     navigation: 'ნავიგაცია',
+    routeSheet: (destination: string) => `მარშრუტი: ${destination}`,
+    roadSigns: 'საგზაო ნიშნები',
     retry: 'ხელახლა ცდა',
     searching: 'ძიება…',
     sheetMore: 'მეტის ნახვა',

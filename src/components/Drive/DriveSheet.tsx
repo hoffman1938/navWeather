@@ -62,7 +62,7 @@ function EtaBar() {
           <span className="etabar__cap">{m.ui.arrival}</span>
         </div>
         <div className="etabar__rem tabular">
-          <span>{remainingMin !== null ? formatDuration(remainingMin * 60, m) : m.ui.waitingForLocation}</span>
+          {remainingMin !== null ? <span>{formatDuration(remainingMin * 60, m)}</span> : <span className="etabar__wait">{m.ui.waitingForLocation}</span>}
           {remainingM !== null ? <span className="etabar__cap">{formatDistance(remainingM, units, m)}</span> : null}
         </div>
         <div className="etabar__controls">{simulating ? <SimControls /> : <EndButton />}</div>
