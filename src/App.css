@@ -21,3 +21,25 @@
 [data-sheet-covers] .map-controls {
   visibility: hidden;
 }
+
+/* Unexpected error: a calm page with one way forward. */
+.crash {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: center;
+}
+.crash h1 {
+  margin: 0;
+  font-size: 22px;
+}
+.crash p {
+  max-width: 36ch;
+  margin: 0 0 8px;
+  color: var(--text-2);
+}

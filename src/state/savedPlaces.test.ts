@@ -22,6 +22,19 @@ describe('saved places and recents (this device only)', () => {
     expect(useSavedPlaces.getState().slotsOf(batumi)).toEqual(['favorite']);
   });
 
+  it('toggling a favourite off removes that place only (not the first favourite in the list)', () => {
+    const s = useSavedPlaces.getState();
+    s.save(tbilisi, 'favorite');
+    s.save(batumi, 'favorite');
+    s.save(gori, 'home');
+    useSavedPlaces.getState().toggle(tbilisi, 'favorite'); // tbilisi is the older (second) favourite
+    expect(useSavedPlaces.getState().saved.map((p) => `${p.slot}:${p.name}`)).toEqual(['home:Gori', 'favorite:Batumi']);
+    useSavedPlaces.getState().toggle(gori, 'favorite'); // on
+    expect(useSavedPlaces.getState().slotsOf(gori).sort()).toEqual(['favorite', 'home']);
+    useSavedPlaces.getState().toggle(gori, 'home'); // off, favourite stays
+    expect(useSavedPlaces.getState().slotsOf(gori)).toEqual(['favorite']);
+  });
+
   it('recents: newest first, no duplicates, never "your location"; turning off clears them', () => {
     const s = useSavedPlaces.getState();
     s.addRecent(gori);

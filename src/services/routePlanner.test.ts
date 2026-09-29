@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { describeError } from './routePlanner';
+import { ProviderError } from './http';
+import { en } from '../i18n/en';
 import {
   BATUMI,
   FakeRecognition,
@@ -87,5 +90,19 @@ describe('resolvePlace', () => {
     expect(parseCoordinateText('41.69, 44.80')).toEqual([44.8, 41.69]);
     expect((await resolvePlace(p, { text: '41.69, 44.80', place: null })).coordinate).toEqual([44.8, 41.69]);
     await expect(resolvePlace(p, { text: 'Atlantis', place: null })).rejects.toThrow(/Atlantis/);
+  });
+});
+
+describe('route error messages', () => {
+  it('explain what the user can do', () => {
+    const fallback = en.ui.unableRoute;
+    expect(describeError(new ProviderError('x', 'no-route', 'Routing'), fallback, en)).toBe(en.ui.noRoadRoute);
+    expect(describeError(new ProviderError('x', 'network', 'Routing'), fallback, en)).toBe(`${fallback} — ${en.ui.checkConnection}`);
+    expect(describeError(new ProviderError('x', 'rate-limited', 'Routing', 429), fallback, en)).toBe(`${fallback} — ${en.ui.busyService}`);
+    expect(describeError(new ProviderError('x', 'http', 'Routing', 503), fallback, en)).toBe(`${fallback} — ${en.ui.busyService}`);
+    // A 4xx is our request's fault: no "try again" promise.
+    expect(describeError(new ProviderError('x', 'http', 'Routing', 400), fallback, en)).toBe(fallback);
+    // Raw technical text never reaches the user.
+    expect(describeError(new Error('TypeError: cannot read properties of undefined'), fallback, en)).toBe(fallback);
   });
 });

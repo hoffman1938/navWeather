@@ -15,6 +15,8 @@ export interface Env {
   REPORTS: DurableObjectNamespace<Reports>;
   /** Abuse guard for reporting and voting (per client IP). */
   REPORT_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+  /** Abuse guard for listing reports (per client IP; generous — a long route asks for several boxes). */
+  REPORT_LIST_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
 
 /**
@@ -75,6 +77,8 @@ async function reports(request: Request, url: URL, env: Env): Promise<Response> 
   const stub = env.REPORTS.get(env.REPORTS.idFromName('global'));
   const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
   if (url.pathname === '/api/reports' && request.method === 'GET') {
+    // Every list request reaches the one Reports object: keep a single client from monopolising it.
+    if (env.REPORT_LIST_LIMITER && !(await env.REPORT_LIST_LIMITER.limit({ key: ip })).success) return json({ error: 'too-many-requests' }, 429);
     return stub.fetch(`https://reports/list?bbox=${encodeURIComponent(url.searchParams.get('bbox') ?? '')}`);
   }
   const vote = /^\/api\/reports\/([^/]+)\/vote$/.exec(url.pathname);

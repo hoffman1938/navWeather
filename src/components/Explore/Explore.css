@@ -458,3 +458,10 @@ button.me-dot::after {
   color: var(--text-2);
   font-size: 14px;
 }
+.pw-status--error {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.pw-status--error p {
+  margin: 0;
+}

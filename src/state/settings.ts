@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { detectLocale, getMessages, isLocaleLoaded, loadLocale, type Locale, type Messages } from '../i18n';
+import { detectLocale, getMessages, isLocaleLoaded, loadLocale, LOCALES, type Locale, type Messages } from '../i18n';
 import { defaultUnits, type UnitPrefs } from '../i18n/format';
 import type { AlertOutput, AlertTiming } from '../intelligence/driverAlerts';
 import type { WeatherAlertPrefs } from '../intelligence/weatherAlerts';
@@ -10,6 +10,8 @@ export interface Settings {
   theme: 'auto' | 'light' | 'dark';
   /** Spoken turn-by-turn and alerts. */
   voice: boolean;
+  /** Which voice speaks each language: 'auto', 'natural' (on-device) or 'device:<voiceURI>'. */
+  voiceByLang: Partial<Record<Locale, string>>;
   alertOutput: AlertOutput;
   alertTiming: AlertTiming;
   weatherAlerts: WeatherAlertPrefs;
@@ -19,6 +21,8 @@ export interface Settings {
   speedCameras: boolean;
   /** Voice + sign before sharp curves (route geometry) and railway crossings (OSM). */
   roadHazards: boolean;
+  /** Other drivers' (unconfirmed) reports on the route, "still there?" prompts, and the Report button. */
+  driverReports: boolean;
   batterySaver: boolean;
   /** Declared by the user; decides fuel vs charging stop advice. */
   vehicle: 'fuel' | 'ev';
@@ -34,6 +38,7 @@ export function defaultSettings(): Settings {
     units: defaultUnits(),
     theme: 'auto',
     voice: true,
+    voiceByLang: {},
     alertOutput: 'both',
     alertTiming: 'auto',
     weatherAlerts: { level: 'all', types: { rain: true, snow: true, fog: true, wind: true, temperature: true } },
@@ -41,32 +46,83 @@ export function defaultSettings(): Settings {
     breakReminders: true,
     speedCameras: false,
     roadHazards: true,
+    driverReports: true,
     batterySaver: false,
     vehicle: 'fuel',
     fuelRangeKm: null,
   };
 }
 
+/** A stored value if it is one of `allowed`, else the default (old or hand-edited storage). */
+function oneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+function bool(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function voiceChoices(value: unknown): Partial<Record<Locale, string>> {
+  const out: Partial<Record<Locale, string>> = {};
+  if (!value || typeof value !== 'object') return out;
+  for (const l of LOCALES) {
+    const v = (value as Record<string, unknown>)[l.id];
+    if (typeof v === 'string' && (v === 'auto' || v === 'natural' || /^device:.{1,300}$/.test(v))) out[l.id] = v;
+  }
+  return out;
+}
+
 /** Preferences only — no routes, places or positions are ever persisted. */
-function load(): Settings {
-  const base = defaultSettings();
+export function parseSettings(raw: string | null, base = defaultSettings()): Settings {
+  if (!raw) return base;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return base;
-    const s = JSON.parse(raw) as Partial<Settings>;
+    const s = JSON.parse(raw) as Record<string, unknown> | null;
+    if (!s || typeof s !== 'object') return base;
+    const units = (s.units ?? {}) as Partial<UnitPrefs>;
+    const wa = (s.weatherAlerts ?? {}) as Partial<WeatherAlertPrefs>;
+    const types = (wa.types ?? {}) as Partial<WeatherAlertPrefs['types']>;
+    const range = s.fuelRangeKm;
     return {
-      ...base,
-      ...s,
-      vehicle: s.vehicle === 'ev' ? 'ev' : 'fuel',
-      units: { ...base.units, ...s.units },
-      weatherAlerts: {
-        ...base.weatherAlerts,
-        ...s.weatherAlerts,
-        types: { ...base.weatherAlerts.types, ...s.weatherAlerts?.types },
+      language: oneOf(s.language, LOCALES.map((l) => l.id), base.language),
+      units: {
+        distance: oneOf(units.distance, ['metric', 'imperial'] as const, base.units.distance),
+        temperature: oneOf(units.temperature, ['c', 'f'] as const, base.units.temperature),
+        wind: oneOf(units.wind, ['kmh', 'mph', 'ms'] as const, base.units.wind),
       },
+      theme: oneOf(s.theme, ['auto', 'light', 'dark'] as const, base.theme),
+      voice: bool(s.voice, base.voice),
+      voiceByLang: voiceChoices(s.voiceByLang),
+      alertOutput: oneOf(s.alertOutput, ['both', 'visual', 'voice', 'off'] as const, base.alertOutput),
+      alertTiming: oneOf(s.alertTiming, ['auto', 'early', 'standard', 'minimal'] as const, base.alertTiming),
+      weatherAlerts: {
+        level: oneOf(wa.level, ['all', 'severe'] as const, base.weatherAlerts.level),
+        types: {
+          rain: bool(types.rain, true),
+          snow: bool(types.snow, true),
+          fog: bool(types.fog, true),
+          wind: bool(types.wind, true),
+          temperature: bool(types.temperature, true),
+        },
+      },
+      speedWarnings: bool(s.speedWarnings, base.speedWarnings),
+      breakReminders: bool(s.breakReminders, base.breakReminders),
+      speedCameras: bool(s.speedCameras, base.speedCameras),
+      roadHazards: bool(s.roadHazards, base.roadHazards),
+      driverReports: bool(s.driverReports, base.driverReports),
+      batterySaver: bool(s.batterySaver, base.batterySaver),
+      vehicle: s.vehicle === 'ev' ? 'ev' : 'fuel',
+      fuelRangeKm: typeof range === 'number' && Number.isFinite(range) && range > 0 && range <= 5000 ? range : null,
     };
   } catch {
     return base;
+  }
+}
+
+function load(): Settings {
+  try {
+    return parseSettings(localStorage.getItem(KEY));
+  } catch {
+    return defaultSettings(); // storage blocked
   }
 }
 

@@ -1,8 +1,14 @@
+import { useEffect, useState } from 'react';
 import { LOCALES, type Locale } from '../../i18n';
+import { modelCardUrl, NATURAL_VOICES, RUNTIME_MB } from '../../voice/natural/catalog';
+import { useNaturalVoice } from '../../voice/natural/state';
+import { voiceQuality, voicesFor } from '../../voice/voices';
 import { useMessages, useSettings, type Settings } from '../../state/settings';
-import { useAppStore } from '../../state/store';
+import { loadDriveExtras, useAppStore } from '../../state/store';
 import { useSavedPlaces } from '../../state/savedPlaces';
 import { Dialog } from '../Common/Dialog';
+import { CloseIcon, SpeakerIcon } from '../Icons/Icons';
+import { getProviders } from '../../services/providers';
 import './Settings.css';
 
 function Select<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange(v: T): void }) {
@@ -42,6 +48,8 @@ export function SettingsDialog() {
   const close = () => useAppStore.getState().setSettingsOpen(false);
   const up = (patch: Partial<Settings>) => {
     s.update(patch);
+    // Switched on mid-drive: fetch what it needs now, not on the next drive.
+    if (patch.speedWarnings || patch.speedCameras || patch.roadHazards) loadDriveExtras();
     useAppStore.getState().rederive();
   };
   const types = s.weatherAlerts.types;
@@ -49,7 +57,12 @@ export function SettingsDialog() {
 
   return (
     <Dialog label={S.title} onClose={close} size="large">
-      <h2>{S.title}</h2>
+      <div className="set-head">
+        <h2>{S.title}</h2>
+        <button className="icon-btn" onClick={close} aria-label={m.ui.close}>
+          <CloseIcon size={20} />
+        </button>
+      </div>
       <div className="set-group">
         <Select<Locale> label={S.language} value={s.language} options={LOCALES.map((l) => [l.id, l.name])} onChange={(language) => up({ language })} />
         <Select
@@ -94,6 +107,7 @@ export function SettingsDialog() {
 
       <div className="set-group">
         <Switch label={S.voiceGuidance} checked={s.voice} onChange={(voice) => up({ voice })} hint={S.voiceRecognitionNote} />
+        {s.voice ? <VoiceSettings /> : null}
       </div>
 
       <div className="set-group">
@@ -141,6 +155,21 @@ export function SettingsDialog() {
         <Switch label={S.breakReminders} checked={s.breakReminders} onChange={(breakReminders) => up({ breakReminders })} hint={S.breakRemindersHint} />
         <Switch label={S.roadHazards} checked={s.roadHazards} onChange={(roadHazards) => up({ roadHazards })} hint={S.roadHazardsHint} />
         <Switch label={S.speedCameras} checked={s.speedCameras} onChange={(speedCameras) => up({ speedCameras })} hint={S.speedCamerasHint} />
+        {getProviders().incidents.name === 'reports' ? (
+          <Switch
+            label={S.driverReports}
+            checked={s.driverReports}
+            onChange={(driverReports) => {
+              up({ driverReports });
+              const app = useAppStore.getState();
+              // Off: forget the reports on screen now; on: fetch them for the current route.
+              if (!driverReports) useAppStore.setState({ incidents: app.incidents.filter((i) => !i.reportId), reportPrompt: null, reportDialogOpen: false });
+              else app.refreshIncidents();
+              useAppStore.getState().rederive();
+            }}
+            hint={S.driverReportsHint}
+          />
+        ) : null}
         <Switch label={S.batterySaver} checked={s.batterySaver} onChange={(batterySaver) => up({ batterySaver })} hint={S.batterySaverHint} />
         <Select
           label={S.vehicle}
@@ -178,6 +207,97 @@ export function SettingsDialog() {
         {S.done}
       </button>
     </Dialog>
+  );
+}
+
+/** The device's voices for a language (they load asynchronously in Chrome and Safari). */
+function useDeviceVoices(lang: string): SpeechSynthesisVoice[] {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const sync = () => setVoices(voicesFor(window.speechSynthesis.getVoices(), lang, { online: navigator.onLine !== false }));
+    sync();
+    window.speechSynthesis.addEventListener?.('voiceschanged', sync);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', sync);
+  }, [lang]);
+  return voices;
+}
+
+/** Which voice speaks: the best device voice, a specific one, or the free on-device natural voice. */
+function VoiceSettings() {
+  const m = useMessages();
+  const S = m.settings;
+  const locale = useSettings((st) => st.language);
+  const choice = useSettings((st) => st.voiceByLang[locale] ?? 'auto');
+  const voices = useDeviceVoices(m.speechLang);
+  const supported = useNaturalVoice((st) => st.supported);
+  const status = useNaturalVoice((st) => st.status[locale]);
+  const progress = useNaturalVoice((st) => st.progress);
+  const natural = NATURAL_VOICES[locale];
+  useEffect(() => {
+    void useNaturalVoice.getState().check(locale);
+  }, [locale]);
+
+  const choose = (value: string) => {
+    const st = useSettings.getState();
+    st.update({ voiceByLang: { ...st.voiceByLang, [locale]: value } });
+    if (value === 'natural') void useNaturalVoice.getState().download(locale);
+  };
+  const label = (v: SpeechSynthesisVoice) => {
+    const tags = [voiceQuality(v) === 'natural' ? S.voiceNaturalTag : null, v.localService ? null : S.voiceNeedsInternet].filter(Boolean);
+    return tags.length ? `${v.name} (${tags.join(', ')})` : v.name;
+  };
+  const known = choice === 'auto' || choice === 'natural' || voices.some((v) => `device:${v.voiceURI}` === choice);
+  const options: [string, string][] = [
+    ['auto', S.voiceAuto],
+    ...voices.map((v): [string, string] => [`device:${v.voiceURI}`, label(v)]),
+    ...(supported ? [['natural', S.voiceNatural(natural.sizeMB + RUNTIME_MB)] as [string, string]] : []),
+  ];
+
+  return (
+    <>
+      <Select label={S.voiceChoice} value={known ? choice : 'auto'} options={options} onChange={choose} />
+      {!voices.length && choice !== 'natural' ? <p className="set-note set-note--warn">{supported ? S.noDeviceVoice : m.ui.noVoice}</p> : null}
+      {choice === 'natural' ? (
+        <div className="set-natural" aria-live="polite">
+          {!supported ? (
+            <p className="set-note">{S.naturalUnsupported}</p>
+          ) : status === 'downloading' ? (
+            <>
+              <progress className="set-progress" max={1} value={progress} aria-label={S.naturalDownloading(Math.round(progress * 100))} />
+              <p className="set-note">{S.naturalDownloading(Math.round(progress * 100))}</p>
+              <button className="btn btn-quiet" onClick={() => useNaturalVoice.getState().cancel()}>
+                {m.ui.cancel}
+              </button>
+            </>
+          ) : status === 'ready' ? (
+            <>
+              <p className="set-note">{S.naturalReady}</p>
+              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().remove(locale)}>
+                {S.naturalRemove}
+              </button>
+            </>
+          ) : status === 'error' || status === 'none' ? (
+            <>
+              {status === 'error' ? <p className="set-note set-note--warn">{S.naturalError}</p> : null}
+              <button className="btn btn-quiet" onClick={() => void useNaturalVoice.getState().download(locale)}>
+                {status === 'error' ? S.naturalRetry : `${S.naturalDownload} (${natural.sizeMB + RUNTIME_MB} MB)`}
+              </button>
+            </>
+          ) : null}
+          <p className="set-note">
+            {S.naturalAbout}{' '}
+            <a href={modelCardUrl(natural)} target="_blank" rel="noopener noreferrer">
+              {S.naturalLicense}
+            </a>
+          </p>
+        </div>
+      ) : null}
+      <button className="btn btn-quiet set-sample" onClick={() => getProviders().tts.preview?.(S.voiceSampleText, m.speechLang, choice)}>
+        <SpeakerIcon size={18} />
+        {S.voiceSample}
+      </button>
+    </>
   );
 }
 

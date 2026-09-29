@@ -23,6 +23,8 @@ interface Persisted {
 export interface SavedPlacesState extends Persisted {
   save(place: Place, slot: SavedSlot): void;
   remove(placeId: string, slot?: SavedSlot): void;
+  /** Save `place` in `slot`, or — if this spot is already saved there — remove it. */
+  toggle(place: Place, slot: SavedSlot): void;
   slotsOf(place: Place): SavedSlot[];
   addRecent(place: Place): void;
   clearRecents(): void;
@@ -90,6 +92,12 @@ export const useSavedPlaces = create<SavedPlacesState>()((set, get) => {
 
     remove(placeId, slot) {
       commit({ saved: get().saved.filter((s) => !(s.id === placeId && (!slot || s.slot === slot))) });
+    },
+
+    toggle(place, slot) {
+      const here = get().saved.find((s) => s.slot === slot && sameSpot(s, place));
+      if (here) commit({ saved: get().saved.filter((s) => s !== here) });
+      else get().save(place, slot);
     },
 
     slotsOf(place) {

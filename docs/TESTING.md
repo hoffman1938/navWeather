@@ -8,6 +8,7 @@ npm run typecheck     # app + worker
 npm run test:live     # opt-in smoke test against the real public APIs (Tbilisi → Batumi)
 npm run dev:api       # local relay, then in another terminal:
 npm run test:share    # end-to-end checks of the live-sharing relay
+npm run test:reports  # end-to-end checks of the driver-reports relay
 ```
 
 ## What is covered
@@ -33,6 +34,11 @@ npm run test:share    # end-to-end checks of the live-sharing relay
 | Names and grammar | `i18n/script.test.ts` | Georgian → Latin/Cyrillic (streets, road numbers), Georgian postposition rules |
 | Store end-to-end | `state/store.test.ts`, `state/scenarios.test.ts` | Tbilisi → Batumi: plan, weather, refresh, simulate, alerts, deviation + recalculation, network loss, arrival summary, assistant |
 | PWA | `test/serviceWorker.test.ts` | shell only; provider, tile and `/api` traffic never cached |
+| Driver reports | `services/traffic/ReportsIncidentProvider.test.ts`, `state/reports.test.ts`, `reports/protocol.test.ts`, `scripts/reports-smoke.mjs` | route boxes (count/area caps, full coverage), clock skew, partial outages, failure wording; real drives only, offline, "still there?" once and never for your own or in a simulation, 5-minute refresh, off switch; relay rules |
+| Drive extras | `state/driveExtras.test.ts` | cameras without limit warnings, loading when switched on mid-drive, never the old route's cameras after a re-route |
+| Settings, saved places | `state/settings.test.ts`, `state/savedPlaces.test.ts` | stored values validated; toggling a favourite removes that place only |
+| Messages | `i18n/messages.test.ts`, `voice/parser.test.ts` | Russian agreement, report kinds named in every language; voice "report …" commands vs. questions |
+| Voice | `voice/voices.test.ts`, `voice/providers.test.ts`, `voice/speech.test.ts`, `voice/natural/storage.test.ts` | natural voices ranked above robotic defaults (Windows/Edge/iPhone/Linux lists), offline never picks a network voice, a failed network voice is repeated on the device; router: auto/device/natural, 2.5 s deadline fallback (late audio never played), errors/no audio output/not downloaded → device voice, cancel; downloads stored only when complete |
 
 The critical path from the brief (plan → sample → ETA → weather → events →
 alerts → simulate → deviate → recalculate → stale data gone) is
@@ -47,13 +53,17 @@ adds +10 km, +30 min, next event, deviate, "heavy rain ahead" and "accident
 report". Injected data is flagged and the UI labels it as simulated. None of
 this is in production builds.
 
-## Screenshot audit
+## Screenshot and accessibility audit
 
 Every state (explore, search, place card, directions, route, expanded route,
-settings, driving, expanded driving, share dialog, arrival) is captured at
-1440×900 and 390×844, light and dark, English and Georgian, with headless
-Chrome driving the dev build (emulated GPS). Findings and fixes are tracked in
-`docs/PLAN.md` §3.
+settings, driving, expanded driving, report dialog, "still there?", share
+dialog, arrival) is captured at 320, 375, 390, 430, 768, 1024, 1280, 1440 and
+1920 px wide, light and dark, English, Georgian and Russian, with headless
+Chrome driving the dev build (emulated GPS; provider responses replayed from
+the test fixtures when the network is closed). Each capture is also checked
+for page-level horizontal overflow, controls off screen, tiny touch targets
+and unlabelled buttons. axe-core runs on 10 states in both themes. Findings
+and fixes: `docs/PLAN.md` §3 and §7.
 
 ## Manual / browser checks performed
 
@@ -64,10 +74,24 @@ Chrome driving the dev build (emulated GPS). Findings and fixes are tracked in
 - Production build served by Cloudflare's runtime (`wrangler dev`): headers,
   SPA fallback, service worker offline reload.
 
+## Natural voice in the browser
+
+Real voice models can't be downloaded in the CI sandbox (Hugging Face is
+blocked there), so the browser check uses a **stand-in ONNX model with the exact
+Piper interface** (`input`, `input_lengths`, `scales` → `output`) served in
+place of Hugging Face. Everything else is real: download into Cache Storage with
+progress, the eSpeak NG phonemizer on English, Russian **and Georgian** text,
+ONNX Runtime in the worker, Web Audio playback, the Settings flow, the
+production build under the real CSP, and a simulated drive **offline** after the
+download. Not verified: how the real Piper voices sound, and synthesis speed on
+real phones (measured 26–363 ms per sentence on the stand-in on a desktop CPU;
+real voices are larger).
+
 ## Not tested (be explicit)
 
 - Real iOS Safari and Android Chrome devices (only emulation).
 - Microphone speech recognition end to end (browser speech APIs need a user
   device; the parser and assistant are unit-tested).
 - A deployed Cloudflare account (the Worker was verified locally only).
+- Driver reports with many real users (moderation, abuse patterns at scale).
 - Long real drives with a phone in a car.

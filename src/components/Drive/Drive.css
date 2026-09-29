@@ -289,11 +289,14 @@
 /* ---- ETA bar (sheet header) ---- */
 .etabar {
   padding: 0 16px;
+  /* Sized by the sheet, not the screen: the desktop side panel is as narrow as a phone. */
+  container-type: inline-size;
 }
 .etabar__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 8px 16px;
 }
 .etabar__eta,
 .etabar__rem {
@@ -308,20 +311,26 @@
   letter-spacing: -0.02em;
 }
 .etabar__rem {
-  flex: 1;
-  min-width: 0;
+  /* Never narrower than its text: on the smallest phones the buttons move to their own line instead of covering it. */
+  flex: 1 1 auto;
   font-size: 17px;
   font-weight: 600;
+}
+.etabar__rem > span {
   white-space: nowrap;
 }
-@media (max-width: 400px) {
+.etabar__rem > .etabar__wait {
+  white-space: normal;
+}
+@container (max-width: 380px) {
   .etabar__row {
-    gap: 12px;
+    gap: 8px 10px;
   }
   .etabar__time {
     font-size: 26px;
   }
-  .roundbtn {
+  /* (.etabar prefix: must win over the base .roundbtn rule further down) */
+  .etabar .roundbtn {
     width: 44px;
     height: 44px;
   }
@@ -335,6 +344,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 .etabar__sim {
   margin: 6px 0 0;
@@ -536,4 +546,82 @@
   min-width: 0;
   font-size: 14px;
   line-height: 1.3;
+}
+
+/* ---- Driver reports ---- */
+.fab--report {
+  color: var(--sev-high);
+}
+.report__sim {
+  padding: 8px 12px;
+  border-radius: var(--r-control);
+  background: var(--sev-high-soft);
+  color: var(--text);
+}
+.report__kinds {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 420px) {
+  .report__kinds {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.report__kind {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+}
+.report__kind:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.report__kind:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.report__kind--accident,
+.report__kind--closure {
+  color: var(--sev-critical);
+}
+.report__kind--hazard,
+.report__kind--roadworks {
+  color: var(--sev-high);
+}
+.report__kind--weather {
+  color: var(--rain);
+}
+.report__kindText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text);
+}
+.report__kindText strong {
+  font-size: 16px;
+}
+.report__kindText small {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.dialog p.report__note {
+  font-size: 13px;
+}
+.report-prompt {
+  border-left-color: var(--accent);
+}
+.report-prompt .reroute__text {
+  flex: 1;
+}
+.report-prompt__close {
+  margin: -6px -6px 0 0;
 }

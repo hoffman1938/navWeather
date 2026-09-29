@@ -21,7 +21,16 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   });
 }
 
-// A stale tab after a redeploy may request chunks that no longer exist.
+// A stale tab after a redeploy may request chunks that no longer exist: one
+// automatic reload per load. Once the app has run fine for a while, a later
+// deploy may trigger it again.
+window.setTimeout(() => {
+  try {
+    sessionStorage.removeItem('navweather.reloaded');
+  } catch {
+    /* ignore */
+  }
+}, 15_000);
 window.addEventListener('vite:preloadError', () => {
   try {
     if (!sessionStorage.getItem('navweather.reloaded')) {

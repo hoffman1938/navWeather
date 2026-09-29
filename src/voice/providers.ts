@@ -1,3 +1,5 @@
+import { pickLocalVoice, pickVoice, voicesFor } from './voices';
+
 /**
  * Speech provider contracts. Browser implementations below; a native shell
  * or cloud speech service can replace them without touching navigation code.
@@ -9,6 +11,10 @@ export interface TextToSpeechProvider {
   cancel(): void;
   /** iOS/Safari only allow speech after a user gesture — call from one. */
   unlock(): void;
+  /** False when nothing on this device can speak the language (e.g. no Georgian voice). */
+  canSpeak?(lang: string): boolean;
+  /** Settings: say `text` with a voice choice that isn't saved yet. */
+  preview?(text: string, lang: string, choice: string): void;
 }
 
 export interface SpeechRecognitionSession {
@@ -28,39 +34,73 @@ export interface SpeechRecognitionProvider {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * The browser's own voices. Picks the most natural-sounding voice for the
+ * language (or the one chosen in Settings) — not the robotic default — and,
+ * if a voice that needs a connection fails, says it again with one that
+ * works on the device.
+ */
 export class BrowserSpeechSynthesis implements TextToSpeechProvider {
   readonly name = 'browser-speech-synthesis';
   private current: SpeechSynthesisUtterance | null = null;
+  /** The voice chosen in Settings for a language (voiceURI), if any. */
+  preferredVoice: (lang: string) => string | null = () => null;
 
   get supported(): boolean {
     return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   }
 
-  speak(text: string, opts: { lang: string; onEnd: () => void }): void {
+  /** Voices for a language, most natural first (they load asynchronously in some browsers). */
+  voices(lang: string): SpeechSynthesisVoice[] {
+    if (!this.supported) return [];
+    return voicesFor(window.speechSynthesis.getVoices(), lang, { online: isOnline() });
+  }
+
+  canSpeak(lang: string): boolean {
+    if (!this.supported) return false;
+    // Chrome/Safari fill the list asynchronously: an empty list means "not known yet", not "none".
+    if (!window.speechSynthesis.getVoices().length) return true;
+    return this.voices(lang).length > 0;
+  }
+
+  speak(text: string, opts: { lang: string; onEnd: () => void; voiceURI?: string | null }): void {
     if (!this.supported) {
       opts.onEnd();
       return;
     }
+    const all = window.speechSynthesis.getVoices();
+    const voice = pickVoice(all, opts.lang, { online: isOnline(), preferredURI: opts.voiceURI ?? this.preferredVoice(opts.lang) });
+    this.say(text, opts.lang, voice, opts.onEnd, () => {
+      // A network voice (Edge "Natural", Chrome "Google …") can fail with no signal: repeat on the device.
+      const local = !voice || voice.localService ? undefined : pickLocalVoice(all, opts.lang);
+      if (local) this.say(text, opts.lang, local, opts.onEnd, opts.onEnd);
+      else opts.onEnd();
+    });
+  }
+
+  private say(text: string, lang: string, voice: SpeechSynthesisVoice | undefined, onEnd: () => void, onFail: () => void) {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = opts.lang;
-    const voice = pickVoice(opts.lang);
+    u.lang = voice?.lang ?? lang;
     if (voice) u.voice = voice;
     u.rate = 1;
     let done = false;
-    const finish = () => {
+    const finish = (failed: boolean) => {
       if (done) return;
       done = true;
       if (this.current === u) this.current = null;
-      opts.onEnd();
+      // Cancelled on purpose (a more urgent message): that is an end, not a failure.
+      if (failed && this.current === null && !cancelled.has(u)) onFail();
+      else onEnd();
     };
-    u.onend = finish;
-    u.onerror = finish;
+    u.onend = () => finish(false);
+    u.onerror = (e) => finish(e.error !== 'interrupted' && e.error !== 'canceled');
     this.current = u;
     window.speechSynthesis.speak(u);
   }
 
   cancel(): void {
     if (!this.supported) return;
+    if (this.current) cancelled.add(this.current);
     this.current = null;
     window.speechSynthesis.cancel();
   }
@@ -73,14 +113,11 @@ export class BrowserSpeechSynthesis implements TextToSpeechProvider {
   }
 }
 
-function pickVoice(lang: string): SpeechSynthesisVoice | undefined {
-  const voices = window.speechSynthesis.getVoices();
-  const base = lang.slice(0, 2);
-  return (
-    voices.find((v) => v.lang === lang && v.localService) ??
-    voices.find((v) => v.lang === lang) ??
-    voices.find((v) => v.lang.startsWith(base))
-  );
+/** Utterances stopped by cancel() (their error event is not a voice failure). */
+const cancelled = new WeakSet<SpeechSynthesisUtterance>();
+
+function isOnline(): boolean {
+  return typeof navigator === 'undefined' || navigator.onLine !== false;
 }
 
 type RecognitionCtor = new () => {

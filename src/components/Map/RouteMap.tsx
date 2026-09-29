@@ -244,7 +244,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     const map = mapRef.current;
     if (!map || !styleVersion) return;
     if (!timed) {
-      for (const id of ['route', 'route-weather', 'endpoints', 'focus', 'pois']) setData(map, id, EMPTY_FC);
+      for (const id of ['route', 'route-weather', 'endpoints', 'focus', 'pois', 'cameras', 'hazards', 'incidents', 'alternatives']) setData(map, id, EMPTY_FC);
       return;
     }
     const g = timed.route.geometry;
@@ -367,6 +367,17 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       features: hazardsOn && hazards ? hazards.map((h) => pointFeature(h.coordinate, { id: h.id, kind: h.kind })) : [],
     });
   }, [hazards, hazardsOn, styleVersion]);
+
+  // ---- Incidents / driver reports on the route --------------------------------------
+  const incidents = useAppStore((s) => s.incidents);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleVersion) return;
+    setData(map, 'incidents', {
+      type: 'FeatureCollection',
+      features: timed ? incidents.map((i) => pointFeature(i.coordinate, { id: i.id, kind: i.kind, verified: i.verified })) : [],
+    });
+  }, [incidents, timed, styleVersion]);
 
   // ---- Places: along the route, or "near here" while exploring; tap → card ----------
   const nearby = useExplore((s) => s.nearby);

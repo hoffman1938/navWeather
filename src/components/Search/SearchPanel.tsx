@@ -25,6 +25,7 @@ export function SearchPanel() {
   const directionsOpen = useExplore((s) => s.directionsOpen);
   const query = useExplore((s) => s.query);
   const near = useExplore((s) => s.myLocation?.coordinate);
+  const searching = useExplore((s) => s.searching);
   const [editing, setEditing] = useState(!hasPlan);
   const ref = useRef<HTMLDivElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
@@ -75,6 +76,7 @@ export function SearchPanel() {
             onSelect={(p) => ex.selectPlace(p, 'search')}
             onSubmit={() => void ex.searchSubmit(useExplore.getState().query)}
             quick
+            busy={searching}
           />
           <button type="button" className="icon-btn" onClick={() => ex.openDirections(true)} aria-label={m.explore.directions}>
             <DirectionsIcon size={22} />

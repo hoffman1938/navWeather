@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDismiss } from '../../hooks/useDismiss';
 import { dailySummary, nextHours } from '../../algorithms/placeForecast';
 import { matchForecastToTime } from '../../algorithms/weatherMatching';
 import { conditionText, formatDistance, formatDuration, formatSpeed, formatTemp } from '../../i18n/format';
@@ -109,21 +110,18 @@ function PlaceHeader() {
 function SaveMenu({ place }: { place: Place }) {
   const m = useMessages();
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useDismiss(ref, open, () => setOpen(false));
   useSavedPlaces((s) => s.saved); // re-render on change
   const slots = useSavedPlaces.getState().slotsOf(place);
-  const toggle = (slot: SavedSlot) => {
-    const st = useSavedPlaces.getState();
-    const existing = st.saved.find((x) => x.slot === slot && st.slotsOf(place).includes(slot));
-    if (existing) st.remove(existing.id, slot);
-    else st.save(place, slot);
-  };
+  const toggle = (slot: SavedSlot) => useSavedPlaces.getState().toggle(place, slot);
   const rows: [SavedSlot, string, React.ReactNode][] = [
     ['favorite', m.explore.favorites, <StarIcon key="f" size={18} filled={slots.includes('favorite')} />],
     ['home', m.explore.home, <HomeIcon key="h" size={18} />],
     ['work', m.explore.work, <WorkIcon key="w" size={18} />],
   ];
   return (
-    <span className="savemenu">
+    <span className="savemenu" ref={ref}>
       <button className="btn btn-quiet" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <StarIcon size={18} filled={slots.length > 0} />
         {m.explore.save}
@@ -172,7 +170,16 @@ function PlaceWeather() {
       </p>
     );
   }
-  if (!f || !now) return <p className="pw-status">{m.explore.unavailable}</p>;
+  if (!f || !now) {
+    return (
+      <div className="pw-status pw-status--error">
+        <p>{m.explore.unavailable}</p>
+        <button className="btn btn-quiet" onClick={() => useExplore.getState().retryCard()}>
+          {m.ui.retry}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="pw">
@@ -211,7 +218,8 @@ function PlaceWeather() {
       ) : null}
       <section className="pw-hours" aria-label={m.explore.hourly}>
         <h3 className="label">{m.explore.hourly}</h3>
-        <ol className="pw-hours__row">
+        {/* Focusable so keyboard users can scroll the hours too. */}
+        <ol className="pw-hours__row" tabIndex={0} aria-label={m.explore.hourly}>
           {hours.map((h) => (
             <li key={h.timeMs} className="pw-hour">
               <span className="pw-hour__time tabular">{formatLocalTime(h.timeMs, f.timezone)}</span>

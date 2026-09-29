@@ -16,11 +16,12 @@ src/
   voice/         TTS/recognition providers, prioritised voice queue, command parser, assistant
   services/      provider interfaces + implementations, WeatherService, route planner, location
   share/         live-location protocol (shared with the Worker), sharer, viewer, links
+  reports/       driver-reports protocol and rules (shared with the Worker)
   state/         zustand stores: app (route/nav), explore (map app), settings, saved places, layout
   components/    UI (map, sheets, search, place card, drive mode, arrival, share, live viewer…)
   dev/           development-only diagnostics + simulation controls (not in production builds)
   i18n/          en (built in), ka and ru (loaded on demand)
-worker/          Cloudflare Worker + Durable Object: the live-location relay
+worker/          Cloudflare Worker + Durable Objects: live-location relay, driver reports
 public/          PWA manifest, icons, service worker, _headers (CSP)
 ```
 
@@ -78,8 +79,9 @@ that names implementations, chosen by `VITE_*` variables.
 | `PlacesProvider`, `PoiProvider`, `SpeedLimitProvider` | Overpass | one shared sequential queue with endpoint fallback |
 | `ElevationProvider` | Open-Meteo | pass detection |
 | `TrafficProvider` | none | hook for live traffic (sets segment durations) |
-| `IncidentProvider` | none | normalized incidents (`verified` flag) → route events |
-| `TextToSpeechProvider` / `SpeechRecognitionProvider` | browser | push-to-talk only |
+| `IncidentProvider` | driver reports (`/api/reports`) | normalized incidents (`verified` flag) → route events; reports are never verified; `report()`/`vote()` when the source accepts them |
+| `TextToSpeechProvider` | `SpeechRouter`: most natural browser voice, or the on-device natural voice (Piper) | see "Voice" below |
+| `SpeechRecognitionProvider` | browser | push-to-talk only |
 | `MapProvider` | OpenFreeMap | style URLs |
 
 ## State
@@ -91,6 +93,7 @@ that names implementations, chosen by `VITE_*` variables.
 | `share/liveShare.ts` / `share/viewer.ts` | live sharing (sender) / watching a shared link |
 | `state/settings.ts` | preferences (localStorage) |
 | `state/savedPlaces.ts` | Home/Work/favourites + recent destinations (localStorage, opt-out) |
+| app store (reports part) | incidents on the route, relay status, "still there?" prompt; own/asked report ids in memory only |
 
 `derive()` is a pure function of the app state and returns everything the UI
 shows; components read narrow selectors.
@@ -123,9 +126,60 @@ viewer app ◀──WebSocket snapshots (or 12 s polling)──────┘ a
 - Browsers pause location in the background, so the app keeps the screen on
   while sharing (Wake Lock) and tells both sides when updates stop.
 
+## Driver reports
+
+```
+car (real GPS) ──POST /api/reports {kind, lat, lon}──▶ Worker ──▶ Reports DO (SQLite, one object)
+route boxes    ──GET  /api/reports?bbox=…  (≤24 boxes, every 5 min driving)──┘   expired rows removed hourly
+passing a report ──POST /api/reports/:id/vote {still|gone}──┘
+```
+
+- Kinds: accident, hazard, road works, closure, dangerous weather. Lifetime by
+  kind (45 min … 12 h); "still there" extends (max 3× lifetime), two "gone"
+  outnumbering confirmations remove it; the same kind reported within 150 m
+  is a confirmation. Rules live in `src/reports/protocol.ts` (shared, tested).
+- The relay keeps a daily-salted hash of the client IP (never the IP) to
+  refuse double votes, voting on your own report and floods; three rate
+  limits (create/vote, list, share creation).
+- Client (`ReportsIncidentProvider`, store): reports become unverified route
+  events ("Accident · reported"), a "still there?" card appears 30–400 m after
+  passing someone else's report on a real drive; nothing is sent from a
+  simulation. The Report button and prompt disappear when turned off in Settings.
+
+## Voice
+
+```
+VoiceQueue (priorities, interruptions, expiry)
+  └─ SpeechRouter ── choice per language (Settings): auto · device:<voice> · natural
+       ├─ BrowserSpeechSynthesis  voices ranked by naturalness (Natural/Neural/Enhanced/
+       │                          Google > default/Desktop/eSpeak); network voices skipped
+       │                          offline and repeated on a device voice if they fail
+       └─ NaturalSpeech (optional, downloaded once)
+            worker: text ─▶ eSpeak NG phonemizer (WASM) ─▶ Piper voice (ONNX Runtime, WASM) ─▶ PCM
+            main:   Web Audio playback · last 24 phrases cached · audio unlocked in the Start tap
+```
+
+- Natural voices: `en_US-hfc_female`, `ru_RU-irina`, `ka_GE-natia` (medium, ~63 MB
+  each) from `rhasspy/piper-voices` on Hugging Face, stored in Cache Storage
+  (`navweather-voices-v1`, which the service worker never clears). The runtime
+  (ONNX Runtime 11 MB, phonemizer 19 MB) is served by the app and loads only
+  when the natural voice is used.
+- A sentence gets 2.5 s to synthesize; after that the device voice says it, so
+  a turn instruction is never late. The voice is loaded ahead of time when it
+  finishes downloading and when a drive starts.
+- Single-threaded WebAssembly (threads would need cross-origin isolation, which
+  would block the map tiles). CSP: `'wasm-unsafe-eval'` (WebAssembly only, no
+  JS eval) and `connect-src` for Hugging Face.
+- Licenses: ONNX Runtime Web (MIT); the piper-phonemize WebAssembly build
+  (`@diffusionstudio/piper-wasm`, MIT) contains eSpeak NG and its data
+  (GPL-3.0, free software); Piper voices each carry their own license in their
+  model card (linked from Settings → "About this voice"). All free to use; check
+  the voice's card before any commercial use.
+
 ## PWA and offline
 
-`public/sw.js` caches only the app shell and hashed assets. It never caches
+`public/sw.js` caches only the app shell and hashed assets (including the
+natural voice's runtime once used); on update it removes only old app shells. It never caches
 provider responses, tiles or `/api/*` (those URLs contain coordinates). When
 the network drops, the loaded route, instructions and cached forecasts keep
 working in memory and are labelled stale.

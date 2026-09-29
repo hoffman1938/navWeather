@@ -40,7 +40,7 @@ export const config = {
     poi: str('VITE_POI_PROVIDER', 'overpass'),
     speedLimits: str('VITE_SPEED_LIMIT_PROVIDER', 'overpass'),
     traffic: str('VITE_TRAFFIC_PROVIDER', 'none'),
-    incidents: str('VITE_INCIDENT_PROVIDER', 'none'),
+    incidents: str('VITE_INCIDENT_PROVIDER', 'reports'),
     airQuality: str('VITE_AIR_QUALITY_PROVIDER', 'open-meteo'),
     speech: str('VITE_SPEECH_PROVIDER', 'browser'),
   },
@@ -50,6 +50,10 @@ export const config = {
     openMeteoAir: str('VITE_OPEN_METEO_AIR_URL', 'https://air-quality-api.open-meteo.com'),
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),
     photon: str('VITE_PHOTON_BASE_URL', 'https://photon.komoot.io'),
+    /** Driver reports relay (same origin as the app: the Worker in worker/). */
+    reports: str('VITE_REPORTS_URL', '/api/reports'),
+    /** Free Piper voice models (downloaded once, on request, for the on-device natural voice). */
+    piperVoices: str('VITE_PIPER_VOICES_URL', 'https://huggingface.co/rhasspy/piper-voices/resolve/main'),
     overpass: list('VITE_OVERPASS_URLS', [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter',

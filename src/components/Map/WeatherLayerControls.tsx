@@ -6,6 +6,7 @@ import { formatTemp } from '../../i18n/format';
 import { deviceTimeZone, formatLocalTime } from '../../utils/timezone';
 import { CloseIcon, LayersIcon, PauseIcon, PlayIcon } from '../Icons/Icons';
 import { layerTime } from './useWeatherLayer';
+import { useDismiss } from '../../hooks/useDismiss';
 import './WeatherLayer.css';
 
 /** Map button: choose a forecast layer (off / precipitation / temperature). */
@@ -14,19 +15,7 @@ export function LayersButton() {
   const layer = useExplore((s) => s.layer);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('pointerdown', away);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('pointerdown', away);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [open]);
+  useDismiss(ref, open, () => setOpen(false));
   const options: ['off' | LayerKind, string][] = [
     ['off', m.layers.off],
     ['precip', m.layers.precip],

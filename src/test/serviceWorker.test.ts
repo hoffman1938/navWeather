@@ -13,7 +13,7 @@ interface FakeFetchEvent {
   respondWith: ReturnType<typeof vi.fn>;
 }
 
-function loadWorker() {
+function loadWorker(existingCaches: string[] = []) {
   const listeners: Record<string, Listener> = {};
   const self = {
     location: { origin: 'https://navweather.pages.dev' },
@@ -21,7 +21,7 @@ function loadWorker() {
     skipWaiting: vi.fn(),
     clients: { claim: vi.fn() },
   };
-  const caches = { open: vi.fn(async () => ({ put: vi.fn() })), match: vi.fn(async () => undefined), keys: vi.fn(async () => []), delete: vi.fn() };
+  const caches = { open: vi.fn(async () => ({ put: vi.fn() })), match: vi.fn(async () => undefined), keys: vi.fn(async () => existingCaches), delete: vi.fn() };
   const fetch = vi.fn(async () => new Response('ok'));
   const src = readFileSync(resolve(__dirname, '../../public/sw.js'), 'utf8');
   new Function('self', 'caches', 'fetch', src)(self, caches, fetch);
@@ -33,7 +33,12 @@ function loadWorker() {
     listeners.fetch(event);
     return event;
   };
-  return { dispatch, caches };
+  const activate = async () => {
+    let done: Promise<unknown> = Promise.resolve();
+    (listeners.activate as unknown as (e: { waitUntil(p: Promise<unknown>): void }) => void)({ waitUntil: (p) => (done = p) });
+    await done;
+  };
+  return { dispatch, caches, activate };
 }
 
 describe('service worker', () => {
@@ -64,5 +69,14 @@ describe('service worker: live data', () => {
     const { dispatch } = loadWorker();
     expect(dispatch('https://navweather.pages.dev/api/share/AAAAAAAAAAAAAAAAAAAAAA', { mode: 'navigate' }).respondWith).not.toHaveBeenCalled();
     expect(dispatch('https://navweather.pages.dev/api/share/AAAAAAAAAAAAAAAAAAAAAA').respondWith).not.toHaveBeenCalled();
+  });
+});
+
+describe('service worker: updates', () => {
+  it('removes old app shells but keeps the downloaded voices', async () => {
+    const { caches, activate } = loadWorker(['navweather-shell-v1', 'navweather-shell-v2', 'navweather-shell-v3', 'navweather-voices-v1']);
+    await activate();
+    const deleted = caches.delete.mock.calls.map((c: unknown[]) => c[0]);
+    expect(deleted.sort()).toEqual(['navweather-shell-v1', 'navweather-shell-v2']);
   });
 });

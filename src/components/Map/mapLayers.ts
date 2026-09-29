@@ -26,7 +26,7 @@ export function addRouteLayers(map: MLMap) {
   const beforeId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
   // lineMetrics → line-progress, so the driven part is a gradient stop, not a re-uploaded line.
   if (!map.getSource('route')) map.addSource('route', { type: 'geojson', data: EMPTY_FC, lineMetrics: true });
-  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy', 'cameras', 'hazards', 'alternatives']) {
+  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy', 'cameras', 'hazards', 'incidents', 'alternatives']) {
     if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: EMPTY_FC });
   }
   const lineLayout = { 'line-join': 'round', 'line-cap': 'round' } as const;
@@ -197,6 +197,19 @@ export function addRouteLayers(map: MLMap) {
       'circle-color': cssVar('--sev-high', '#b45309'),
       'circle-stroke-color': surface,
       'circle-stroke-width': 2,
+    },
+  });
+  // Reports / incidents on the route: a ring + dot (unconfirmed reports are hollow).
+  map.addLayer({
+    id: 'incidents',
+    type: 'circle',
+    source: 'incidents',
+    minzoom: 7,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 4.5, 13, 7],
+      'circle-color': ['case', ['get', 'verified'], cssVar('--sev-critical', '#b42318'), surface],
+      'circle-stroke-color': cssVar('--sev-critical', '#b42318'),
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 7, 2.5, 13, 3.5],
     },
   });
   map.addLayer({

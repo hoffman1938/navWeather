@@ -86,7 +86,8 @@ export function DepartureSelector() {
               defaultValue={toDateTimeLocalValue(departure.mode === 'at' ? departure.utcMs : now, originTz)}
               onChange={(e) => {
                 const utc = parseDateTimeLocal(e.target.value, originTz);
-                if (utc !== null) useAppStore.getState().setDeparture({ mode: 'at', utcMs: utc });
+                // Typed values can ignore min/max: keep within the forecast horizon.
+                if (utc !== null) useAppStore.getState().setDeparture({ mode: 'at', utcMs: Math.max(now - 3600_000, Math.min(now + 14 * 86400000, utc)) });
               }}
             />
           </label>
