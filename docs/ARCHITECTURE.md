@@ -30,6 +30,8 @@ public/          PWA manifest, icons, service worker, _headers (CSP)
 ```
 search / pin / link ─▶ Place ─▶ RoutingProvider (OSRM: full geometry, per-edge durations,
                                 steps with lanes/exits, up to 3 alternatives)
+     ─▶ (few roads? findViaRoutes: ask for routes THROUGH 4 probe points off the main road, keep the
+          believable ones — ≤ 1.5× the time, no out-and-back spur — silent via points, legs merged)
      ─▶ selectDistinctRoutes: the router's best road first, then only roads that really
                               go another way (≥ 10 % and ≥ 1 km of their own, not absurdly slow)
      ─▶ buildTimedRoute: cumulative distance + time for every vertex
@@ -99,6 +101,7 @@ that names implementations, chosen by `VITE_*` variables.
 
 | Interface | Default | Notes |
 | --- | --- | --- |
+| `RoutingProvider` per travel mode | car: OSRM demo; walk/bike: OSM community OSRM instances (`routing.openstreetmap.de/routed-foot|bike`); flight: `FlightEstimateProvider`; transit: none | `providersForMode(base, mode)` gives the mode's router (a flight has no places/elevation/road data); `travelMode` lives in the app store |
 | `RoutingProvider` | OSRM demo server | declares capabilities; `avoid` is empty because the demo server rejects `exclude`; asks for `alternatives=3` (plain `true` returns at most one), retrying with `true` if an older server answers 400 |
 | `WeatherProvider` (+ `WeatherService`) | Open-Meteo | batching, cache, stale fallback, model-run checks |
 | `GeocodingProvider` / `AutocompleteProvider` | Nominatim (1 req/s) / Photon | Nominatim forbids autocomplete |
@@ -216,3 +219,16 @@ One Cloudflare Worker with static assets (`wrangler.toml`): `/api/*` runs the
 Worker, everything else is served from `dist/` with `public/_headers` (CSP,
 Permissions-Policy) and SPA fallback. All of it fits the Workers Free plan.
 The static app alone also works on Cloudflare Pages — without live sharing.
+
+## Travel modes
+
+`TravelMode = drive | walk | bike | transit | flight` (`types/travel.ts`). The store's
+`travelMode` picks the router for planning, re-routing and places along the route
+(`routeProviders()`); the weather pipeline is the same for every mode, only the
+timing differs, so a walker gets the forecast for *their* arrival times. Car-only
+extras are gated on `travelMode === 'drive'`: speed limits, cameras, curves and
+crossings (`loadDriveExtras`), break reminders and fuel/charging advice (`derive`).
+Only `NAVIGABLE_MODES` (drive, walk, bike) can be started or simulated. A flight is the
+great-circle line with 25 min on the ground + 800 km/h, labelled as an estimate;
+transit has no router and `calculateRoute` reports that plainly. The saved drive
+session remembers the mode so a reload resumes a walk as a walk.

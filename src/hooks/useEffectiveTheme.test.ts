@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { autoThemeFor } from './useEffectiveTheme';
+import { autoThemeFor, resolveTheme } from './useEffectiveTheme';
 
 const KHASHURI: [number, number] = [43.6, 42.0];
 const sim = (nowMs: number) => ({ playing: true, speed: 60, nowMs, modelTimeS: 0, startMs: 0, arrived: false });
@@ -20,5 +20,25 @@ describe('automatic day/night while driving', () => {
     const vehicle = { coordinate: KHASHURI, timestampMs: 0 };
     const noon = () => Date.UTC(2026, 8, 26, 8, 0);
     expect(autoThemeFor({ mode: 'navigating', vehicle, sim: sim(0) }, noon)).toBe('light');
+  });
+});
+
+describe('which theme the app shows', () => {
+  it('"auto" is the device\'s own, while planning and while driving', () => {
+    expect(resolveTheme('auto', true, null)).toEqual({ theme: 'dark', forced: false });
+    expect(resolveTheme('auto', false, null)).toEqual({ theme: 'light', forced: false });
+    // Driving by day with a dark device: still dark.
+    expect(resolveTheme('auto', true, 'light')).toEqual({ theme: 'dark', forced: false });
+  });
+
+  it('"sun" follows the sun at the car once driving, the device before', () => {
+    expect(resolveTheme('sun', true, null)).toEqual({ theme: 'dark', forced: false });
+    expect(resolveTheme('sun', true, 'light')).toEqual({ theme: 'light', forced: true });
+    expect(resolveTheme('sun', false, 'dark')).toEqual({ theme: 'dark', forced: true });
+  });
+
+  it('light and dark are always what was chosen', () => {
+    expect(resolveTheme('light', true, 'dark')).toEqual({ theme: 'light', forced: true });
+    expect(resolveTheme('dark', false, 'light')).toEqual({ theme: 'dark', forced: true });
   });
 });

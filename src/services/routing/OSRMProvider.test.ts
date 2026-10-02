@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rawTbilisiBatumi, tbilisiBatumiRoute, TBILISI, BATUMI } from '../../test/helpers';
-import { normalizeOsrmRoute, OSRMProvider } from './OSRMProvider';
+import { mergeLegs, normalizeOsrmRoute, OSRMProvider } from './OSRMProvider';
 
 describe('OSRM alternatives request', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -86,5 +86,80 @@ describe('OSRM normalization (Tbilisi → Batumi)', () => {
     const r = normalizeOsrmRoute(raw, { origin: TBILISI, destination: BATUMI });
     expect(r.segmentSource).toBe('proportional');
     expect(r.segments).toHaveLength(1);
+  });
+});
+
+describe('routing through silent via points', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** The fixture road, split into two legs at the step nearest the middle, as OSRM answers a request with one via point. */
+  function twoLegs() {
+    const raw = rawTbilisiBatumi();
+    const leg = raw.legs[0];
+    const cut = Math.floor(leg.steps.length / 2);
+    const ann = leg.annotation!;
+    const k = leg.steps.slice(0, cut).reduce((n, s) => n + Math.max(0, (s.geometry?.coordinates.length ?? 1) - 1), 0);
+    const arrive = { ...leg.steps.at(-1)! };
+    const depart = { ...leg.steps[0] };
+    const first = [...leg.steps.slice(0, cut), { ...arrive, geometry: { coordinates: [leg.steps[cut].geometry!.coordinates[0]] } }];
+    const second = [{ ...depart, geometry: leg.steps[cut].geometry }, ...leg.steps.slice(cut + 1)];
+    raw.legs = [
+      { ...leg, steps: first, annotation: { duration: ann.duration!.slice(0, k), distance: ann.distance!.slice(0, k) }, distance: 1, duration: 1 },
+      { ...leg, steps: second, annotation: { duration: ann.duration!.slice(k), distance: ann.distance!.slice(k) }, distance: 1, duration: 1 },
+    ];
+    return { raw, expectedSteps: leg.steps.length };
+  }
+
+  it('merges the legs into one road: no stop at the via point, no instruction there', () => {
+    const { raw } = twoLegs();
+    const merged = mergeLegs(raw);
+    expect(merged.legs).toHaveLength(1);
+    const types = merged.legs[0].steps.map((s) => s.maneuver.type);
+    expect(types.filter((t) => t === 'arrive')).toHaveLength(1); // only the destination
+    expect(types.filter((t) => t === 'depart')).toHaveLength(1); // only the start
+    expect(types).toContain('new name'); // the quiet seam
+    const route = normalizeOsrmRoute(merged, { origin: TBILISI, destination: BATUMI });
+    expect(route.waypoints).toBeUndefined();
+    expect(route.legs).toHaveLength(1);
+    // Timing still follows the per-edge annotations, scaled to the whole.
+    expect(route.segmentSource).toBe('annotations');
+    expect(route.segments).toHaveLength(route.geometry.length - 1);
+    // Steps still line up with the geometry end to end.
+    const steps = route.legs[0].steps;
+    for (let i = 1; i < steps.length; i++) expect(steps[i].fromIndex).toBe(steps[i - 1].toIndex);
+    expect(steps.at(-1)!.toIndex).toBe(route.geometry.length - 1);
+  });
+
+  it('leaves a single-leg answer alone', () => {
+    const raw = rawTbilisiBatumi();
+    expect(mergeLegs(raw)).toBe(raw);
+  });
+
+  it('asks OSRM through the point, with no alternatives and a snapping radius for the via point only', async () => {
+    const urls: URL[] = [];
+    const { raw } = twoLegs();
+    vi.stubGlobal('fetch', async (input: string) => {
+      urls.push(new URL(input));
+      return Response.json({ code: 'Ok', routes: [raw] });
+    });
+    const osrm = new OSRMProvider('https://osrm.test', 'driving', 5000, undefined, 3);
+    const routes = await osrm.calculateRoutes({ origin: TBILISI, destination: BATUMI, alternatives: true, via: [[43.5, 42.6]] });
+    const u = urls[0];
+    expect(u.pathname).toContain('44.801449,41.693459;43.500000,42.600000;41.636009,41.650950');
+    expect(u.searchParams.get('alternatives')).toBe('false');
+    expect(u.searchParams.get('radiuses')).toBe('unlimited;8000;unlimited');
+    expect(routes).toHaveLength(1);
+    expect(routes[0].legs).toHaveLength(1);
+  });
+
+  it('ignores via points when stops are given, or when the server cannot', async () => {
+    const urls: URL[] = [];
+    vi.stubGlobal('fetch', async (input: string) => (urls.push(new URL(input)), Response.json({ code: 'Ok', routes: [rawTbilisiBatumi()] })));
+    const osrm = new OSRMProvider('https://osrm.test');
+    await osrm.calculateRoutes({ origin: TBILISI, destination: BATUMI, waypoints: [BATUMI], via: [[43.5, 42.6]] });
+    expect(urls[0].searchParams.get('radiuses')).toBeNull();
+    const noVia = new OSRMProvider('https://osrm.test', 'driving', 5000, { alternatives: true, avoid: [], laneGuidance: true, matrix: true, multiStop: true });
+    await noVia.calculateRoutes({ origin: TBILISI, destination: BATUMI, via: [[43.5, 42.6]] });
+    expect(urls[1].pathname.split(';')).toHaveLength(2);
   });
 });

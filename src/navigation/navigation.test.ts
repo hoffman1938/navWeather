@@ -127,4 +127,10 @@ describe('announcement timing', () => {
     expect(navigationZoom(5000, 30)).toBeLessThan(navigationZoom(150, 30));
     expect(navigationZoom(null, 10)).toBeGreaterThan(navigationZoom(null, 30));
   });
+
+  it('auto-zoom is close enough to read the road, even at highway speed', () => {
+    expect(navigationZoom(null, 30)).toBeGreaterThanOrEqual(14.75); // was 13.25: a regional map
+    expect(navigationZoom(null, 8)).toBeGreaterThanOrEqual(16);
+    expect(navigationZoom(150, 30)).toBeGreaterThan(16);
+  });
 });

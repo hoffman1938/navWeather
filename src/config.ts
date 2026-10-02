@@ -46,6 +46,9 @@ export const config = {
   },
   endpoints: {
     osrm: str('VITE_OSRM_BASE_URL', 'https://router.project-osrm.org'),
+    /** OpenStreetMap community routing instances for walking and cycling (the demo server above only does cars). */
+    osrmFoot: str('VITE_OSRM_FOOT_URL', 'https://routing.openstreetmap.de/routed-foot'),
+    osrmBike: str('VITE_OSRM_BIKE_URL', 'https://routing.openstreetmap.de/routed-bike'),
     openMeteo: str('VITE_OPEN_METEO_BASE_URL', 'https://api.open-meteo.com'),
     openMeteoAir: str('VITE_OPEN_METEO_AIR_URL', 'https://air-quality-api.open-meteo.com'),
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),

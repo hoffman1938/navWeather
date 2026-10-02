@@ -1,5 +1,5 @@
 import { localizeScript } from '../i18n/script';
-import { otherDistinctRoutes, selectDistinctRoutes } from '../algorithms/routeAlternatives';
+import { doublesBack, otherDistinctRoutes, probePoints, selectDistinctRoutes } from '../algorithms/routeAlternatives';
 import { snapPlacesToRoute } from '../algorithms/placesAlongRoute';
 import { nameSamples, refineSamplesForWeather, mergeSamples, sampleRoute } from '../algorithms/routeSampling';
 import { buildTimedRoute, positionAtDistance } from '../algorithms/routeTiming';
@@ -9,7 +9,7 @@ import { en, type Messages } from '../i18n/en';
 import type { LngLat, Place } from '../types/geo';
 import type { ElevationProfile, PlaceAlongRoute, Route, RouteSample, TimedRoute } from '../types/route';
 import type { LocationForecast, WeatherAtTime } from '../types/weather';
-import { isAbortError, ProviderError } from './http';
+import { isAbortError, mapWithConcurrency, ProviderError } from './http';
 import type { Providers } from './providers';
 import type { AvoidOption } from './routing/RoutingProvider';
 import type { ForecastLookup } from './weather/WeatherService';
@@ -98,6 +98,7 @@ export async function planRouteOptions(
   options: PlanOptions = {},
 ): Promise<RouteOptionsResult> {
   const { signal, onStage } = options;
+  const language = options.language ?? 'en';
   onStage?.('routing');
   const routes = await providers.routing.calculateRoutes({
     origin,
@@ -109,17 +110,87 @@ export async function planRouteOptions(
     signal,
   });
   // Only genuinely different roads: routers return near-copies of the best route.
-  const distinct = selectDistinctRoutes(routes, { max: options.alternatives ? (options.maxRoutes ?? config.routing.maxRoutes) : 1 });
-  const localized = distinct.map((r) => localizeRouteNames(r, options.language ?? 'en'));
-  const withTraffic = await Promise.all(localized.map((r) => providers.traffic.applyTraffic(r, signal)));
+  const maxRoutes = options.alternatives ? (options.maxRoutes ?? config.routing.maxRoutes) : 1;
+  const distinct = selectDistinctRoutes(routes, { max: maxRoutes });
+  // Routers often find no alternative at all. Look for more roads in the background, while the best one's
+  // place names and elevation load, so choosing between roads costs almost no extra waiting.
+  const probing =
+    options.alternatives && !options.waypoints?.length && distinct.length < maxRoutes
+      ? findViaRoutes(providers, distinct[0], origin, destination, { signal, startBearingDeg: options.startBearingDeg })
+      : Promise.resolve<Route[]>([]);
+  const best = await providers.traffic.applyTraffic(localizeRouteNames(distinct[0], language), signal);
   onStage?.('places');
-  const primary = await enrichRoute(providers, withTraffic[0], {
+  const primary = await enrichRoute(providers, best, {
     signal,
     placesDeadlineMs: options.placesDeadlineMs,
     language: options.language,
   });
-  const alternatives = withTraffic.slice(1).map((r) => basicPlan(buildTimedRoute(r)));
+  const viaRoutes = await probing;
+  if (signal?.aborted) throw new ProviderError('Request aborted', 'aborted', 'Planner');
+  const others = options.alternatives ? otherDistinctRoutes(distinct[0], [...distinct.slice(1), ...viaRoutes], { max: maxRoutes - 1 }) : [];
+  const alternatives = await Promise.all(
+    others.map(async (r) => basicPlan(buildTimedRoute(await providers.traffic.applyTraffic(localizeRouteNames(r, language), signal)))),
+  );
   return { primary, alternatives };
+}
+
+/** Is a road found through a via point a believable way to go, not a detour for its own sake? */
+function believable(route: Route, primary: Route): boolean {
+  return route.durationS <= primary.durationS * 1.5 && route.distanceM <= primary.distanceM * 1.6 && doublesBack(route) < 0.04;
+}
+
+/** How long to wait for roads found through via points before showing what there is. */
+export const VIA_PROBE_DEADLINE_MS = 6000;
+
+/**
+ * Roads a router would not offer by itself: ask it for routes THROUGH points
+ * off the main road, and keep the believable ones. Best effort — a point with
+ * no road near it is the normal case, and after the deadline whatever has come
+ * back is used. Needs a provider that can route through silent via points.
+ */
+export async function findViaRoutes(
+  providers: Providers,
+  primary: Route,
+  origin: Place,
+  destination: Place,
+  options: { signal?: AbortSignal; startBearingDeg?: number; deadlineMs?: number } = {},
+): Promise<Route[]> {
+  if (!providers.routing.capabilities.via) return [];
+  const ctrl = new AbortController();
+  const found: Route[] = [];
+  let closed = false;
+  let stop: () => void = () => undefined;
+  // Whichever comes first ends the wait — the probes finishing, the caller giving up, or the deadline —
+  // even if a provider ignores the abort signal.
+  const ended = new Promise<void>((resolve) => (stop = resolve));
+  const onAbort = () => {
+    ctrl.abort();
+    stop();
+  };
+  options.signal?.addEventListener('abort', onAbort, { once: true });
+  const timer = setTimeout(onAbort, options.deadlineMs ?? VIA_PROBE_DEADLINE_MS);
+  try {
+    const probes = mapWithConcurrency(probePoints(primary), 2, async (point) => {
+      try {
+        const [route] = await providers.routing.calculateRoutes({
+          origin,
+          destination,
+          via: [point],
+          startBearingDeg: options.startBearingDeg,
+          signal: ctrl.signal,
+        });
+        if (!closed && route && believable(route, primary)) found.push(route);
+      } catch {
+        /* no road there, router busy, deadline: this probe adds nothing */
+      }
+    });
+    await Promise.race([probes, ended]);
+  } finally {
+    closed = true;
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', onAbort);
+  }
+  return [...found];
 }
 
 /**
@@ -134,7 +205,8 @@ export async function planOtherRoads(
   destination: Place,
   options: { reference: Route; signal?: AbortSignal; startBearingDeg?: number; language?: string; maxRoads?: number },
 ): Promise<PlannedRoute[]> {
-  const { signal } = options;
+  const { signal, reference } = options;
+  const max = options.maxRoads ?? Math.max(0, config.routing.maxRoutes - 1);
   const routes = await providers.routing.calculateRoutes({
     origin,
     destination,
@@ -142,7 +214,11 @@ export async function planOtherRoads(
     alternatives: true,
     signal,
   });
-  const others = otherDistinctRoutes(options.reference, routes, { max: options.maxRoads ?? Math.max(0, config.routing.maxRoutes - 1) });
+  let others = otherDistinctRoutes(reference, routes, { max });
+  if (others.length < max) {
+    const viaRoutes = await findViaRoutes(providers, reference, origin, destination, { signal, startBearingDeg: options.startBearingDeg });
+    others = otherDistinctRoutes(reference, [...routes, ...viaRoutes], { max });
+  }
   const localized = others.map((r) => localizeRouteNames(r, options.language ?? 'en'));
   const withTraffic = await Promise.all(localized.map((r) => providers.traffic.applyTraffic(r, signal)));
   return withTraffic.map((r) => basicPlan(buildTimedRoute(r)));

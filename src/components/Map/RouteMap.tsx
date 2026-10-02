@@ -590,7 +590,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       map.once('moveend', () => (transitioning.current = false));
       map.easeTo({
         center: v.coordinate,
-        zoom: mode === 'simulating' ? 12 : 15,
+        zoom: mode === 'simulating' ? 12 : 16.5,
         bearing: v.headingDeg ?? 0,
         pitch: reduced ? 0 : 45,
         duration: reduced ? 0 : 900,
@@ -609,7 +609,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       map.once('moveend', () => (transitioning.current = false));
       map.easeTo({
         center: v.coordinate,
-        zoom: Math.max(map.getZoom(), 13),
+        zoom: Math.max(map.getZoom(), 15.5),
         bearing: v.headingDeg ?? map.getBearing(),
         pitch: reduced ? 0 : 45,
         duration: reduced ? 0 : 500,

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useExplore } from '../../state/explore';
 import { useLayoutStore } from '../../state/layout';
 import { useMessages } from '../../state/settings';
-import { useAppStore } from '../../state/store';
+import { useAppStore, type PlaceField } from '../../state/store';
 import { useElementSize } from '../../hooks/useElementSize';
 import { BackIcon, CloseIcon, DirectionsIcon, EditIcon, SettingsIcon, SwapIcon } from '../Icons/Icons';
 import { NearbyChips } from '../Explore/Nearby';
+import { TravelModeBar } from '../Plan/TravelModeBar';
 import { PlaceInput } from './PlaceInput';
 import './Search.css';
 
@@ -22,6 +23,7 @@ export function SearchPanel() {
     return r ? [r.origin.name, ...(r.waypoints ?? []).map((w) => w.name), r.destination.name].join(' → ') : '';
   });
   const mode = useAppStore((s) => s.mode);
+  const travelMode = useAppStore((s) => s.travelMode);
   const directionsOpen = useExplore((s) => s.directionsOpen);
   const query = useExplore((s) => s.query);
   const near = useExplore((s) => s.myLocation?.coordinate);
@@ -120,6 +122,7 @@ export function SearchPanel() {
           submit();
         }}
       >
+        <TravelModeBar />
         <div className="search__fields">
           <PlaceInput
             inputRef={firstField}
@@ -174,6 +177,11 @@ export function SearchPanel() {
             {routeError}
           </p>
         ) : null}
+        {routeError && travelMode === 'transit' ? (
+          <a className="linkbtn" href={transitTimetablesUrl(origin, destination)} target="_blank" rel="noopener noreferrer">
+            {m.travel.transitLink}
+          </a>
+        ) : null}
         <div className="search__actions">
           {!hasPlan ? (
             <button type="button" className="icon-btn" onClick={() => useExplore.getState().openDirections(false)} aria-label={m.explore.back}>
@@ -217,4 +225,17 @@ export function SearchPanel() {
       </form>
     </div>
   );
+}
+
+/**
+ * Where to look up public-transport timetables, which this app has no data for:
+ * Google Maps' directions page, opened only if the user taps the link.
+ * A start that is "Your location" is left out, so Google uses theirs.
+ */
+export function transitTimetablesUrl(origin: PlaceField, destination: PlaceField): string {
+  const text = (f: PlaceField) => (f.place?.kind === 'here' ? '' : f.place ? f.place.label || f.place.name : f.text.trim());
+  const params = new URLSearchParams({ api: '1', travelmode: 'transit' });
+  if (text(origin)) params.set('origin', text(origin));
+  if (text(destination)) params.set('destination', text(destination));
+  return `https://www.google.com/maps/dir/?${params}`;
 }

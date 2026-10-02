@@ -15,6 +15,8 @@ import { DepartureChart, DepartureTip } from './DeparturePlanner';
 import { ElevationProfile } from './ElevationProfile';
 import { DepartureSelector } from './DepartureSelector';
 import { RouteOptions } from './RouteOptions';
+import { TravelModeBar } from './TravelModeBar';
+import { NAVIGABLE_MODES } from '../../types/travel';
 import { ResumeDrive, takeResumableDrive } from './ResumeDrive';
 import './Plan.css';
 
@@ -116,28 +118,40 @@ function RouteHeader() {
   const plan = useAppStore((s) => s.plan)!;
   const arrivalMs = useAppStore((s) => s.derived.arrivalMs);
   const destTz = useAppStore((s) => s.derived.points.at(-1)?.timezone ?? deviceTimeZone());
+  const travelMode = useAppStore((s) => s.travelMode);
+  const navigable = NAVIGABLE_MODES.includes(travelMode);
   const { route } = plan.timed;
   return (
-    <div className="rhead">
-      <div className="rhead__text">
-        <h2 className="rhead__title">{route.destination.name}</h2>
-        <p className="rhead__meta tabular">
-          {formatDistance(plan.timed.totalDistM, units, m)} · ~{formatDuration(plan.timed.totalTimeS, m)}
-          {arrivalMs ? ` · ${m.ui.arrive(formatLocalTime(arrivalMs, destTz))}` : ''}
-        </p>
-        <DepartureSelector />
+    <>
+      <div className="rhead rhead--modes">
+        <TravelModeBar />
       </div>
-      <div className="rhead__actions">
-        <button className="btn btn-primary" onClick={() => void useAppStore.getState().requestNavigation()}>
-          <NavigateIcon size={16} />
-          {m.ui.start}
-        </button>
-        <button className="btn btn-quiet" onClick={() => useAppStore.getState().startSimulation()}>
-          <PlayIcon size={14} />
-          {m.ui.simulate}
-        </button>
+      <div className="rhead">
+        <div className="rhead__text">
+          <h2 className="rhead__title">{route.destination.name}</h2>
+          <p className="rhead__meta tabular">
+            {formatDistance(plan.timed.totalDistM, units, m)} · ~{formatDuration(plan.timed.totalTimeS, m)}
+            {arrivalMs ? ` · ${m.ui.arrive(formatLocalTime(arrivalMs, destTz))}` : ''}
+          </p>
+          {travelMode === 'flight' ? <p className="rhead__note">{m.travel.flightNote}</p> : null}
+          <DepartureSelector />
+        </div>
+        {navigable ? (
+          <div className="rhead__actions">
+            <button className="btn btn-primary" onClick={() => void useAppStore.getState().requestNavigation()}>
+              <NavigateIcon size={16} />
+              {m.ui.start}
+            </button>
+            <button className="btn btn-quiet" onClick={() => useAppStore.getState().startSimulation()}>
+              <PlayIcon size={14} />
+              {m.ui.simulate}
+            </button>
+          </div>
+        ) : (
+          <p className="rhead__note">{m.travel.flightPlanOnly}</p>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 

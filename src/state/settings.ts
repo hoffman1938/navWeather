@@ -7,7 +7,8 @@ import type { WeatherAlertPrefs } from '../intelligence/weatherAlerts';
 export interface Settings {
   language: Locale;
   units: UnitPrefs;
-  theme: 'auto' | 'light' | 'dark';
+  /** auto = like the device; sun = like the device, but day/night by the sun at the car while driving. */
+  theme: 'auto' | 'light' | 'dark' | 'sun';
   /** Spoken turn-by-turn and alerts. */
   voice: boolean;
   /** Which Google voice speaks each language: 'auto' (the best one) or 'device:<voiceURI>'. */
@@ -17,8 +18,10 @@ export interface Settings {
   weatherAlerts: WeatherAlertPrefs;
   speedWarnings: boolean;
   breakReminders: boolean;
-  /** Mapped speed cameras (off by default: not legal everywhere). */
+  /** Mapped speed cameras (on by default; the setting says to use them only where that is legal). */
   speedCameras: boolean;
+  /** The user has switched cameras on or off themselves — only then does a stored value beat the default. */
+  speedCamerasChosen: boolean;
   /** Voice + sign before sharp curves (route geometry) and railway crossings (OSM). */
   roadHazards: boolean;
   /** Other drivers' (unconfirmed) reports on the route, "still there?" prompts, and the Report button. */
@@ -44,7 +47,8 @@ export function defaultSettings(): Settings {
     weatherAlerts: { level: 'all', types: { rain: true, snow: true, fog: true, wind: true, temperature: true } },
     speedWarnings: true,
     breakReminders: true,
-    speedCameras: false,
+    speedCameras: true,
+    speedCamerasChosen: false,
     roadHazards: true,
     driverReports: true,
     batterySaver: false,
@@ -89,7 +93,7 @@ export function parseSettings(raw: string | null, base = defaultSettings()): Set
         temperature: oneOf(units.temperature, ['c', 'f'] as const, base.units.temperature),
         wind: oneOf(units.wind, ['kmh', 'mph', 'ms'] as const, base.units.wind),
       },
-      theme: oneOf(s.theme, ['auto', 'light', 'dark'] as const, base.theme),
+      theme: oneOf(s.theme, ['auto', 'light', 'dark', 'sun'] as const, base.theme),
       voice: bool(s.voice, base.voice),
       voiceByLang: voiceChoices(s.voiceByLang),
       alertOutput: oneOf(s.alertOutput, ['both', 'visual', 'voice', 'off'] as const, base.alertOutput),
@@ -106,7 +110,9 @@ export function parseSettings(raw: string | null, base = defaultSettings()): Set
       },
       speedWarnings: bool(s.speedWarnings, base.speedWarnings),
       breakReminders: bool(s.breakReminders, base.breakReminders),
-      speedCameras: bool(s.speedCameras, base.speedCameras),
+      // Saved before cameras were on by default: that stored `false` was the old default, not a choice.
+      speedCameras: s.speedCamerasChosen === true ? bool(s.speedCameras, base.speedCameras) : base.speedCameras,
+      speedCamerasChosen: s.speedCamerasChosen === true,
       roadHazards: bool(s.roadHazards, base.roadHazards),
       driverReports: bool(s.driverReports, base.driverReports),
       batterySaver: bool(s.batterySaver, base.batterySaver),
@@ -152,7 +158,7 @@ export const useSettings = create<SettingsStore>()((set, get) => ({
       );
       return;
     }
-    set(patch);
+    set('speedCameras' in patch ? { ...patch, speedCamerasChosen: true } : patch);
     const { update: _u, reset: _r, ...rest } = get();
     save(rest);
   },

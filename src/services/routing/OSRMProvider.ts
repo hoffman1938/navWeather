@@ -68,6 +68,7 @@ export class OSRMProvider implements RoutingProvider {
       laneGuidance: true,
       matrix: true,
       multiStop: true,
+      via: true,
     },
     /**
      * Alternatives to ask for. `alternatives=true` yields at most ONE, so a
@@ -77,9 +78,11 @@ export class OSRMProvider implements RoutingProvider {
   ) {}
 
   async calculateRoutes(req: RouteRequest): Promise<Route[]> {
-    const points = [req.origin, ...(req.waypoints ?? []), req.destination];
+    const via = this.capabilities.via && !req.waypoints?.length ? (req.via ?? []) : [];
+    const points: { coordinate: LngLat }[] = [req.origin, ...via.map((coordinate) => ({ coordinate })), ...(req.waypoints ?? []), req.destination];
     // OSRM only computes alternatives for two-point requests.
     const wantsAlternatives = !!req.alternatives && this.capabilities.alternatives && points.length === 2;
+    if (via.length) return this.request(req, points, 'false', via.length);
     const count = wantsAlternatives ? Math.max(1, Math.round(this.maxAlternatives)) : 0;
     try {
       return await this.request(req, points, count > 1 ? String(count) : count === 1 ? 'true' : 'false');
@@ -92,7 +95,7 @@ export class OSRMProvider implements RoutingProvider {
     }
   }
 
-  private async request(req: RouteRequest, points: RouteRequest['origin'][], alternatives: string): Promise<Route[]> {
+  private async request(req: RouteRequest, points: { coordinate: LngLat }[], alternatives: string, viaCount = 0): Promise<Route[]> {
     const coords = points.map((p) => coordParam(p.coordinate)).join(';');
     const params = new URLSearchParams({
       overview: 'full',
@@ -101,6 +104,8 @@ export class OSRMProvider implements RoutingProvider {
       annotations: 'duration,distance',
       alternatives,
     });
+    // A via point far from any road means "no road there", not "snap to the nearest road in the country".
+    if (viaCount) params.set('radiuses', points.map((_, i) => (i > 0 && i <= viaCount ? String(VIA_SNAP_RADIUS_M) : 'unlimited')).join(';'));
     if (req.startBearingDeg !== undefined && Number.isFinite(req.startBearingDeg)) {
       params.set('bearings', [`${Math.round(req.startBearingDeg) % 360},60`, ...points.slice(1).map(() => '')].join(';'));
     }
@@ -118,7 +123,7 @@ export class OSRMProvider implements RoutingProvider {
       const kind = data.code === 'NoRoute' || data.code === 'NoSegment' ? 'no-route' : 'invalid-response';
       throw new ProviderError(data.message ?? `Routing failed (${data.code})`, kind, 'Routing service');
     }
-    return data.routes.map((r) => normalizeOsrmRoute(r, req));
+    return data.routes.map((r) => normalizeOsrmRoute(viaCount ? mergeLegs(r) : r, req));
   }
 
   /** OSRM table service: real driving durations/distances (used for detours). */
@@ -143,6 +148,48 @@ export class OSRMProvider implements RoutingProvider {
   private get base() {
     return this.baseUrl.replace(/\/$/, '');
   }
+}
+
+/** How far from a road a via point may be and still count (m). */
+const VIA_SNAP_RADIUS_M = 8000;
+
+/**
+ * One leg out of several (a route through silent via points): the arrival at
+ * each via point is dropped and the departure after it becomes a quiet
+ * "new name" step, so there is no stop and no spoken instruction there.
+ * Exported for tests.
+ */
+export function mergeLegs(raw: OsrmRoute): OsrmRoute {
+  if (raw.legs.length < 2) return raw;
+  const last = raw.legs.length - 1;
+  const steps: OsrmStep[] = [];
+  raw.legs.forEach((leg, li) => {
+    leg.steps.forEach((st, si) => {
+      if (li < last && si === leg.steps.length - 1 && st.maneuver.type === 'arrive') return;
+      if (li > 0 && si === 0 && st.maneuver.type === 'depart') {
+        steps.push({ ...st, maneuver: { ...st.maneuver, type: 'new name', modifier: 'straight' } });
+        return;
+      }
+      steps.push(st);
+    });
+  });
+  const cat = (key: 'duration' | 'distance' | 'speed'): number[] | undefined => {
+    const parts = raw.legs.map((l) => l.annotation?.[key]);
+    return parts.every((p): p is number[] => Array.isArray(p)) ? parts.flat() : undefined;
+  };
+  const annotation = { duration: cat('duration'), distance: cat('distance'), speed: cat('speed') };
+  return {
+    ...raw,
+    legs: [
+      {
+        distance: raw.legs.reduce((a, l) => a + l.distance, 0),
+        duration: raw.legs.reduce((a, l) => a + l.duration, 0),
+        summary: raw.legs.map((l) => l.summary).filter(Boolean).join(', '),
+        steps,
+        annotation: annotation.duration && annotation.distance ? annotation : undefined,
+      },
+    ],
+  };
 }
 
 /** Convert an OSRM route into the app's normalized Route. Exported for tests. */

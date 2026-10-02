@@ -44,8 +44,19 @@ weather and AQI at the map centre. Directions start from "Your location".
 Save places as Home, Work or favourites; share a place as a link; after a
 drive, save where you parked (this device only).
 
+**Travel modes** — car, walking, bicycle, public transport, flight, as tabs like
+Google Maps. Walking and cycling are routed by OpenStreetMap's community routing
+servers, with the same weather at *your* pace (rain matters more on a bike) and
+turn-by-turn; the driving extras (speed limits, cameras, curves, driving breaks,
+fuel advice) stay for the car. **Flight is a labelled estimate** — the straight
+line and a typical time, no airports, schedules or prices — and is a plan only.
+**Public transport is not available**: it needs timetable data and there is no
+free worldwide source, so the app says so (and links to Google Maps timetables,
+opened only if you tap it) instead of inventing anything.
+
 **Plan** — up to three genuinely different **roads** to the destination (near-copies
-of the best route are dropped), each with its own forecast: the road numbers it
+of the best route are dropped; when the router offers none, the app asks it for
+routes *through* points off the main road and keeps the believable ones), each with its own forecast: the road numbers it
 follows ("via S1 · S12"), a weather ribbon along its whole length, a few stops with
 the time you would be there and the expected weather and temperature, and the
 exposure in minutes ("Heavy rain 35 min" vs "Mostly dry"; never auto-selected).
@@ -67,8 +78,8 @@ Also:
 speed limits (OSM, "signs take precedence"), the "Ahead" list and time-based
 weather alerts that stay quiet unless it matters, low-sun glare warnings,
 time-zone changes, break reminders, sharp curves and railway crossings (with
-the forecast road surface), and optional speed-camera alerts (OSM, off by
-default — not legal everywhere). Push-to-talk voice questions ("When will the
+the forecast road surface), and speed-camera alerts (OSM, **on by default** — use them only where that is legal;
+one switch in Settings). Push-to-talk voice questions ("When will the
 rain start?", "Find a gas station", "Recalculate route", "Report an
 accident"). Arrival shows a trip summary (not stored).
 
@@ -99,8 +110,9 @@ can't give one (location off or blocked, no GPS on a desktop), the trip starts
 from your approximate area (city level, from your connection via the app's own
 Worker — no third party) and the app says so; type an exact start any time.
 
-English and Russian; metric/imperial; light/dark/automatic (day/night
-by the sun at the car while driving); installable PWA.
+English and Russian; metric/imperial; appearance **like the device** (a dark phone gets
+a dark map in the car too), light, dark, or "day and night" (the sun at the car while
+driving); a street-level camera while driving; installable PWA.
 
 ## What it costs: nothing
 

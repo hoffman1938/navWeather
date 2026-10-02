@@ -153,9 +153,10 @@ export function markSpoken(mv: Maneuver, stage: AnnouncementStage, spoken: Set<s
 /** Navigation camera zoom: zoom out on open road, zoom in approaching maneuvers. */
 export function navigationZoom(distanceToManeuverM: number | null, speedMps: number): number {
   const v = speedMps || 0;
-  const cruise = v >= 25 ? 13.25 : v >= 15 ? 14.25 : 15.25;
+  // Close enough to read the road you are on: a street-level view even at highway speed.
+  const cruise = v >= 25 ? 14.75 : v >= 15 ? 15.75 : 16.5;
   if (distanceToManeuverM === null || distanceToManeuverM > 900) return cruise;
-  const near = 16.5;
+  const near = 17.25;
   const t = Math.max(0, Math.min(1, (900 - distanceToManeuverM) / 750));
   const z = cruise + (near - cruise) * t;
   return Math.round(z * 4) / 4; // quantize → no jitter

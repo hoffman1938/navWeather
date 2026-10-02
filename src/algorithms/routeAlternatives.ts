@@ -1,4 +1,6 @@
+import type { LngLat } from '../types/geo';
 import type { Route } from '../types/route';
+import { bearingDeg, cumulativeDistances, destinationPoint, pointAtDistance } from '../utils/distance';
 import { buildTimedRoute } from './routeTiming';
 import { createRouteProjector } from './placesAlongRoute';
 
@@ -15,7 +17,7 @@ export interface DistinctRouteOptions {
   bufferM?: number;
 }
 
-const DEFAULTS = { maxSharedFraction: 0.9, minUniqueM: 1000, maxSlowerRatio: 1.75, bufferM: 120 };
+const DEFAULTS = { maxSharedFraction: 0.93, minUniqueM: 1000, maxSlowerRatio: 1.75, bufferM: 120 };
 
 /**
  * Share of `route`'s length (0–1) that runs along the road `reference` takes.
@@ -96,4 +98,55 @@ export function routeVia(route: Route, max = 2): string[] {
     .sort((a, b) => b[1] - a[1])
     .slice(0, max)
     .map(([label]) => label);
+}
+
+/**
+ * Places to ask a router to route THROUGH, to find roads it would not offer on
+ * its own: at a few points along `route`, to its left and right, far enough
+ * (12 % of the trip, 6–40 km) that a road through them is a different road.
+ * A router snaps each to its nearest road, so a point that lands on the main
+ * road itself just gives the main road back — harmless, and then dropped.
+ */
+export function probePoints(route: Route, fractions: number[] = [0.35, 0.65]): LngLat[] {
+  const g = route.geometry;
+  if (g.length < 2) return [];
+  const cum = cumulativeDistances(g);
+  const total = cum[cum.length - 1];
+  const offsetM = Math.max(6000, Math.min(40_000, total * 0.12));
+  return fractions.flatMap((f) => {
+    const { coordinate, index } = pointAtDistance(g, cum, total * f);
+    const heading = bearingDeg(g[Math.min(index, g.length - 2)], g[Math.min(index + 1, g.length - 1)]);
+    return [destinationPoint(coordinate, heading - 90, offsetM), destinationPoint(coordinate, heading + 90, offsetM)];
+  });
+}
+
+/**
+ * How much of the road goes back over road it has already driven (an out-and-back
+ * spur to reach a via point, rather than a road that gets there and goes on): the
+ * share of its length (0–1) that passes a place it passed more than 8 km earlier.
+ */
+export function doublesBack(route: Route): number {
+  const g = route.geometry;
+  if (g.length < 2) return 0;
+  const cum = cumulativeDistances(g);
+  const total = cum[cum.length - 1];
+  if (total <= 0) return 0;
+  const CELL = 0.003; // ≈ 300 m
+  const seen = new Map<string, number>();
+  const key = (cx: number, cy: number) => `${cx}:${cy}`;
+  let revisitedM = 0;
+  for (let i = 0; i < g.length; i++) {
+    const cx = Math.round(g[i][0] / CELL);
+    const cy = Math.round(g[i][1] / CELL);
+    let back = false;
+    for (let dx = -1; dx <= 1 && !back; dx++) {
+      for (let dy = -1; dy <= 1 && !back; dy++) {
+        const first = seen.get(key(cx + dx, cy + dy));
+        if (first !== undefined && cum[i] - first > 8000) back = true;
+      }
+    }
+    if (back && i > 0) revisitedM += cum[i] - cum[i - 1];
+    if (!seen.has(key(cx, cy))) seen.set(key(cx, cy), cum[i]);
+  }
+  return revisitedM / total;
 }

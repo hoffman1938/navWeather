@@ -7,17 +7,21 @@ import { useDarkMode } from './useMediaQuery';
 export type Theme = 'light' | 'dark';
 
 /**
- * Theme: the user's choice (light/dark), or automatic. Automatic follows the
- * system while planning, and day/night at the vehicle while driving — like a
- * car navigation system.
+ * Theme: light or dark as chosen; "auto" is the device's own (always — a dark
+ * phone gets a dark map in the car too); "sun" is the device's while planning
+ * and day/night at the vehicle while driving, like a car navigation system.
  */
+export function resolveTheme(choice: 'auto' | 'light' | 'dark' | 'sun', systemDark: boolean, sun: Theme | null): { theme: Theme; forced: boolean } {
+  if (choice === 'light' || choice === 'dark') return { theme: choice, forced: true };
+  if (choice === 'sun' && sun !== null) return { theme: sun, forced: true };
+  return { theme: systemDark ? 'dark' : 'light', forced: false };
+}
+
 export function useEffectiveTheme(): { theme: Theme; forced: boolean } {
   const systemDark = useDarkMode();
   const choice = useSettings((s) => s.theme);
-  const auto = useAppStore(autoThemeFor);
-  if (choice !== 'auto') return { theme: choice, forced: true };
-  if (auto === null) return { theme: systemDark ? 'dark' : 'light', forced: false };
-  return { theme: auto, forced: true };
+  const sun = useAppStore(autoThemeFor);
+  return resolveTheme(choice, systemDark, sun);
 }
 
 /** Day/night at the vehicle's position and (real or simulated) time; null while planning. */
