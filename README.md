@@ -60,6 +60,17 @@ Georgian intercity trains and marshrutkas are not — then the app says "no publ
 transport found" (and links to Google Maps timetables, opened only if you tap it)
 instead of inventing anything. It is a plan only, like a flight.
 
+**Long Trip Mode** — trips of 800 km+, 10 h+ of driving, or that need a night
+switch it on by themselves (thresholds in one config file; you can turn it off or
+on for any trip). The planner (a stateless Cloudflare Worker endpoint) lays out
+breaks, meals, fuel/charging (only from the range you enter), overnight areas in
+real towns, days, a timeline and the weather at the times you'll really be there
+— stops included — and suggests stopping earlier when heavy weather falls late
+in the day. Hotels, fuel, food and rest areas come from OpenStreetMap with the
+reason each was picked (availability, prices and ratings are not claimed), plus
+border crossings. While driving, it replans when you fall well behind.
+Details: [docs/features/LONG_TRIP_MODE.md](docs/features/LONG_TRIP_MODE.md).
+
 **Plan** — up to three genuinely different **roads** to the destination (near-copies
 of the best route are dropped; when the router offers none, the app asks it for
 routes *through* points off the main road and keeps the believable ones), each with its own forecast: the road numbers it

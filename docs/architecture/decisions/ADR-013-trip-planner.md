@@ -26,11 +26,15 @@ Option 3.
   ranking, opening hours, weather risks, replanning helpers). The Worker
   imports it like the share/report protocols, so the same engine can later run
   on iOS/Android/CarPlay/Android Auto or a fleet backend unchanged.
-- `POST /api/v1/trips/plan` (Worker) validates the request, fetches
-  OpenStreetMap places around the stop zones from Overpass **server-side**
-  (identifying User-Agent, one query per zone, edge-cached by area for 24 h),
-  runs the planner with a time budget and returns the plan. Rate-limited per
-  client. No storage, no logging of coordinates.
+- `POST /api/v1/trips/plan` (Worker) validates the request and returns the
+  plan **without place lookups** (≈0.3 s): overnight areas are chosen from
+  settlements. Live tests showed the public Overpass taking ~7–11 s per
+  query, so places are a separate call:
+  `POST /api/v1/trips/places` (one stop, Overpass **server-side** with an
+  identifying User-Agent, edge-cached by area for 24 h) when the user opens a
+  stop (the first night is prefetched), and `POST /api/v1/trips/borders`
+  (countries along the route, one `is_in` query, cached 7 days).
+  Rate-limited per client. No storage, no logging of coordinates.
 - The client classifies instantly with the same pure function (so the UI
   reacts before the network answers, and offline), asks the Worker for the
   plan, applies the plan's stop durations to every ETA (weather at the real
@@ -47,8 +51,8 @@ by area and carry a proper User-Agent — better for the public Overpass than
 per-browser calls.
 
 ## Consequences
-- New endpoint, new rate-limit binding (`TRIP_LIMITER`), new Overpass
-  subrequests from the Worker (≤ ~10 per plan; Free plan allows 50).
+- Three endpoints, a new rate-limit binding (`TRIP_LIMITER`), and Overpass
+  subrequests from the Worker (one per places/borders call).
 - Workers Free allows **10 ms CPU** per invocation; JSON parsing of Overpass
   answers plus planning can exceed it on long trips → Workers Paid is
   expected for production use of this endpoint (REQ-CF-007). Measured cost

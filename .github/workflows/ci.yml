@@ -41,5 +41,6 @@ jobs:
           curl -sf http://127.0.0.1:8787/api/v1/health || (cat wrangler.log; exit 1)
           npm run test:share
           npm run test:reports
+          npm run test:trips
           API=/api npm run test:share
           API=/api npm run test:reports

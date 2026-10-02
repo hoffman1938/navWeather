@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { getProviders } from '../services/providers';
 import { forecastLookupFn } from '../services/routePlanner';
 import { isAbortError } from '../services/http';
-import { buildTripRequest, fetchStopPlaces, fetchTripPlan, profileFromTimed } from '../services/trip/requests';
+import { buildTripRequest, fetchBorders, fetchStopPlaces, fetchTripPlan, profileFromTimed } from '../services/trip/requests';
+import type { BorderCrossing } from '../trip/borders';
 import { atLeast, classifyTrip, countTimeZoneChanges } from '../trip/classification/classify';
 import { REPLAN, TRIP_THRESHOLDS } from '../trip/config';
 import { delaySeconds, progressStateFor } from '../trip/replanning/progress';
@@ -42,6 +43,8 @@ export interface TripState {
   overnightsM: number[];
   stopPlaces: Record<string, StopPlacesState>;
   lastReplanAt: number;
+  /** Border crossings along the route (OSM countries), loaded after the plan. */
+  borders: { status: 'idle' | 'loading' | 'ready' | 'error'; crossings: BorderCrossing[] };
 
   setOverride(mode: LongTripOverride): void;
   /** Re-classify and (when the trip calls for it) ask for a plan. */
@@ -61,6 +64,7 @@ const initial = {
   overnightsM: [],
   stopPlaces: {},
   lastReplanAt: 0,
+  borders: { status: 'idle' as const, crossings: [] as BorderCrossing[] },
 };
 
 let planAbort: AbortController | null = null;
@@ -156,8 +160,10 @@ export const useTripStore = create<TripState>()((set, get) => ({
       return;
     }
     // A new route: wait for its forecasts (the planner needs them for weather risks) — the weather
-    // subscription asks once they are loaded or have failed. A re-route while driving can't wait.
-    if (reason === 'route' && !progress) return;
+    // subscription asks once they are loaded or have failed. A re-route while driving can't wait, and
+    // another road picked from the options already has its forecasts (they were loaded for every road).
+    const hasForecasts = plan.samples.length > 0 && plan.samples.every((s) => lookup(s));
+    if (reason === 'route' && !progress && !hasForecasts) return;
     void requestPlan(lookup, progress);
   },
 
@@ -240,6 +246,7 @@ async function requestPlan(lookup: ReturnType<typeof forecastLookupFn>, progress
     // Prefetch the first night's hotels: the most important stop on a long trip.
     const night = plan.recommendedStops.find((s) => s.kinds.includes('overnight'));
     if (night && longTripActive()) useTripStore.getState().loadStopPlaces(night.id);
+    if (longTripActive() && useTripStore.getState().borders.status === 'idle') loadBorders(ctx.plan.timed.route.id);
   } catch (e) {
     if (isAbortError(e)) return;
     useTripStore.setState({ status: 'error', error: useAppStore.getState().online ? 'unavailable' : 'offline' });
@@ -249,6 +256,26 @@ async function requestPlan(lookup: ReturnType<typeof forecastLookupFn>, progress
 }
 
 let lastCheckAt = 0;
+
+/** Countries along the route (once per route; the route's shape, not the user's position, is sent). */
+function loadBorders(routeId: string) {
+  const app = useAppStore.getState();
+  if (!app.plan || app.plan.timed.route.id !== routeId) return;
+  useTripStore.setState({ borders: { status: 'loading', crossings: [] } });
+  fetchBorders(app.plan.timed, currentMessages().locale)
+    .then((r) => {
+      const t = useTripStore.getState();
+      if (t.routeId !== routeId) return;
+      useTripStore.setState({
+        borders: { status: 'ready', crossings: r.crossings },
+        ...(t.classification && r.countries.some(Boolean) ? { classification: { ...t.classification, requiresBorderCrossing: r.crossings.length > 0 } } : {}),
+      });
+    })
+    .catch(() => {
+      if (useTripStore.getState().routeId !== routeId) return;
+      useTripStore.setState({ borders: { status: 'error', crossings: [] } });
+    });
+}
 
 /** While really driving: replan when the car is well behind or ahead of the plan. */
 function checkProgress() {

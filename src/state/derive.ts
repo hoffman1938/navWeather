@@ -247,7 +247,16 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
       ? stableJson(
           previous.options,
           // A public-transport trip starts at its own timetabled time; a road whenever you leave.
-          input.options.map((o, i) => summarizeOption(wholeRoad(o), i, input, o.timed.route.transit?.departMs ?? input.departureMs)),
+          input.options.map((o, i) =>
+            summarizeOption(
+              wholeRoad(o),
+              i,
+              input,
+              o.timed.route.transit?.departMs ?? input.departureMs,
+              // The trip plan belongs to the chosen road: its card shows the times with the planned stops.
+              o === plan && dwellBeforeS ? dwellBeforeS : undefined,
+            ),
+          ),
         )
       : [];
   const otherRoads = navigating ? stableJson(previous.otherRoads, summarizeOtherRoads(input, plan, progress)) : [];
@@ -278,7 +287,14 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
  * rain / heavy rain / storm / snow / fog / strong gusts. `departureMs` is when
  * the road would be started (the plan's departure, or now for roads from the car).
  */
-export function summarizeOption(o: OptionRoad, index: number, input: DeriveInput, departureMs = input.departureMs): RouteOptionSummary {
+export function summarizeOption(
+  o: OptionRoad,
+  index: number,
+  input: DeriveInput,
+  departureMs = input.departureMs,
+  dwellBeforeS?: (alongM: number) => number,
+): RouteOptionSummary {
+  const dwell = (m: number) => (dwellBeforeS ? dwellBeforeS(m) * 1000 : 0);
   let wet = 0;
   let heavy = 0;
   let has = false;
@@ -286,7 +302,7 @@ export function summarizeOption(o: OptionRoad, index: number, input: DeriveInput
   const s = o.samples;
   const points = buildRouteWeatherPoints({
     samples: s,
-    arrivals: s.map((smp) => departureMs + smp.travelTimeS * 1000),
+    arrivals: s.map((smp) => departureMs + smp.travelTimeS * 1000 + dwell(smp.distanceM)),
     forecastFor: input.forecastFor,
     nowMs: input.nowMs,
     progressM: null,
@@ -315,7 +331,7 @@ export function summarizeOption(o: OptionRoad, index: number, input: DeriveInput
     index,
     distanceM: o.totalDistM,
     durationS: o.totalTimeS,
-    arrivalMs: departureMs + o.totalTimeS * 1000,
+    arrivalMs: departureMs + o.totalTimeS * 1000 + dwell(o.totalDistM + 2),
     via: routeVia(o.route),
     wetMinutes: Math.round(wet),
     heavyMinutes: Math.round(heavy),

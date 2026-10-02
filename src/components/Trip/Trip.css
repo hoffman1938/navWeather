@@ -76,6 +76,11 @@
   font-size: 17px;
   font-weight: 700;
 }
+.ltrip__tile-value--text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
 .ltrip__tile-label {
   font-size: 12px;
   color: var(--text-3);

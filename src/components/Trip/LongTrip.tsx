@@ -1,15 +1,10 @@
-import { useState } from 'react';
-import { formatDistance, formatDuration, formatTemp, conditionText } from '../../i18n/format';
+import { formatDistance, formatDuration, formatDurationCompact } from '../../i18n/format';
 import { localizeScript } from '../../i18n/script';
 import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { longTripActive, useTripStore } from '../../state/trip';
-import type { ReasonCode, RecommendedPlace, StopPlaces, TimelineEntry, TripPlan, TripStop } from '../../trip/types';
+import type { ReasonCode, TripPlan } from '../../trip/types';
 import { formatLocalTime, formatWeekday, localDateKey } from '../../utils/timezone';
-import type { EventIcon as EventIconKey } from '../../intelligence/types';
-import { EventIcon } from '../Common/EventIcon';
-import { ChevronIcon } from '../Icons/Icons';
-import { WeatherIcon } from '../WeatherIcon/WeatherIcon';
 import './Trip.css';
 
 /**
@@ -17,19 +12,19 @@ import './Trip.css';
  * from the trip store; never computes trip logic itself.
  */
 
-type M = ReturnType<typeof useMessages>;
+export type M = ReturnType<typeof useMessages>;
 
 /** "18:40", or "Sat 18:40" when it isn't today where it happens. */
-function when(ms: number, tz: string, m: M): string {
+export function when(ms: number, tz: string, m: M): string {
   const time = formatLocalTime(ms, tz);
   return localDateKey(ms, tz) === localDateKey(Date.now(), tz) ? time : `${formatWeekday(ms, tz, m.locale)} ${time}`;
 }
 
-function name(s: string | undefined, m: M): string {
+export function name(s: string | undefined, m: M): string {
   return s ? localizeScript(s, m.locale) : '';
 }
 
-function reasonText(r: ReasonCode, m: M, units: 'metric' | 'imperial'): string {
+export function reasonText(r: ReasonCode, m: M, units: 'metric' | 'imperial'): string {
   const R = m.trip.reason;
   switch (r.code) {
     case 'near-route':
@@ -81,7 +76,7 @@ export function LongTripBanner() {
       </div>
     );
   }
-  if (c.longTripMode || c.category === 'EXTENDED' || c.category === 'LONG') {
+  if (c.longTripMode || c.category !== 'SHORT') {
     return (
       <div className="ltrip-banner ltrip-banner--quiet">
         <button className="linkbtn" onClick={() => set('on')}>
@@ -101,6 +96,9 @@ export function LongTripDashboard() {
   const error = useTripStore((s) => s.error);
   const active = useTripStore((s) => longTripActive(s));
   const classification = useTripStore((s) => s.classification);
+  const borders = useTripStore((s) => s.borders);
+  // The app's arrival (exact route timing + planned stops) — the same number as the header.
+  const appArrival = useAppStore((s) => s.derived.arrivalMs);
   if (!active) return null;
   if (!plan) {
     return (
@@ -126,31 +124,37 @@ export function LongTripDashboard() {
   const S = plan.summary;
   const T = m.trip.tiles;
   const tz = plan.timeline.at(-1)?.tz ?? 'UTC';
+  const borderValue = borders.status === 'ready' ? String(borders.crossings.length) : borders.status === 'loading' ? '…' : m.trip.notChecked;
   const tiles: [string, string][] = [
-    [T.driving, formatDuration(plan.estimatedDrivingTimeMinutes * 60, m)],
+    [T.driving, formatDurationCompact(plan.estimatedDrivingTimeMinutes * 60, m)],
     [T.overnights, String(S.overnights)],
     [T.fuel, String(S.fuelStops)],
     [T.rest, String(S.restStops)],
     [T.meals, String(S.mealStops)],
     [T.weather, String(S.weatherRisks)],
-    [T.border, S.borderCrossings === null ? m.trip.notChecked : String(S.borderCrossings)],
+    [T.border, borderValue],
   ];
   return (
     <section className="ltrip" aria-label={m.trip.longTrip}>
       <h3 className="ltrip__label">{m.trip.longTrip}</h3>
       <div className="ltrip__eta">
         <span className="ltrip__eta-label">{m.trip.arrival}</span>
-        <span className="ltrip__eta-time tabular">{when(plan.arriveAtMs, tz, m)}</span>
+        <span className="ltrip__eta-time tabular">{when(appArrival ?? plan.arriveAtMs, tz, m)}</span>
         <span className="ltrip__eta-note">{m.trip.totalTime(formatDuration(plan.estimatedTotalTimeMinutes * 60, m))}</span>
       </div>
       <ul className="ltrip__tiles">
         {tiles.map(([k, v]) => (
           <li key={k}>
-            <span className="ltrip__tile-value tabular">{v}</span>
+            <span className={`ltrip__tile-value tabular${/\d/.test(v) ? '' : ' ltrip__tile-value--text'}`}>{v}</span>
             <span className="ltrip__tile-label">{k}</span>
           </li>
         ))}
       </ul>
+      {borders.crossings.length ? (
+        <p className="ltrip__note">
+          {borders.crossings.map((c) => m.trip.borderLine(name(c.from.name, m), name(c.to.name, m), `${Math.round(c.alongM / 1000)} km`)).join(' · ')}
+        </p>
+      ) : null}
       {status === 'loading' ? (
         <p className="plan-status" role="status">
           <span className="spinner" aria-hidden="true" />
@@ -189,254 +193,5 @@ function TripAdvice({ plan }: { plan: TripPlan }) {
         return null;
       })}
     </>
-  );
-}
-
-function PlacesList({ places, m, units }: { places: StopPlaces[]; m: M; units: 'metric' | 'imperial' }) {
-  return (
-    <div className="ltrip-places">
-      {places.map((cat) => (
-        <div key={cat.category}>
-          <h5 className="ltrip-places__cat">{m.trip.category[cat.category]}</h5>
-          {cat.status === 'unavailable' ? (
-            <p className="ltrip__note">{m.trip.placesUnavailable}</p>
-          ) : cat.places.length === 0 ? (
-            <p className="ltrip__note">{cat.category === 'hotel' ? m.trip.noHotels : m.trip.noneHere}</p>
-          ) : (
-            <ul className="ltrip-places__list">
-              {cat.places.map((p) => (
-                <PlaceRow key={p.id} place={p} m={m} units={units} />
-              ))}
-            </ul>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PlaceRow({ place, m, units }: { place: RecommendedPlace; m: M; units: 'metric' | 'imperial' }) {
-  const label = name(place.name, m) || name(place.brand, m) || m.trip.category[place.category];
-  return (
-    <li className="ltrip-place">
-      <span className="ltrip-place__name">{label}</span>
-      <span className="ltrip-place__why">{place.reasons.map((r) => reasonText(r, m, units)).join(' · ')}</span>
-    </li>
-  );
-}
-
-/** Places for one stop, loaded when asked (or prefetched for the first night). */
-function StopPlacesView({ stop }: { stop: TripStop }) {
-  const m = useMessages();
-  const units = useSettings((s) => s.units.distance);
-  const st = useTripStore((s) => s.stopPlaces[stop.id]);
-  if (!st) {
-    return (
-      <button className="linkbtn" onClick={() => useTripStore.getState().loadStopPlaces(stop.id)}>
-        {m.trip.showPlaces}
-      </button>
-    );
-  }
-  if (st.status === 'loading') {
-    return (
-      <p className="plan-status" role="status">
-        <span className="spinner" aria-hidden="true" />
-        {m.trip.loadingPlaces}
-      </p>
-    );
-  }
-  if (st.status === 'error' || !st.places) {
-    return (
-      <p className="ltrip__note">
-        {m.trip.placesUnavailable}{' '}
-        <button
-          className="linkbtn"
-          onClick={() => {
-            useTripStore.setState((t) => {
-              const next = { ...t.stopPlaces };
-              delete next[stop.id];
-              return { stopPlaces: next };
-            });
-            useTripStore.getState().loadStopPlaces(stop.id);
-          }}
-        >
-          {m.trip.retry}
-        </button>
-      </p>
-    );
-  }
-  return <PlacesList places={st.places} m={m} units={units} />;
-}
-
-/** 🛏 Overnight stay: where, when, which hotels nearby, and other towns that would work. */
-export function OvernightStay() {
-  const m = useMessages();
-  const plan = useTripStore((s) => (longTripActive(s) ? s.plan : null));
-  if (!plan || plan.accommodation.length === 0) return null;
-  return (
-    <section className="ltrip-night">
-      <h3 className="label">{m.trip.overnightTitle}</h3>
-      <p className="ltrip__note">{m.trip.overnightIntro}</p>
-      {plan.accommodation.map((a) => {
-        const stop = plan.recommendedStops.find((s) => s.id === a.stopId)!;
-        return (
-          <div key={a.stopId} className="ltrip-night__card">
-            <div className="ltrip-night__head">
-              <span className="ltrip-night__area">
-                <small>{m.trip.area}</small>
-                {name(a.areaName, m) || m.trip.areaUnnamed(`${Math.round(stop.alongM / 1000)} km`)}
-              </span>
-              <span className="ltrip-night__eta tabular">
-                {when(a.arriveMs, a.tz, m)}
-                <small>{m.trip.stayNights(a.nights)}</small>
-              </span>
-            </div>
-            <p className="ltrip__note">{m.trip.hotelsNote}</p>
-            <StopPlacesView stop={stop} />
-            {a.alternatives.length ? (
-              <div className="ltrip-night__alts">
-                <h5 className="ltrip-places__cat">{m.trip.alternatives}</h5>
-                {a.alternatives.map((alt) => (
-                  <button key={alt.alongM} className="btn btn-quiet ltrip-night__alt" onClick={() => useTripStore.getState().chooseOvernight(a.stopId, alt.alongM)}>
-                    {m.trip.stayInstead(name(alt.name, m), when(alt.arriveMs, a.tz, m))}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-const TIMELINE_ICON: Record<TimelineEntry['kind'], EventIconKey> = {
-  depart: 'stop',
-  continue: 'clock',
-  fuel: 'fuel',
-  charge: 'charging',
-  rest: 'rest',
-  meal: 'poi',
-  weather: 'rain',
-  overnight: 'rest',
-  arrive: 'flag',
-};
-
-const HAZARD_ICON: Record<string, EventIconKey> = { rain: 'rain', 'heavy-rain': 'heavy-rain', snow: 'snow', storm: 'storm', fog: 'fog', wind: 'wind', freezing: 'ice' };
-
-function TimelineIcon({ kind, hazard }: { kind: TimelineEntry['kind']; hazard?: string }) {
-  return (
-    <span className="ltrip-tl__icon" aria-hidden="true">
-      <EventIcon icon={kind === 'weather' && hazard ? (HAZARD_ICON[hazard] ?? 'rain') : TIMELINE_ICON[kind]} size={20} />
-    </span>
-  );
-}
-
-/** The whole trip at a glance, day by day (each day expands). */
-export function TripDays() {
-  const m = useMessages();
-  const units = useSettings((s) => s.units.distance);
-  const plan = useTripStore((s) => (longTripActive(s) ? s.plan : null));
-  const [open, setOpen] = useState<Record<number, boolean>>({ 0: true });
-  if (!plan) return null;
-  return (
-    <section className="ltrip-days">
-      {plan.days.map((d) => {
-        const isOpen = open[d.index] ?? plan.days.length === 1;
-        const entries = plan.timeline.filter((e) => e.day === d.index);
-        return (
-          <div key={d.index} className="ltrip-day">
-            <button className="ltrip-day__head" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [d.index]: !isOpen })}>
-              <span>
-                <strong>{m.trip.dayN(d.index + 1)}</strong> {m.trip.dayRoute(name(d.fromName, m), name(d.toName, m))}
-              </span>
-              <span className="ltrip-day__meta tabular">
-                {formatDistance(d.distanceKm * 1000, units, m)} · {formatDuration(d.drivingMinutes * 60, m)}
-                <ChevronIcon size={14} className={isOpen ? 'ltrip-day__chev is-open' : 'ltrip-day__chev'} />
-              </span>
-            </button>
-            {isOpen ? (
-              <ol className="ltrip-timeline">
-                {entries.map((e, i) => (
-                  <li key={`${e.kind}-${e.atMs}-${i}`} className={`ltrip-tl ltrip-tl--${e.kind}`}>
-                    <span className="ltrip-tl__time tabular">{formatLocalTime(e.atMs, e.tz)}</span>
-                    <TimelineIcon kind={e.kind} hazard={e.hazard} />
-                    <span className="ltrip-tl__text">
-                      <strong>{e.kind === 'weather' && e.hazard ? m.trip.hazard[e.hazard] : m.trip.timeline[e.kind]}</strong>
-                      {e.placeName ? ` · ${name(e.placeName, m)}` : ''}
-                      {e.dwellMinutes && e.kind !== 'overnight' ? ` · ${formatDuration(e.dwellMinutes * 60, m)}` : ''}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            ) : null}
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-/** "Recommended for your trip": the few stops that matter, each with its places on request. */
-export function TripRecommendations() {
-  const m = useMessages();
-  const units = useSettings((s) => s.units.distance);
-  const plan = useTripStore((s) => (longTripActive(s) ? s.plan : null));
-  const [open, setOpen] = useState<string | null>(null);
-  if (!plan) return null;
-  const stops = plan.recommendedStops.filter((s) => !s.kinds.includes('overnight'));
-  if (!stops.length) return null;
-  return (
-    <section className="ltrip-recs">
-      <h3 className="label">{m.trip.recommended}</h3>
-      <ul className="rows">
-        {stops.map((s) => {
-          const kind = s.kinds.includes('meal') ? 'meal' : s.kinds.includes('charge') ? 'charge' : s.kinds.includes('fuel') ? 'fuel' : 'rest';
-          const label = s.kinds.map((k) => m.trip.stopKind[k]).join(' + ');
-          return (
-            <li key={s.id} className="ltrip-rec">
-              <button className="ltrip-rec__head" aria-expanded={open === s.id} onClick={() => setOpen(open === s.id ? null : s.id)}>
-                <TimelineIcon kind={kind} />
-                <span className="ltrip-rec__text">
-                  <strong>{label}</strong>
-                  <span className="ltrip-rec__meta tabular">
-                    {formatLocalTime(s.arriveMs, s.tz)} · {formatDistance(s.alongM, units, m)}
-                    {s.placeName ? ` · ${m.ui.near(name(s.placeName, m))}` : ''} · {formatDuration(s.dwellMinutes * 60, m)}
-                  </span>
-                </span>
-              </button>
-              {open === s.id ? <StopPlacesView stop={s} /> : null}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/** Weather along the journey at the planned (stop-aware) times. */
-export function JourneyWeather() {
-  const m = useMessages();
-  const units = useSettings((s) => s.units);
-  const active = useTripStore((s) => longTripActive(s) && !!s.plan);
-  const points = useAppStore((s) => s.derived.displayPoints);
-  if (!active || points.length === 0) return null;
-  return (
-    <section className="ltrip-wx">
-      <h3 className="label">{m.trip.journeyWeather}</h3>
-      <ul className="rows">
-        {points.map((p) => (
-          <li key={p.id} className="ltrip-wx__row">
-            <span className="ltrip-wx__km tabular">+{formatDistance(p.distanceFromStartKm * 1000, units.distance, m)}</span>
-            <span className="ltrip-wx__when tabular">{when(p.arrivalMs, p.timezone, m)}</span>
-            {p.weather ? <WeatherIcon condition={p.weather.condition} isDay={p.weather.isDay} size={22} /> : null}
-            <span className="ltrip-wx__text">
-              {p.weather ? `${conditionText(p.weather, m)} · ${formatTemp(p.weather.temperature, units.temperature)}` : m.ui.noForecast}
-              {p.placeName ? ` · ${name(p.placeName, m)}` : ''}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

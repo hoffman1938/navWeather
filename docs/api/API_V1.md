@@ -56,6 +56,21 @@ device can't give a position. `200 { lat, lon, city, country }` or
 `PublicReport = { id, kind, lat, lon, createdAt, expiresAt, confirms, denies }`.
 Reports are **unverified** by definition; clients must label them "reported".
 
+### Long-trip planner ([LONG_TRIP_MODE](../features/LONG_TRIP_MODE.md), ADR-013)
+
+Stateless: requests are validated (`src/trip/protocol.ts`, `src/trip/borders.ts`),
+answered and discarded. Rate limit `TRIP_LIMITER`: 20/min per IP, shared by the three.
+
+| Method & path | Body | Responses |
+| --- | --- | --- |
+| `POST /trips/plan` | `TripPlanRequest` ≤400 KB: `route` {id, polyline (precision 5, a point every `stepM` ≥ 500 m), `stepM`, `timesS` (cumulative driving s), `distanceM`, origin, destination, tz?}, `departAtMs` (−2 d … +16 d), `vehicle` {kind, powertrain, rangeKm?, fullRangeKm?}, `preferences` {pace, hotelMinStars, hotelMaxDetourKm, food, fuelBrand}, `places`? (≤200 settlements), `weather`? (≤200 samples of hourly hazard codes), `progress`? (replanning), `overnightsM`? (user-chosen nights), `locale` | `200 TripPlan` (no place lookups — fast); 400 `bad-request` / `bad-route`; 413; 415; 429; 503 |
+| `POST /trips/places` | `StopPlacesRequest` ≤40 KB: `stop` {lat, lon, kinds, arriveMs, tz}, `route` (polyline ±30 km), `vehicle`, `preferences`, `locale` | `200 { places: StopPlaces[] }` — per category `ok` / `none-found` / `unavailable` (Overpass failed); edge-cached by area for 24 h |
+| `POST /trips/borders` | `{ version: 1, points: [lon,lat][] (2–20), alongM: number[], locale }` | `200 { countries: ({code,name}|null)[], crossings: {alongM, from, to}[] }`; 503 when Overpass is unavailable; edge-cached for 7 days |
+
+Types: `src/trip/types.ts`. Positions sent are the planned route (needed to
+plan it); the car's position is sent only as `progress.alongM` (a distance
+along that route) when replanning.
+
 ## Planned
 
 ### `POST /reports/query` — PLANNED (P1, REQ-CF-009)

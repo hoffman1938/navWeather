@@ -22,6 +22,7 @@ supersede it with a new one.
 | [010](ADR-010-mobile-stack.md) | Mobile stack: decide by spike; React Native + native car modules favoured | Proposed |
 | [011](ADR-011-public-transport.md) | Public transport via Transitous, switchable off | Accepted (terms pending) |
 | [012](ADR-012-offline.md) | Offline: honest shell-and-cache on web; regions and on-device routing native-only | Accepted |
+| [013](ADR-013-trip-planner.md) | Long-trip planner: stateless Worker endpoints over a shared TS domain module | Accepted |
 
 All external facts in these ADRs were verified against official sources on
 **2026-10-02**; see [LICENSING_MATRIX](../../legal/LICENSING_MATRIX.md) for links.

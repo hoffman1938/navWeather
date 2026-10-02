@@ -92,6 +92,8 @@ export function buildSchedule(input: ScheduleInput): Schedule {
   let wall = input.startMs;
   let drivenToday = input.drivenTodayS ?? 0;
   let sinceRest = input.sinceRestS ?? 0;
+  /** When this driving day began (for the latest-arrival rule). */
+  let dayStart = input.startMs - drivenToday * 1000;
   let day = 0;
   const eaten = new Set<string>();
   const stops: ScheduledStop[] = [];
@@ -117,7 +119,7 @@ export function buildSchedule(input: ScheduleInput): Schedule {
     if (meal) candidates.push({ kind: 'meal', inS: meal.inS, why: 'meal-window', mealKey: meal.key });
 
     // Overnight: daily driving, or the latest arrival hour — unless the destination is close.
-    const overnight = overnightIn(wall, tz, pace, drivenToday);
+    const overnight = overnightIn(wall, tz, pace, drivenToday, dayStart);
     let overnightCandidate: Candidate | null = { kind: 'overnight', inS: overnight.inS, why: overnight.why };
     const nextForced = forced.find((f) => f > along + 1);
     if (nextForced !== undefined) {
@@ -186,11 +188,12 @@ export function buildSchedule(input: ScheduleInput): Schedule {
       fillAlongM = along;
       fillRangeM = fullRangeM;
     }
+    wall += dwellS * 1000;
     if (isOvernight) {
       drivenToday = 0;
       day++;
+      dayStart = wall;
     }
-    wall += dwellS * 1000;
   }
 
   return { stops, startAlongM: input.startAlongM, startMs: input.startMs, arriveMs: wall + Math.max(0, profile.totalTimeS - T) * 1000, days: day + 1 };
@@ -223,15 +226,17 @@ function nextMeal(wall: number, tz: string, eaten: Set<string>, drivenToday: num
   return null;
 }
 
-/** Drive-seconds until the overnight stay is due, and why. */
-function overnightIn(wall: number, tz: string, pace: PacePreset, drivenToday: number): { inS: number; why: 'daily-limit' | 'latest-arrival' } {
+/**
+ * Drive-seconds until the overnight stay is due, and why. The latest arrival
+ * is the first `latestArrivalHour` at least 3 h after this driving day began —
+ * so someone who sets off at 23:00 drives a normal day (the daily limit) and
+ * is not told to stop at 01:00.
+ */
+function overnightIn(wall: number, tz: string, pace: PacePreset, drivenToday: number, dayStart: number): { inS: number; why: 'daily-limit' | 'latest-arrival' } {
   const dailyLeft = Math.max(0, pace.dailyDriveS - drivenToday);
-  const h = localHour(wall, tz);
-  // After midnight the "latest arrival" was yesterday's.
-  const latest = h < 5 ? wall : atLocalHour(wall, tz, pace.latestArrivalHour);
-  let latestIn = Math.max(0, (latest - wall) / 1000);
-  // Someone who sets off late in the evening isn't told to stop at once.
-  if (latestIn < 2 * 3600 && drivenToday < 2 * 3600) latestIn = Infinity;
+  let latest = atLocalHour(dayStart, tz, pace.latestArrivalHour);
+  if (latest < dayStart + 3 * 3600_000) latest = atLocalHour(dayStart, tz, pace.latestArrivalHour, 1);
+  const latestIn = Math.max(0, (latest - wall) / 1000);
   return latestIn < dailyLeft ? { inS: latestIn, why: 'latest-arrival' } : { inS: dailyLeft, why: 'daily-limit' };
 }
 

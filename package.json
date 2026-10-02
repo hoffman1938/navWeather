@@ -2,7 +2,7 @@
   "name": "navweather",
   "private": true,
   "version": "0.1.0",
-  "description": "Know the weather before you reach it — forecast along your driving route at your estimated arrival time.",
+  "description": "Know the weather before you reach it \u2014 forecast along your driving route at your estimated arrival time.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,8 @@
     "test:live": "LIVE_API_TESTS=1 vitest run src/integration/live.test.ts",
     "test:share": "node scripts/share-smoke.mjs",
     "test:reports": "node scripts/reports-smoke.mjs",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "test:trips": "node scripts/trip-smoke.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.11.2",

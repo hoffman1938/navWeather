@@ -19,6 +19,7 @@ navigation with reports on). Live sharing: 2 % of DAU share for 1 h.
 | **Overpass** | places per plan; limits/cameras/crossings per drive; POI search | ≈ 3 | ≈ 5 | **≈ 3.5** |
 | **Worker API** (today) | report boxes ≤24 per load, refresh every 5 min driving; live share PUT every ≥5 s | ≈ 20 | ≈ 250 | **≈ 105** |
 | **Worker API** (after REQ-CF-009 corridor request) | one request per load/refresh | ≈ 2 | ≈ 25 | **≈ 25** |
+| **Long Trip Mode** (drivers on LONG trips, est. 10 % of drivers) | 1 plan + ≤1 replan per hour driving + 1–4 stop-places + 1 borders call | — | ≈ 5–8 Worker requests; ≈ 2–5 Overpass queries (edge-cached by area) | **≈ 0.5** |
 | Static assets | page loads | free (KNOWN: not billed) | | |
 | Map tiles | OpenFreeMap CDN (not our bill) | ~100–300 tile requests per session | | |
 

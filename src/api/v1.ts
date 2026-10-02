@@ -20,6 +20,7 @@ export const apiPaths = {
   health: `${API_BASE}/health`,
   tripsPlan: `${API_BASE}/trips/plan`,
   tripsPlaces: `${API_BASE}/trips/places`,
+  tripsBorders: `${API_BASE}/trips/borders`,
 } as const;
 
 /**

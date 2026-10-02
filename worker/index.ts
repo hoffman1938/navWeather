@@ -4,7 +4,7 @@ import { REPORT_ID_RE } from '../src/reports/protocol';
 import { json, randomToken, readJson, sha256Hex } from './http';
 import { LiveShare } from './liveShare';
 import { Reports } from './reports';
-import { tripPlaces, tripPlan, type TripEnv } from './trips';
+import { tripBorders, tripPlaces, tripPlan, type TripEnv } from './trips';
 
 export { LiveShare, Reports };
 
@@ -44,6 +44,7 @@ export interface Env extends TripEnv {
  *
  *   POST   /api/trips/plan         long-trip plan for a route (stateless; worker/trips.ts)
  *   POST   /api/trips/places       places around one planned stop (Overpass, edge-cached)
+ *   POST   /api/trips/borders      countries along the route and where they change (Overpass, edge-cached)
  */
 export default {
   async fetch(request, env): Promise<Response> {
@@ -62,6 +63,7 @@ export default {
 
     if (path === '/api/trips/plan') return tripPlan(request, env);
     if (path === '/api/trips/places') return tripPlaces(request, env);
+    if (path === '/api/trips/borders') return tripBorders(request, env);
 
     // When the device can't say where it is (location off, no GPS on a desktop), a trip can
     // still start from the right city: Cloudflare already knows the connection's rough area.

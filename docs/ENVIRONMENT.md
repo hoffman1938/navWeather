@@ -88,3 +88,14 @@ Local development: `npm run dev:api` starts the Worker on port 8787, and the
 Vite dev server proxies `/api` to it (`vite.config.ts`). Without it, the app
 works normally, "Share live location" explains that the server is missing,
 and driver reports show as "unavailable" in the Data panel.
+
+## Worker variables and bindings (Long Trip Mode)
+
+| Name | Kind | Default | Purpose |
+| --- | --- | --- | --- |
+| `TRIP_LIMITER` | rate-limit binding (`wrangler.toml`) | 20 requests / 60 s per IP | `/api/v1/trips/*` |
+| `OVERPASS_URLS` | `[vars]` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` | Overpass endpoints for trip stop places and borders (server-side) |
+| `TRIP_USER_AGENT` | `[vars]` | `navWeather/0.1 (trip planner; Cloudflare Worker)` | identifies the app to Overpass — **add a contact before production** |
+
+Trip thresholds and presets are code, not environment: `src/trip/config.ts`
+(`TRIP_THRESHOLDS`, `PACE_PRESETS`, `STOP_DEFAULTS`, `REPLAN`).

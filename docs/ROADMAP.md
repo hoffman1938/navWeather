@@ -50,6 +50,9 @@ Until then the current layout stays (moving files without a second consumer
 is churn). The boundaries already exist: engines import nothing from React.
 
 ## 4. Missing features (vs the brief)
+(Long Trip Mode core shipped 2026-10-02 — remaining items in
+[LONG_TRIP_MODE §17](features/LONG_TRIP_MODE.md): truck restrictions,
+verified rest rules, EV charging times, fuel prices, real hotel availability.)
 Official weather warnings; crosswind estimate; storm proximity (no free
 lightning source verified); accounts and sync; push notifications; offline
 regions; truck routing and avoid options (router-blocked); live traffic (no

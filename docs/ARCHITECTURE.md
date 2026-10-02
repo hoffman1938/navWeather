@@ -240,3 +240,22 @@ comparison is off (a later departure is another trip). The map draws transit leg
 instead of the route line (walks dotted, rides in the line colour). No itinerary →
 `no-route` → "no public transport found". `VITE_TRANSIT_URL=` (empty) switches it
 off. The saved drive session remembers the mode so a reload resumes a walk as a walk.
+
+## Long Trip Mode
+
+Spec: [features/LONG_TRIP_MODE.md](features/LONG_TRIP_MODE.md); decision: ADR-013.
+
+```
+route ready ─▶ state/trip.ts: classifyTrip (instant, pure, offline)
+forecasts loaded ─▶ POST /api/v1/trips/plan (route resampled + driving times, departure, vehicle,
+                    preferences, settlements, hourly hazard codes) ─▶ worker/trips.ts ─▶ src/trip/planning
+                    ◀─ TripPlan (stops, nights, days, timeline, weather risks, advice)
+  ─▶ setTripStopsProvider → derive(): every ETA after a stop += its duration (forecasts at the real times)
+  ─▶ routeIntelligence: planned stops as TRIP_STOP events (replace generic break/fuel reminders)
+  ─▶ first night's hotels: POST /api/v1/trips/places (Overpass, edge-cached) · borders: POST /trips/borders
+driving: ≥20 min off plan (10 min cooldown) ─▶ replan with progress (along, driven today, since break)
+```
+
+`src/trip/` has no DOM or Workers-only dependencies (shared by the Worker and
+the client, ready for mobile). The trip store lives outside `store.ts`; the
+app store only asks for the stops to add to ETAs.

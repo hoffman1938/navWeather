@@ -57,6 +57,31 @@ direction (§79 of the brief).
 | REQ-CORE-011 | Driver reports, always labelled "reported" | P2 | VERIFIED | `worker/reports.ts`, `reports/protocol.ts`; `scripts/reports-smoke.mjs` |
 | REQ-CORE-012 | Weather-aware re-route offers while driving (never automatic) | P2 | VERIFIED | `state/store.ts` (weather reroute); tests |
 
+### 3a. Long Trip Mode
+
+Specification (source of truth): [features/LONG_TRIP_MODE.md](features/LONG_TRIP_MODE.md);
+decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
+
+| ID | Requirement | Priority | Status | Traceability |
+| --- | --- | --- | --- | --- |
+| REQ-TRIP-001 | One trip classification engine (SHORT/MEDIUM/EXTENDED/LONG) with configurable thresholds — never hard-coded in components | P1 | VERIFIED | `src/trip/config.ts`, `classification/classify.ts`; `trip.test.ts` |
+| REQ-TRIP-002 | Long Trip Mode on automatically (distance, driving time, overnight, several breaks), user override, non-blocking | P1 | VERIFIED | `state/trip.ts`, `components/Trip/LongTrip.tsx`; `trip.test.tsx` |
+| REQ-TRIP-003 | Trip plan: segments, breaks, meals, fuel/charge, overnights, days, timeline | P1 | VERIFIED | `planning/schedule.ts`, `planner.ts` |
+| REQ-TRIP-004 | Every ETA and forecast match includes planned stop durations (weather at the real times) | P0 | VERIFIED | `state/derive.ts` (`tripStops`), `routeIntelligence.ts` (`dwellBeforeS`) |
+| REQ-TRIP-005 | Overnight areas from driving time, latest arrival, settlement size, no-extra-night rule; user can choose another town | P1 | VERIFIED | `planning/overnight.ts`, `chooseOvernight` |
+| REQ-TRIP-006 | Hotels from OpenStreetMap near the area, within the user's distance; never claim availability | P1 | VERIFIED | `stops/recommend.ts`, `/api/v1/trips/places` |
+| REQ-TRIP-007 | Fuel/charging only from user-declared range or tank + consumption; never estimated | P1 | VERIFIED | `schedule.ts`, `settings.ts` (`fullRangeKm`) |
+| REQ-TRIP-008 | Meal places closed at the planned arrival are excluded (OSM opening hours, safe subset) | P1 | VERIFIED | `stops/openingHours.ts` |
+| REQ-TRIP-009 | Weather risks at stop-aware times; "stop earlier" advice with reason, never applied silently | P1 | VERIFIED | `weather/risks.ts` |
+| REQ-TRIP-010 | Replan from the car when ≥ 20 min off plan (10 min cooldown), carry today's driving over re-routes; announce arrival changes ≥ 15 min | P1 | VERIFIED | `state/trip.ts`, `replanning/progress.ts` |
+| REQ-TRIP-011 | Planned stops as route events replacing generic break/fuel reminders; no notification spam | P1 | VERIFIED | `routeIntelligence.ts` |
+| REQ-TRIP-012 | Border crossings along the route (OSM countries), shown in dashboard and timeline | P2 | VERIFIED | `trip/borders.ts`, `/api/v1/trips/borders` |
+| REQ-TRIP-013 | Vehicle-specific planning: car/van/motorcycle/truck/EV (stops and places); truck road restrictions | P2 | PARTIALLY (restrictions BLOCKED until Valhalla, ADR-004) | `stops/places.ts`, `recommend.ts` |
+| REQ-TRIP-014 | Preferences: pace, hotel stars and distance, food, fuel brand (device-only) | P1 | IMPLEMENTED | `SettingsDialog.tsx` (Long trips) |
+| REQ-TRIP-015 | Planner stateless on Cloudflare; no stored trips, no position logs; Queues/D1 not used | P0 | IMPLEMENTED | `worker/trips.ts`, ADR-013 |
+| REQ-TRIP-016 | Jurisdiction-specific driving/rest rules for commercial drivers | P3 | PLANNED (needs verified rules) | — |
+| REQ-TRIP-017 | Cheapest-fuel and live hotel availability | P3 | BLOCKED (no open/verified data source) | — |
+
 ## 4. Supported platforms
 
 | ID | Platform | Priority | Status |
@@ -102,6 +127,7 @@ direction (§79 of the brief).
 | REQ-CF-007 | Workers Paid plan ($5/month minimum) before public beta | P1 | PLANNED | [COST](operations/COST_AND_SCALE.md) §3 |
 | REQ-CF-008 | Shard the single `Reports` object by region before it nears ~1,000 req/s | P2 | PLANNED | [SCALE](operations/COST_AND_SCALE.md) |
 | REQ-CF-009 | Report listing as one corridor request instead of up to 24 box requests | P1 | PLANNED | `services/traffic/ReportsIncidentProvider.ts`, [API_V1](api/API_V1.md) |
+| REQ-CF-010 | Trip planner endpoints (`/api/v1/trips/plan|places|borders`) stateless, rate-limited (`TRIP_LIMITER`), places/borders edge-cached | P1 | IMPLEMENTED | `worker/trips.ts`, `wrangler.toml` |
 
 ## 7. Map architecture
 
@@ -373,6 +399,10 @@ public beta → iOS → Android → CarPlay → Android Auto → international.
   sources but returned no itineraries for Tbilisi → Batumi on 2026-10-02.
 - Geocoding can pick a same-named place elsewhere (e.g. "Tavisupleba Square" →
   Kobuleti); the result is shown, but the town is not named in transit errors.
+- Long Trip Mode: car only; hotels/places only as mapped in OpenStreetMap (no
+  ratings, prices or availability); no fuel prices; no truck road
+  restrictions; pace presets are preferences, not legal driving limits;
+  places and borders depend on the public Overpass server (slow at times).
 
 ## 33. Known technical debt
 
@@ -385,7 +415,8 @@ public beta → iOS → Android → CarPlay → Android Auto → international.
 | DEBT-005 | No linter | style drift | add ESLint (REQ-CI-003) |
 | DEBT-006 | Main JS chunk 583 KB (188 KB gz) | LCP on slow phones | code-split (REQ-PERF-004) |
 | DEBT-007 | Observability disabled | blind in production | REQ-OBS-002 |
-| DEBT-008 | Overpass used live per route | violates heavy-use guidance at scale | precomputed OSM extracts / own Overpass (ADR-004) |
+| DEBT-008 | Overpass used live per route (and per trip stop / borders) | violates heavy-use guidance at scale | precomputed OSM extracts / own Overpass (ADR-004) |
+| DEBT-009 | Main JS chunk 604 KB after Long Trip Mode (196 KB gz) | LCP | more lazy chunks (REQ-PERF-004) |
 
 ## 34. External dependencies
 
@@ -397,7 +428,7 @@ public beta → iOS → Android → CarPlay → Android Auto → international.
 | OSRM public demo + FOSSGIS routing servers | car/walk/bike routing | NOT SUITABLE for production; OK for development/private beta |
 | Nominatim (OSMF) | typed search | REQUIRES REVIEW (no autocomplete; 1 req/s; heavy users self-host) |
 | Photon (komoot) | autocomplete, reverse | REQUIRES REVIEW (fair use, terms informal) |
-| Overpass public instances | places, POIs, speed limits, cameras | NOT SUITABLE for production volume |
+| Overpass public instances | places, POIs, speed limits, cameras; trip stop places and borders (from the Worker) | NOT SUITABLE for production volume |
 | Open-Meteo (free) | forecasts, elevation, air quality | SAFE non-commercial / REQUIRES paid plan commercially |
 | Transitous | public transport | REQUIRES REVIEW (open-source + non-commercial + contact) |
 | Browser speech (Google voices in Chrome) | TTS, push-to-talk | REQUIRES REVIEW (text/audio go to the browser vendor; disclosed) |
@@ -416,7 +447,7 @@ ADR-001 Cloudflare-first on Workers · ADR-002 Vite + React SPA · ADR-003
 client engines, thin edge · ADR-004 routing engine · ADR-005 weather provider
 and edge cache · ADR-006 map stack · ADR-007 data storage · ADR-008 identity ·
 ADR-009 API versioning · ADR-010 mobile stack (proposed) · ADR-011 public
-transport · ADR-012 offline.
+transport · ADR-012 offline · ADR-013 long-trip planner (stateless Worker).
 
 ## 37. Open questions (owner decisions needed)
 
@@ -450,6 +481,8 @@ transport · ADR-012 offline.
 | CCPA/CPRA thresholds | official site unreachable at verification time | before US launch |
 | Georgian Law on Personal Data Protection (2023) obligations for this app | legal review | before Georgian public launch |
 | Tomorrow.io free-tier terms | pricing page returned 404 | only if considered |
+| Workers CPU per trip-plan request on the Free plan (10 ms) | long plans may exceed it | measure after deployment (REQ-CF-007) |
+| Overpass usage from the Worker for trips (places, borders) | public instance asks for light use; edge cache helps | before public beta (self-host, ADR-004) |
 
 ---
 

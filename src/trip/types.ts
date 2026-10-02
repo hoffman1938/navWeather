@@ -264,7 +264,8 @@ export type TripAdvice =
   | { kind: 'enter-range' }
   | { kind: 'no-places'; category: PlaceCategory; stopId: string };
 
-export type TimelineKind = 'depart' | 'fuel' | 'charge' | 'rest' | 'meal' | 'weather' | 'overnight' | 'continue' | 'arrive';
+/** 'border' entries are added by the client from the borders lookup. */
+export type TimelineKind = 'depart' | 'fuel' | 'charge' | 'rest' | 'meal' | 'weather' | 'overnight' | 'continue' | 'arrive' | 'border';
 
 export interface TimelineEntry {
   atMs: number;

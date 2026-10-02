@@ -17,6 +17,7 @@ import type {
   VehicleProfile,
 } from '../../trip/types';
 import { fetchJson } from '../http';
+import { borderSamplePoints, type BordersRequest, type BordersResponse } from '../../trip/borders';
 
 /**
  * Client side of the long-trip planner (ADR-013): turn the app's route,
@@ -158,4 +159,17 @@ export async function fetchStopPlaces(
     init: { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req) },
   });
   return res.places;
+}
+
+/** Countries along the route and where they change (a few dozen points, never the user's position). */
+export function fetchBorders(timed: TimedRoute, locale: string, signal?: AbortSignal): Promise<BordersResponse> {
+  const { points, alongM } = borderSamplePoints(timed.totalDistM, (d) => positionAtDistance(timed, d).coordinate);
+  const req: BordersRequest = { version: 1, points, alongM, locale };
+  return fetchJson<BordersResponse>(apiPaths.tripsBorders, {
+    provider: 'Trip planner',
+    signal,
+    // A background lookup (nothing waits on it); the public Overpass can be slow.
+    timeoutMs: 40_000,
+    init: { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req) },
+  });
 }

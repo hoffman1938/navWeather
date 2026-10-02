@@ -67,5 +67,6 @@ and push it. Commit messages: what and why; reference requirement IDs.
 - Security: `docs/security/SECURITY.md` · Privacy, licensing: `docs/legal/`
 - Mobile/CarPlay/Android Auto: `docs/mobile/` · UX/SEO/analytics/i18n: `docs/product/`
 - Cost & scale, CI/CD, testing, DR: `docs/operations/`
+- Feature specs (source of truth per feature): `docs/features/` (Long Trip Mode)
 - Latest audit: `docs/audit/2026-10-02-platform-audit.md`
 - Product iteration log (Russian): `docs/PLAN.md`
