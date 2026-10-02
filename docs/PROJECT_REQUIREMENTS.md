@@ -1,8 +1,10 @@
 # navWeather — Project Requirements (single source of truth)
 
-> **Status of this document:** v1.0, created 2026-10-02 from the owner's
+> **Status of this document:** v1.1. Created 2026-10-02 (v1.0) from the owner's
 > platform brief and a full audit of the repository
-> ([audit report](audit/2026-10-02-platform-audit.md)). It states what the
+> ([audit report](AUDIT/2026-10-02-platform-audit.md)); statuses re-verified
+> against the code and live runs on 2026-10-03
+> ([MASTER_AUDIT](AUDIT/MASTER_AUDIT.md), defects `B-xx`). It states what the
 > system **should** be. The source code states what the system **currently
 > is**. Every session compares the two (see [AGENTS.md](../AGENTS.md)).
 >
@@ -14,7 +16,10 @@
 
 **Priorities:** P0 critical · P1 high · P2 medium · P3 future.
 **Statuses:** PLANNED · IN PROGRESS · IMPLEMENTED · VERIFIED (implemented and
-covered by automated tests or a recorded check) · BLOCKED · DEPRECATED · FUTURE.
+covered by automated tests or a recorded check) · DEFECT (implemented, but a
+confirmed bug makes it behave wrongly — see the linked `B-xx` in
+[MASTER_AUDIT](AUDIT/MASTER_AUDIT.md) §4; added 2026-10-03) · BLOCKED ·
+DEPRECATED · FUTURE.
 **Traceability:** each requirement names the code, tests and docs that carry it.
 
 ---
@@ -33,7 +38,7 @@ direction (§79 of the brief).
 
 | ID | Goal | Priority | Status |
 | --- | --- | --- | --- |
-| GOAL-1 | A trustworthy answer to "what weather will I drive into, and when?" for any road trip | P0 | IMPLEMENTED |
+| GOAL-1 | A trustworthy answer to "what weather will I drive into, and when?" for any road trip | P0 | IMPLEMENTED (verified live for trips up to ~2 days; multi-day: REQ-WX-008) |
 | GOAL-2 | Turn-by-turn navigation good enough to drive with, on the web today and natively later | P0 | IMPLEMENTED (web limits: §19) |
 | GOAL-3 | Timely, non-spammy weather alerts that separate forecast, derived estimate and official warning | P0 | PARTIALLY (no official warnings, §17) |
 | GOAL-4 | Run at near-zero cost during MVP; cost grows sub-linearly with users | P0 | IN PROGRESS (§29) |
@@ -56,6 +61,7 @@ direction (§79 of the brief).
 | REQ-CORE-010 | Live location sharing (latest position only, expiring) | P2 | VERIFIED | `worker/liveShare.ts`, `share/*`; `liveShare.test.ts`, `scripts/share-smoke.mjs` |
 | REQ-CORE-011 | Driver reports, always labelled "reported" | P2 | VERIFIED | `worker/reports.ts`, `reports/protocol.ts`; `scripts/reports-smoke.mjs` |
 | REQ-CORE-012 | Weather-aware re-route offers while driving (never automatic) | P2 | VERIFIED | `state/store.ts` (weather reroute); tests |
+| REQ-CORE-013 | Fuel/charging reminders from the user's declared range stay fixed to the road: the range is consumed as the car drives, so the reminder comes closer (added 2026-10-03) | P0 | DEFECT (B-02: the stop is always 70 % of the range ahead of the car) | `intelligence/routeIntelligence.ts`; `routeIntelligence.test.ts` (progress 0 only) |
 
 ### 3a. Long Trip Mode
 
@@ -66,14 +72,14 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | --- | --- | --- | --- | --- |
 | REQ-TRIP-001 | One trip classification engine (SHORT/MEDIUM/EXTENDED/LONG) with configurable thresholds — never hard-coded in components | P1 | VERIFIED | `src/trip/config.ts`, `classification/classify.ts`; `trip.test.ts` |
 | REQ-TRIP-002 | Long Trip Mode on automatically (distance, driving time, overnight, several breaks), user override, non-blocking | P1 | VERIFIED | `state/trip.ts`, `components/Trip/LongTrip.tsx`; `trip.test.tsx` |
-| REQ-TRIP-003 | Trip plan: segments, breaks, meals, fuel/charge, overnights, days, timeline | P1 | VERIFIED | `planning/schedule.ts`, `planner.ts` |
+| REQ-TRIP-003 | Trip plan: segments, breaks, meals, fuel/charge, overnights, days, timeline | P1 | DEFECT (B-04: night departures give a daytime "overnight", a second night 3.6 h later and one meal in 41 h — live check 2026-10-03) | `planning/schedule.ts`, `planner.ts` |
 | REQ-TRIP-004 | Every ETA and forecast match includes planned stop durations (weather at the real times) | P0 | VERIFIED | `state/derive.ts` (`tripStops`), `routeIntelligence.ts` (`dwellBeforeS`) |
-| REQ-TRIP-005 | Overnight areas from driving time, latest arrival, settlement size, no-extra-night rule; user can choose another town | P1 | VERIFIED | `planning/overnight.ts`, `chooseOvernight` |
+| REQ-TRIP-005 | Overnight areas from driving time, latest arrival, settlement size, no-extra-night rule; user can choose another town | P1 | DEFECT (B-05: the first plan is requested before late settlements arrive → no town names, no alternatives until a manual retry) | `planning/overnight.ts`, `chooseOvernight`, `state/trip.ts` |
 | REQ-TRIP-006 | Hotels from OpenStreetMap near the area, within the user's distance; never claim availability | P1 | VERIFIED | `stops/recommend.ts`, `/api/v1/trips/places` |
-| REQ-TRIP-007 | Fuel/charging only from user-declared range or tank + consumption; never estimated | P1 | VERIFIED | `schedule.ts`, `settings.ts` (`fullRangeKm`) |
+| REQ-TRIP-007 | Fuel/charging only from user-declared range or tank + consumption; never estimated | P0 | DEFECT (B-01: replans assume the starting range is still in the tank — 338 km stop moved to 660 km; B-20: range without tank size plans one stop silently) | `schedule.ts`, `settings.ts` (`fullRangeKm`), `state/trip.ts` |
 | REQ-TRIP-008 | Meal places closed at the planned arrival are excluded (OSM opening hours, safe subset) | P1 | VERIFIED | `stops/openingHours.ts` |
-| REQ-TRIP-009 | Weather risks at stop-aware times; "stop earlier" advice with reason, never applied silently | P1 | VERIFIED | `weather/risks.ts` |
-| REQ-TRIP-010 | Replan from the car when ≥ 20 min off plan (10 min cooldown), carry today's driving over re-routes; announce arrival changes ≥ 15 min | P1 | VERIFIED | `state/trip.ts`, `replanning/progress.ts` |
+| REQ-TRIP-009 | Weather risks at stop-aware times; "stop earlier" advice with reason, never applied silently | P1 | DEFECT (B-07: not recomputed when forecasts change while planning; B-21: no forecast counted as "no hazard"; B-08/B-09: thresholds and hour alignment differ from the alert engine) | `weather/risks.ts`, `weather/hazards.ts`, `services/trip/requests.ts` |
+| REQ-TRIP-010 | Replan from the car when ≥ 20 min off plan (10 min cooldown), carry today's driving over re-routes; announce arrival changes ≥ 15 min | P1 | DEFECT (B-03: time at a planned stop counts as delay; B-01: remaining range not carried) | `state/trip.ts`, `replanning/progress.ts` |
 | REQ-TRIP-011 | Planned stops as route events replacing generic break/fuel reminders; no notification spam | P1 | VERIFIED | `routeIntelligence.ts` |
 | REQ-TRIP-012 | Border crossings along the route (OSM countries), shown in dashboard and timeline | P2 | VERIFIED | `trip/borders.ts`, `/api/v1/trips/borders` |
 | REQ-TRIP-013 | Vehicle-specific planning: car/van/motorcycle/truck/EV (stops and places); truck road restrictions | P2 | PARTIALLY (restrictions BLOCKED until Valhalla, ADR-004) | `stops/places.ts`, `recommend.ts` |
@@ -81,6 +87,10 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-TRIP-015 | Planner stateless on Cloudflare; no stored trips, no position logs; Queues/D1 not used | P0 | IMPLEMENTED | `worker/trips.ts`, ADR-013 |
 | REQ-TRIP-016 | Jurisdiction-specific driving/rest rules for commercial drivers | P3 | PLANNED (needs verified rules) | — |
 | REQ-TRIP-017 | Cheapest-fuel and live hotel availability | P3 | BLOCKED (no open/verified data source) | — |
+| REQ-TRIP-018 | Remaining range is tracked along the drive (declared range − distance since the last fill) and sent with every replan and re-route (added 2026-10-03) | P0 | PLANNED (fixes B-01) | `state/trip.ts`, `replanning/progress.ts` |
+| REQ-TRIP-019 | Plausible days for any departure time: overnights only in the local evening/night window, a meal at least every ~6 h awake, night driving (00:00–06:00) flagged with advice to start in the morning — never changed silently (added 2026-10-03) | P1 | PLANNED (fixes B-04) | `planning/schedule.ts`, `config.ts` |
+| REQ-TRIP-020 | Time spent at a planned stop, up to its planned departure, is not a delay (added 2026-10-03) | P1 | PLANNED (fixes B-03) | `replanning/progress.ts` |
+| REQ-TRIP-021 | The plan is refreshed when its inputs arrive or change while planning: late settlements, new or longer forecasts (debounced, no notification spam) (added 2026-10-03) | P1 | PLANNED (fixes B-05, B-07) | `state/trip.ts` |
 
 ## 4. Supported platforms
 
@@ -159,13 +169,16 @@ Details: [WEATHER_ENGINE](architecture/WEATHER_ENGINE.md).
 
 | ID | Requirement | Priority | Status | Traceability |
 | --- | --- | --- | --- | --- |
-| REQ-WX-001 | Route → adaptive samples → ETA → grid-snapped batched forecasts → cached → matched at ETA → timeline → alerts | P0 | VERIFIED | `routePlanner.ts`, `WeatherService.ts`, `weatherMatching.ts` |
+| REQ-WX-001 | Route → adaptive samples → ETA → grid-snapped batched forecasts → cached → matched at ETA → timeline → alerts | P0 | VERIFIED (tests + live run 2026-10-03; horizon for multi-day trips: REQ-WX-008) | `routePlanner.ts`, `WeatherService.ts`, `weatherMatching.ts` |
 | REQ-WX-002 | Forecast values never extrapolated past the forecast horizon; interval vs instant semantics | P0 | VERIFIED | `weatherMatching.ts`; tests |
 | REQ-WX-003 | Every value labelled RAW FORECAST, DERIVED ESTIMATE or OFFICIAL WARNING in UI and voice | P0 | PARTIALLY (forecast/estimate yes; official warnings not integrated) | `components/Plan/DataSources.tsx`; REQ-WX-006 |
 | REQ-WX-004 | Stale forecasts shown as stale; model-run-aware refresh; offline keeps last forecast | P0 | VERIFIED | `WeatherService.ts`, `store.ts refreshIfStale` |
 | REQ-WX-005 | Weather requests through a shared edge cache with a paid key before a beta beyond ~25 daily users or any commercial use (the app as a whole passes the free tier's 10,000 calls/day at ~30 DAU) | P1 | PLANNED | ADR-005, COST_AND_SCALE §2 |
 | REQ-WX-006 | Official warnings (national services / MeteoAlarm where licensed), labelled "official" | P2 | PLANNED (source & licence REQUIRE VERIFICATION per country) | ADR-005 |
 | REQ-WX-007 | Request ≤10 weather variables per call where possible (Open-Meteo counts more as extra calls) | P2 | PLANNED (currently 14) | `OpenMeteoProvider.ts`; [COST](operations/COST_AND_SCALE.md) |
+| REQ-WX-008 | The forecast horizon requested covers the whole trip including planned stops, from the first load (added 2026-10-03) | P1 | DEFECT (B-06: 48 h on the first load — 77 of 145 points without a forecast on a 4.5-day trip until the next refresh) | `state/store.ts` (`loadWeather`), `WeatherService.ts` |
+| REQ-WX-009 | One set of weather hazard thresholds (rain, heavy rain, snow, freezing, fog, low visibility, wind, storm, temperature), configurable in one module, documented with their rationale and used by alerts, trip risks, road comparison, departure advice and the road-surface estimate (added 2026-10-03) | P1 | DEFECT (B-08: values differ across 7 files, e.g. gusts 60 vs 70 km/h, freezing ≤1 vs ≤0.5 °C) | `intelligence/weatherAlerts.ts`, `trip/weather/hazards.ts`, `state/derive.ts`, `algorithms/departurePlanner.ts`, `algorithms/roadHazards.ts` |
+| REQ-WX-010 | Extreme temperature alerts (heat, severe cold) with configurable thresholds (added 2026-10-03) | P2 | PLANNED | `intelligence/weatherAlerts.ts` |
 
 ## 10. Authentication architecture
 
@@ -294,6 +307,8 @@ Model: [COST_AND_SCALE](operations/COST_AND_SCALE.md).
 | REQ-MOB-002 | Every server feature reachable via `/api/v1` with Bearer-token auth (no cookie-only flows) | P1 | PLANNED (accounts) |
 | REQ-MOB-003 | Decide mobile stack via a time-boxed spike (background location, CarPlay, Android Auto) | P2 | PLANNED ([ADR-010](architecture/decisions/ADR-010-mobile-stack.md), PROPOSED) |
 | REQ-MOB-004 | Voice layer as platform-neutral instruction IDs + params, rendered by a per-platform TTS adapter | P1 | IMPLEMENTED (web) / PLANNED (mobile) |
+| REQ-MOB-005 | Location behind a `LocationProvider` interface (today an injectable browser `geolocation`) (added 2026-10-03) | P2 | PLANNED |
+| REQ-MOB-006 | Notifications behind a `NotificationProvider` interface; alerts can reach a backgrounded app where the platform allows (added 2026-10-03) | P2 | PLANNED (alerts are foreground-only today) |
 
 ## 21. CarPlay requirements
 
@@ -335,19 +350,21 @@ from a web app. Status: FUTURE (P3).
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-TEST-001 | Unit + scenario tests for all engines (currently 548) | P0 | VERIFIED |
+| REQ-TEST-001 | Unit + scenario tests for all engines (586 passing on 2026-10-03) | P0 | VERIFIED |
 | REQ-TEST-002 | Worker smoke tests for share and reports, both API prefixes | P0 | VERIFIED (local) |
 | REQ-TEST-003 | Special cases: time-zone crossing, provider failure, re-route, GPS drift/tunnel, offline, duplicate alerts, forecast update, long and international routes | P0 | PARTIALLY (see TESTING gaps) |
 | REQ-TEST-004 | Real-device tests (iOS Safari, Android Chrome) before public beta | P1 | PLANNED |
 | REQ-TEST-005 | Browser E2E (Playwright) for search → route → simulate → arrive | P2 | PLANNED |
+| REQ-TEST-006 | A regression test for every confirmed defect (B-01…B-07 first) before it is closed (added 2026-10-03) | P0 | PLANNED |
 
 ## 26. CI/CD requirements
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-CI-001 | PR checks: typecheck (app + Worker), unit tests, build, Worker smoke tests | P0 | IMPLEMENTED (`.github/workflows/ci.yml`) |
+| REQ-CI-001 | PR checks: typecheck (app + Worker), unit tests, build, Worker smoke tests | P0 | IMPLEMENTED (`.github/workflows/ci.yml`; runs on GitHub NOT VERIFIED on 2026-10-03 — the same steps pass locally) |
 | REQ-CI-002 | Deploy to Cloudflare from CI with a scoped API token (manual trigger first) | P1 | IMPLEMENTED (`deploy.yml`, needs secrets) |
-| REQ-CI-003 | Lint (ESLint) in CI | P2 | PLANNED (no linter configured yet) |
+| REQ-CI-003 | Lint (ESLint) in CI | P2 | PLANNED (no linter configured yet, although the code carries 8 `eslint-disable` comments) |
+| REQ-CI-005 | Dependency audit in CI without high findings (dev included) (added 2026-10-03) | P2 | PLANNED (dev: `undici` high via `wrangler` 4.142, B-16) |
 | REQ-CI-004 | D1 migrations applied by CI before code that needs them, backward compatible | P2 | PLANNED (with D1) |
 
 ## 27. Monitoring requirements
@@ -365,6 +382,10 @@ from a web app. Status: FUTURE (P3).
 server data (live shares and reports expire by design). With D1: Time Travel
 (7 days Free / 30 days Paid) plus a scheduled export; migrations forward-only
 and backward compatible. Status: PLANNED.
+
+| ID | Requirement | Priority | Status |
+| --- | --- | --- | --- |
+| REQ-DR-001 | Runbooks in `docs/runbooks/`: provider outage (routing, weather, Overpass), Worker rollback, leaked token, report abuse (added 2026-10-03) | P2 | PLANNED (directory missing) |
 
 ## 29. Cost-control requirements
 
@@ -402,7 +423,9 @@ public beta → iOS → Android → CarPlay → Android Auto → international.
 - Long Trip Mode: car only; hotels/places only as mapped in OpenStreetMap (no
   ratings, prices or availability); no fuel prices; no truck road
   restrictions; pace presets are preferences, not legal driving limits;
-  places and borders depend on the public Overpass server (slow at times).
+  places and borders depend on the public Overpass server (slow at times;
+  during the 2026-10-03 live check both public instances failed one request —
+  504 after 8 s and a dropped connection after 12 s).
 
 ## 33. Known technical debt
 
@@ -417,6 +440,10 @@ public beta → iOS → Android → CarPlay → Android Auto → international.
 | DEBT-007 | Observability disabled | blind in production | REQ-OBS-002 |
 | DEBT-008 | Overpass used live per route (and per trip stop / borders) | violates heavy-use guidance at scale | precomputed OSM extracts / own Overpass (ADR-004) |
 | DEBT-009 | Main JS chunk 604 KB after Long Trip Mode (196 KB gz) | LCP | more lazy chunks (REQ-PERF-004) |
+| DEBT-010 | Weather thresholds duplicated in 7 files with different values (B-08) | inconsistent alerts vs trip risks | REQ-WX-009 |
+| DEBT-011 | `forecasts` map in the app store is never pruned (B-11) | memory in long sessions | prune to the samples of known roads |
+| DEBT-012 | `derive` throttle never applies during real navigation (B-10) | CPU/battery per GPS fix | only use the simulated clock while simulating |
+| DEBT-013 | Dev dependency `undici` (via `wrangler` 4.142) has a high advisory (B-16) | local/CI tooling | update `wrangler` (REQ-CI-005) |
 
 ## 34. External dependencies
 
@@ -483,8 +510,12 @@ transport · ADR-012 offline · ADR-013 long-trip planner (stateless Worker).
 | Tomorrow.io free-tier terms | pricing page returned 404 | only if considered |
 | Workers CPU per trip-plan request on the Free plan (10 ms) | long plans may exceed it | measure after deployment (REQ-CF-007) |
 | Overpass usage from the Worker for trips (places, borders) | public instance asks for light use; edge cache helps | before public beta (self-host, ADR-004) |
+| Whether a production deployment exists and works | no deployment URL or record found on 2026-10-03 | owner |
+| CI runs on GitHub Actions | workflow present; run history not checked (no `gh` access) | owner |
+| Open-Meteo plan prices | not published; third-party sites quote ~$29/month for Standard (1M calls) | before REQ-WX-005 |
 
 ---
 
-*Last full review: 2026-10-02. Update the status columns in the same commit
-that changes the implementation.*
+*Last full review: 2026-10-03 ([MASTER_AUDIT](AUDIT/MASTER_AUDIT.md)). No
+requirement was found obsolete, so none is marked DEPRECATED. Update the status
+columns in the same commit that changes the implementation.*

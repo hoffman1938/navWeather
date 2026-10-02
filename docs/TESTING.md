@@ -83,6 +83,11 @@ and fixes: `docs/PLAN.md` §3 and §7.
 - Production build served by Cloudflare's runtime (`wrangler dev`): headers,
   SPA fallback, service worker offline reload.
 
+Live check 2026-10-03 ([MASTER_AUDIT](AUDIT/MASTER_AUDIT.md) §1): dev build against the real public providers —
+Tbilisi → Batumi (OSRM `alternatives=3` + via probes answered; one alternative road), Tbilisi → Istanbul and
+Tbilisi → Berlin Long Trip plans through the local Worker, and a 60× simulated drive that spoke a heavy-rain
+alert ~35 min ahead. Both public Overpass instances failed one request each during that run.
+
 ## "Your location" in the browser
 
 Dev build with mocked providers and a controllable `navigator.geolocation`:

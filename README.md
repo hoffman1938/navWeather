@@ -201,7 +201,8 @@ unavailable).
 Start with **[Project requirements](docs/PROJECT_REQUIREMENTS.md)** (single
 source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
 
-- [Platform audit 2026-10-02](docs/audit/2026-10-02-platform-audit.md) — findings, fixes, sources
+- [Master audit 2026-10-03](docs/AUDIT/MASTER_AUDIT.md) — status of every requirement, confirmed defects, cost, roadmap ([gap analysis](docs/AUDIT/FEATURE_GAP_ANALYSIS.md), [implementation roadmap](docs/AUDIT/IMPLEMENTATION_ROADMAP.md))
+- [Platform audit 2026-10-02](docs/AUDIT/2026-10-02-platform-audit.md) — findings, fixes, sources
 - [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md) · [Roadmap & MVP](docs/ROADMAP.md)
 - [API v1](docs/api/API_V1.md) · [Data model](docs/database/DATA_MODEL.md) · [Security](docs/security/SECURITY.md) · [Privacy](docs/legal/PRIVACY.md) · [Licensing matrix](docs/legal/LICENSING_MATRIX.md)
 - [Weather engine](docs/architecture/WEATHER_ENGINE.md) · [Maps, routing, GIS](docs/architecture/MAPS_ROUTING_GEO.md) · [Mobile strategy](docs/mobile/MOBILE_STRATEGY.md) · [Cost & scale](docs/operations/COST_AND_SCALE.md) · [Delivery](docs/operations/DELIVERY.md)

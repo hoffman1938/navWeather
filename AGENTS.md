@@ -68,5 +68,7 @@ and push it. Commit messages: what and why; reference requirement IDs.
 - Mobile/CarPlay/Android Auto: `docs/mobile/` · UX/SEO/analytics/i18n: `docs/product/`
 - Cost & scale, CI/CD, testing, DR: `docs/operations/`
 - Feature specs (source of truth per feature): `docs/features/` (Long Trip Mode)
-- Latest audit: `docs/audit/2026-10-02-platform-audit.md`
+- Latest audit: `docs/AUDIT/MASTER_AUDIT.md` (2026-10-03: status of every requirement, confirmed defects `B-xx`),
+  with `docs/AUDIT/FEATURE_GAP_ANALYSIS.md` and `docs/AUDIT/IMPLEMENTATION_ROADMAP.md`;
+  previous: `docs/AUDIT/2026-10-02-platform-audit.md`
 - Product iteration log (Russian): `docs/PLAN.md`
