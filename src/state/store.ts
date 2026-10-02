@@ -54,6 +54,7 @@ import { VoiceQueue } from '../voice/queue';
 import { deriveRouteWeather, emptyDerived, type Derived } from './derive';
 import { clearDriveSession, saveDriveSession } from './driveSession';
 import { useSavedPlaces } from './savedPlaces';
+import { isLocationNotice } from './locationNotice';
 import { currentMessages, settingsSnapshot, useSettings } from './settings';
 
 export type RouteStatus = 'idle' | PlanStage | 'ready' | 'error';
@@ -566,6 +567,7 @@ export const useAppStore = create<AppState>()(
           if (f.place?.kind !== 'here') return f;
           const start = await tripStart(ctrl.signal);
           if (start.approximate) approximateCity = start.approximate.city;
+          else if (isLocationNotice(get().notice?.text)) get().dismissNotice(); // the device gave a position: the old warning is out of date
           const name = start.approximate ? m.location.approxName : m.ui.currentLocation;
           return { text: name, place: { ...f.place, name, label: name, coordinate: start.coordinate } };
         };
