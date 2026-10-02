@@ -4,7 +4,7 @@ import { setProviders } from '../services/providers';
 import { installFakeProviders, type Harness } from '../test/harness';
 import { BATUMI } from '../test/helpers';
 import { herePlace, useExplore } from './explore';
-import { useSettings } from './settings';
+import { currentMessages, useSettings } from './settings';
 import { __resetStoreRuntime, useAppStore } from './store';
 
 const BASE = Date.UTC(2026, 8, 27, 6, 0);
@@ -101,6 +101,58 @@ describe('directions from a place', () => {
     expect(s.routeStatus).toBe('error');
     expect(s.routeError).toMatch(/Location is blocked for this site/);
     expect(h.routingCalls).toHaveLength(0);
+  });
+
+  it('blocked, then allowed in the browser: the very next try uses the real position (no minute of "blocked")', async () => {
+    stubGeolocation({ code: 1 });
+    useAppStore.getState().setDestinationPlace(BATUMI);
+    useAppStore.getState().setOriginPlace(herePlace());
+    await useAppStore.getState().calculateRoute();
+    expect(useAppStore.getState().routeError).toMatch(/Location is blocked/);
+
+    // The user allows location in the browser's site settings and presses Directions again.
+    stubGeolocation({ lon: 44.793, lat: 41.7151 });
+    useAppStore.getState().setOriginPlace(herePlace());
+    await useAppStore.getState().calculateRoute();
+    const s = useAppStore.getState();
+    expect(s.routeError).toBeNull();
+    expect(s.routeStatus).toBe('ready');
+    expect(h.routingCalls.at(-1)!.origin.coordinate).toEqual([44.793, 41.7151]);
+    expect(s.notice?.text ?? '').not.toMatch(/Location is blocked/);
+  });
+});
+
+describe('a sticky location warning', () => {
+  const blocked = () => useAppStore.getState().showNotice('warning', currentMessages().location.errors.denied, true);
+
+  it('goes as soon as a position arrives', () => {
+    let fix: PositionCallback = () => undefined;
+    const geo = { getCurrentPosition: vi.fn(), watchPosition: vi.fn((ok: PositionCallback) => ((fix = ok), 1)), clearWatch: vi.fn() };
+    Object.defineProperty(navigator, 'geolocation', { value: geo, configurable: true });
+    blocked();
+    useExplore.getState().locateMe();
+    fix({ coords: { longitude: 44.8, latitude: 41.7, accuracy: 20, heading: null, speed: null }, timestamp: Date.now() } as GeolocationPosition);
+    expect(useExplore.getState().myLocation).not.toBeNull();
+    expect(useAppStore.getState().notice).toBeNull();
+  });
+
+  it('is the only notice to go: others stay', () => {
+    let fix: PositionCallback = () => undefined;
+    const geo = { getCurrentPosition: vi.fn(), watchPosition: vi.fn((ok: PositionCallback) => ((fix = ok), 1)), clearWatch: vi.fn() };
+    Object.defineProperty(navigator, 'geolocation', { value: geo, configurable: true });
+    useAppStore.getState().showNotice('info', 'Forecast updated', true);
+    useExplore.getState().locateMe();
+    fix({ coords: { longitude: 44.8, latitude: 41.7, accuracy: 20, heading: null, speed: null }, timestamp: Date.now() } as GeolocationPosition);
+    expect(useAppStore.getState().notice?.text).toBe('Forecast updated');
+  });
+
+  it('a route from the device position also clears it', async () => {
+    blocked();
+    stubGeolocation({ lon: 44.793, lat: 41.7151 });
+    useAppStore.getState().setDestinationPlace(BATUMI);
+    useAppStore.getState().setOriginPlace(herePlace());
+    await useAppStore.getState().calculateRoute();
+    expect(useAppStore.getState().notice).toBeNull();
   });
 });
 

@@ -44,15 +44,26 @@ weather and AQI at the map centre. Directions start from "Your location".
 Save places as Home, Work or favourites; share a place as a link; after a
 drive, save where you parked (this device only).
 
-**Plan** — route options with weather exposure per route ("Heavy rain 35 min"
-vs "Mostly dry"; never auto-selected), the weather timeline at each ETA, heads-up
+**Plan** — up to three genuinely different **roads** to the destination (near-copies
+of the best route are dropped), each with its own forecast: the road numbers it
+follows ("via S1 · S12"), a weather ribbon along its whole length, a few stops with
+the time you would be there and the expected weather and temperature, and the
+exposure in minutes ("Heavy rain 35 min" vs "Mostly dry"; never auto-selected).
+Then the weather timeline at each ETA of the road you pick, heads-up
 events, "Where will I be at…", places along the route with real detour times,
 multi-stop trips, departure time in the start location's time zone, and
 **when to leave**: the next 12 hours of departures compared by rain and severe
 weather on the way ("Leaving at 06:30: about 54 min less heavy weather").
 
 **Drive** — turn-by-turn (lanes when OSM has them), speed-adaptive voice
-prompts, heading-up camera that re-centres itself, off-route recalculation,
+prompts, heading-up camera that re-centres itself, and **following the road you
+choose**: if you leave the planned road onto another road the app already knows,
+it carries on along that road at once (no waiting, works offline, its forecast is
+already loaded); if you turn onto a road it doesn't know, it makes new directions
+from there and looks up the other roads from that point with their forecasts.
+"Other roads" in the pulled-up sheet lists the roads you can still take from
+here — time difference, forecast, "Take this road" — and fades as you pass the fork.
+Also:
 speed limits (OSM, "signs take precedence"), the "Ahead" list and time-based
 weather alerts that stay quiet unless it matters, low-sun glare warnings,
 time-zone changes, break reminders, sharp curves and railway crossings (with

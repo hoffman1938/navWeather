@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { isAbortError } from '../services/http';
-import { latestFix, LocationError, LocationWatcher, rememberFix, tripStart, type LocationErrorKind, type LocationFix } from '../services/location';
+import { forgetLocationFailure, latestFix, LocationError, LocationWatcher, rememberFix, tripStart, type LocationErrorKind, type LocationFix } from '../services/location';
 import { getProviders } from '../services/providers';
 import type { LayerKind } from '../algorithms/weatherGrid';
 import type { Poi, PoiCategory } from '../services/places/PoiProvider';
@@ -11,6 +11,7 @@ import { useLiveShare } from '../share/liveShare';
 import type { LngLat, Place } from '../types/geo';
 import type { LocationForecast } from '../types/weather';
 import { haversineM } from '../utils/distance';
+import { isLocationNotice } from './locationNotice';
 import { currentMessages } from './settings';
 import { chargingSummary } from '../services/places/evCharging';
 import { tripLocationErrorText, useAppStore, type SheetState } from './store';
@@ -417,7 +418,8 @@ export const locationWatcher = new LocationWatcher({
     const s = useExplore.getState();
     useExplore.setState({ myLocation: fix, locationError: null, ...(s.locate === 'pending' ? { locate: 'on' } : {}) });
     const app = useAppStore.getState();
-    if (s.locationError && app.notice?.text === currentMessages().location.waitingGps) app.dismissNotice();
+    // Positions are flowing: a "blocked" / "waiting for GPS" warning from before is out of date.
+    if (isLocationNotice(app.notice?.text)) app.dismissNotice();
     if (app.mode === 'navigating') app.handlePosition(fix);
   },
   onError(kind, hadFix) {
@@ -448,3 +450,23 @@ export const locationWatcher = new LocationWatcher({
     app.showNotice('warning', locationMessage(kind), kind === 'unavailable');
   },
 });
+
+/**
+ * The user changed the site's location permission (in the address-bar icon or
+ * the browser settings) while the app is open: drop the old failure and its
+ * sticky warning, so the next tap on "Your location" asks the browser afresh.
+ */
+if (typeof navigator !== 'undefined' && typeof navigator.permissions?.query === 'function') {
+  navigator.permissions
+    .query({ name: 'geolocation' as PermissionName })
+    .then((status) => {
+      status.addEventListener('change', () => {
+        if (status.state === 'denied') return;
+        forgetLocationFailure();
+        if (useExplore.getState().locationError) useExplore.setState({ locationError: null });
+        const app = useAppStore.getState();
+        if (isLocationNotice(app.notice?.text)) app.dismissNotice();
+      });
+    })
+    .catch(() => undefined);
+}

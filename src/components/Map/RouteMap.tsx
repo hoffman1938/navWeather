@@ -20,7 +20,7 @@ import type { LngLat } from '../../types/geo';
 import type { TimedRoute } from '../../types/route';
 import { lowerIndex, sliceLine } from '../../utils/distance';
 import { LocateIcon } from '../Icons/Icons';
-import { exposureLine } from '../Plan/RouteOptions';
+import { exposureLine, roadNames } from '../Plan/RouteOptions';
 import { WeatherMarker } from '../WeatherMarker/WeatherMarker';
 import { add3dBuildings, addRouteLayers, EMPTY_FC, lineFeature, pointFeature, routeGradient, setData } from './mapLayers';
 import { useExploreLayer } from './useExploreLayer';
@@ -278,6 +278,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
   const routeOptions = useAppStore((s) => s.routeOptions);
   const selectedOption = useAppStore((s) => s.selectedOption);
   const optionSummaries = useAppStore((s) => s.derived.options);
+  const otherRoads = useAppStore((s) => s.derived.otherRoads);
   const offered = useAppStore((s) => s.weatherReroute?.plan ?? null);
   const altLabels = useRef<Marker[]>([]);
   useEffect(() => {
@@ -287,9 +288,16 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     altLabels.current = [];
     const planning = mode === 'planning' && routeOptions.length > 1;
     const alts = planning ? routeOptions.map((o, i) => ({ o, i })).filter(({ i }) => i !== selectedOption) : [];
+    // Driving: a re-route on offer, and the other roads the car can still take (quiet, not tappable — switching is in the sheet).
+    const driving = mode !== 'planning'
+      ? [
+          ...(offered ? [lineFeature(offered.timed.route.geometry, { index: -1 })] : []),
+          ...otherRoads.flatMap((r) => (routeOptions[r.index] ? [lineFeature(routeOptions[r.index].timed.route.geometry, { index: -1 })] : [])),
+        ]
+      : null;
     setData(map, 'alternatives', {
       type: 'FeatureCollection',
-      features: offered && mode !== 'planning' ? [lineFeature(offered.timed.route.geometry, { index: -1 })] : alts.map(({ o, i }) => lineFeature(o.timed.route.geometry, { index: i })),
+      features: driving ?? alts.map(({ o, i }) => lineFeature(o.timed.route.geometry, { index: i })),
     });
     const chosen = routeOptions[selectedOption];
     if (!planning || !chosen) return;
@@ -314,7 +322,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       const time = Math.abs(delta) < 60 ? m.ui.same : `${delta > 0 ? '+' : '−'}${formatDuration(Math.abs(delta), m)}`;
       const wet = summary?.hasWeather ? exposureLine(summary, m, 1) : '';
       el.textContent = wet ? `${time} · ${wet}` : time;
-      el.setAttribute('aria-label', `${m.ui.alternative} ${i}: ${el.textContent}`);
+      el.setAttribute('aria-label', `${roadNames(optionSummaries, m).get(i) ?? `${m.ui.alternative} ${i}`}: ${el.textContent}`);
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         void useAppStore.getState().selectRouteOption(i);
@@ -324,7 +332,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       const anchor = best[0] < (w + e) / 2 ? 'left' : 'right';
       altLabels.current.push(new Marker({ element: el, anchor, offset: [anchor === 'left' ? 6 : -6, 0] }).setLngLat(best).addTo(map));
     }
-  }, [routeOptions, selectedOption, optionSummaries, offered, mode, styleVersion, m]);
+  }, [routeOptions, selectedOption, optionSummaries, otherRoads, offered, mode, styleVersion, m]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !styleVersion) return;

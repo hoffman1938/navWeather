@@ -118,6 +118,7 @@ let approx: { at: number; value: ApproximateLocation } | null = null;
 /** The device just couldn't give a position: don't make the next tap wait for the same failure. */
 let failed: { at: number; kind: LocationErrorKind } | null = null;
 const FAILED_MS = 60_000;
+const SLOW_FAILURES: LocationErrorKind[] = ['timeout', 'unavailable'];
 
 /**
  * The connection's rough area (city level), from our own Worker — for when the
@@ -155,7 +156,10 @@ export async function tripStart(
     return { coordinate: fix.coordinate, approximate: null };
   } catch (e) {
     if (!(e instanceof LocationError)) throw e;
-    if (!failed || Date.now() - failed.at >= FAILED_MS) failed = { at: Date.now(), kind: e.kind };
+    // Only remember failures that took time (no signal yet). A refusal is instant and free to ask again —
+    // and remembering it would keep saying "blocked" for a minute after the user allows location.
+    if (SLOW_FAILURES.includes(e.kind) && (!failed || Date.now() - failed.at >= FAILED_MS)) failed = { at: Date.now(), kind: e.kind };
+    else if (!SLOW_FAILURES.includes(e.kind)) failed = null;
     try {
       const a = await approximateLocation(signal);
       return { coordinate: a.coordinate, approximate: { city: a.city, reason: e.kind } };
@@ -164,6 +168,11 @@ export async function tripStart(
       throw e;
     }
   }
+}
+
+/** The browser's location permission changed (e.g. the user just allowed it): forget old failures. */
+export function forgetLocationFailure() {
+  failed = null;
 }
 
 /** Test helper. */

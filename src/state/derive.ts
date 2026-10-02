@@ -1,5 +1,9 @@
 import type { RouteCamera } from '../algorithms/cameras';
 import type { RouteIncident } from '../algorithms/incidents';
+import { routeVia } from '../algorithms/routeAlternatives';
+import { buildRoadForecast, type RoadForecast } from '../algorithms/roadForecast';
+import { roadAhead, wholeRoad, type OptionRoad } from '../algorithms/roadAhead';
+import { coincidesAhead, roadsNearCar } from '../algorithms/roadMatching';
 import { buildCurrentPoint, buildRouteWeatherPoints, reconcilePoints } from '../algorithms/routeWeather';
 import { computeArrivals } from '../algorithms/routeTiming';
 import { buildTimelineItems, type TimelineItem } from '../algorithms/timeline';
@@ -10,7 +14,7 @@ import {
   weatherRouteSegments,
 } from '../algorithms/weatherGrouping';
 import type { SpeedLimitProfile } from '../algorithms/speedLimits';
-import { isPrecipitating, matchForecastToTime } from '../algorithms/weatherMatching';
+import { isPrecipitating } from '../algorithms/weatherMatching';
 import type { Messages } from '../i18n/en';
 import type { UnitPrefs } from '../i18n/format';
 import { buildRouteIntelligence, type RouteIntelligence } from '../intelligence/routeIntelligence';
@@ -35,12 +39,24 @@ export interface RouteOptionSummary {
   index: number;
   distanceM: number;
   durationS: number;
+  /** Arrival (UTC ms) if this road is taken from its own start time. */
+  arrivalMs: number;
+  /** The roads it mostly follows, longest first ("E60", "S12"); empty when the router names none. */
+  via: string[];
   /** Minutes of the drive expected in each condition (at the ETAs). */
   wetMinutes: number;
   heavyMinutes: number;
   exposure: Record<ExposureKind, number>;
   hasWeather: boolean;
+  /** The forecast along this road — headline, ribbon, stops; null until a forecast has arrived. */
+  forecast: RoadForecast | null;
   classes: string[];
+}
+
+/** A road the driver can still take from here, compared with the one being driven. */
+export interface OtherRoadSummary extends RouteOptionSummary {
+  /** Seconds slower (+) or faster (−) than staying on the current road, from here. */
+  deltaS: number;
 }
 
 export interface Derived {
@@ -59,6 +75,8 @@ export interface Derived {
   maneuvers: Maneuver[];
   intelligence: RouteIntelligence;
   options: RouteOptionSummary[];
+  /** While driving: other roads to the destination still within reach, fastest first. */
+  otherRoads: OtherRoadSummary[];
   departureMs: number;
   arrivalMs: number | null;
 }
@@ -77,6 +95,7 @@ export const emptyDerived: Derived = {
   maneuvers: [],
   intelligence: emptyIntelligence,
   options: [],
+  otherRoads: [],
   departureMs: 0,
   arrivalMs: null,
 };
@@ -85,6 +104,8 @@ export interface DeriveInput {
   plan: PlannedRoute | null;
   /** All route options (primary first) — for the weather comparison while planning. */
   options: PlannedRoute[];
+  /** Roads known to the destination while driving (the current one included). */
+  knownRoads: PlannedRoute[];
   forecastFor: (s: RouteSample) => LocationForecast | undefined;
   mode: NavigationMode;
   /** Planning: chosen departure. Navigating: when this route leg started. */
@@ -201,8 +222,9 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
 
   const options =
     !navigating && input.options.length > 1
-      ? stableJson(previous.options, input.options.map((o, i) => summarizeOption(o, i, input)))
+      ? stableJson(previous.options, input.options.map((o, i) => summarizeOption(wholeRoad(o), i, input)))
       : [];
+  const otherRoads = navigating ? stableJson(previous.otherRoads, summarizeOtherRoads(input, plan, progress)) : [];
 
   const arrivalMs = navigating ? progress.etaMs : input.departureMs + plan.timed.totalTimeS * 1000;
 
@@ -218,21 +240,34 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     maneuvers,
     intelligence: stableIntelligence(previous.intelligence, intelligence),
     options,
+    otherRoads,
     departureMs: input.departureMs,
     arrivalMs,
   };
 }
 
-/** Weather exposure of a route option: minutes in rain / heavy rain at the ETAs. */
-function summarizeOption(o: PlannedRoute, index: number, input: DeriveInput): RouteOptionSummary {
+/**
+ * What a road offers: its forecast at the ETAs, and the minutes it spends in
+ * rain / heavy rain / storm / snow / fog / strong gusts. `departureMs` is when
+ * the road would be started (the plan's departure, or now for roads from the car).
+ */
+export function summarizeOption(o: OptionRoad, index: number, input: DeriveInput, departureMs = input.departureMs): RouteOptionSummary {
   let wet = 0;
   let heavy = 0;
   let has = false;
   const ex: Record<ExposureKind, number> = { heavy: 0, storm: 0, snow: 0, fog: 0, wind: 0, rain: 0 };
   const s = o.samples;
+  const points = buildRouteWeatherPoints({
+    samples: s,
+    arrivals: s.map((smp) => departureMs + smp.travelTimeS * 1000),
+    forecastFor: input.forecastFor,
+    nowMs: input.nowMs,
+    progressM: null,
+    modelTimeS: 0,
+    fallbackTimeZone: nearestTimeZone(s, input.forecastFor, 0, input.fallbackTimeZone),
+  });
   for (let i = 0; i < s.length; i++) {
-    const f = input.forecastFor(s[i]);
-    const w = f ? matchForecastToTime(f, input.departureMs + s[i].travelTimeS * 1000) : null;
+    const w = points[i].weather;
     if (!w) continue;
     has = true;
     const next = s[i + 1]?.travelTimeS ?? s[i].travelTimeS;
@@ -248,17 +283,40 @@ function summarizeOption(o: PlannedRoute, index: number, input: DeriveInput): Ro
     if (w.condition === 'FOG' || (w.visibility !== undefined && w.visibility < 1000)) ex.fog += span;
     if ((w.windGusts ?? 0) >= 70) ex.wind += span;
   }
-  const classes = [...new Set(o.timed.route.legs.flatMap((l) => l.steps.flatMap((st) => st.classes ?? [])))];
+  const classes = [...new Set(o.route.legs.flatMap((l) => l.steps.flatMap((st) => st.classes ?? [])))];
   return {
     index,
-    distanceM: o.timed.totalDistM,
-    durationS: o.timed.totalTimeS,
+    distanceM: o.totalDistM,
+    durationS: o.totalTimeS,
+    arrivalMs: departureMs + o.totalTimeS * 1000,
+    via: routeVia(o.route),
     wetMinutes: Math.round(wet),
     heavyMinutes: Math.round(heavy),
     exposure: Object.fromEntries(Object.entries(ex).map(([k, v]) => [k, Math.round(v)])) as Record<ExposureKind, number>,
     hasWeather: has,
+    forecast: buildRoadForecast(points, o.totalDistM, input.m, input.units.temperature),
     classes,
   };
+}
+
+/**
+ * Other roads to the destination that the car can still take: known roads it
+ * is on or beside, that don't just follow the current road to the end.
+ * Each is the part still ahead, with its forecast for the times you'd be there.
+ */
+function summarizeOtherRoads(input: DeriveInput, plan: PlannedRoute, progress: RouteProgress): OtherRoadSummary[] {
+  const car = input.vehicleCoordinate;
+  if (!car || input.knownRoads.length < 2) return [];
+  const currentRemainingS = plan.timed.totalTimeS - progress.modelTimeS;
+  const out: OtherRoadSummary[] = [];
+  for (const { index, distanceAlongM } of roadsNearCar(input.knownRoads.map((o) => o.timed), car)) {
+    const road = input.knownRoads[index];
+    if (road.timed === plan.timed || road.timed.totalDistM - distanceAlongM < 1000) continue;
+    if (coincidesAhead(road.timed, distanceAlongM, plan.timed)) continue;
+    const ahead = roadAhead(road, distanceAlongM);
+    out.push({ ...summarizeOption(ahead, index, input, input.nowMs), deltaS: ahead.totalTimeS - currentRemainingS });
+  }
+  return out.sort((a, b) => a.durationS - b.durationS);
 }
 
 function stableArray<T>(prev: T[], next: T[]): T[] {

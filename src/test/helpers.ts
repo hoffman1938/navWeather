@@ -34,6 +34,40 @@ export function tbilisiBatumiRoute(mutate?: (raw: RawOsrmRoute) => void): Route 
   return normalizeOsrmRoute(raw, { origin: TBILISI, destination: BATUMI });
 }
 
+/**
+ * A different road between the same two places: the Tbilisi → Batumi road
+ * with its middle `from`–`to` share (fractions of its length) pushed `dLat`
+ * degrees north (≈ 111 km per degree) and rejoining it smoothly — a detour that
+ * leaves and returns to the main road. `durationFactor` scales the trip time.
+ * With `fromCoordinate`, only the part from the vertex nearest to it on.
+ */
+export function tbilisiBatumiDetour(from: number, to: number, dLat: number, durationFactor = 1.1, fromCoordinate?: [number, number]): Route {
+  const base = tbilisiBatumiRoute();
+  const g = base.geometry;
+  const n = g.length;
+  let geometry = g.map(([lon, lat], i): [number, number] => {
+    const f = i / (n - 1);
+    if (f < from || f > to) return [lon, lat];
+    const w = Math.sin(((f - from) / (to - from)) * Math.PI);
+    return [lon, lat + dLat * w];
+  });
+  let share = 1;
+  if (fromCoordinate) {
+    let k = 0;
+    geometry.forEach((c, i) => {
+      if (Math.hypot(c[0] - fromCoordinate[0], c[1] - fromCoordinate[1]) < Math.hypot(geometry[k][0] - fromCoordinate[0], geometry[k][1] - fromCoordinate[1])) k = i;
+    });
+    geometry = [fromCoordinate, ...geometry.slice(k + 1)];
+    share = geometry.length / n;
+  }
+  const distance = base.distanceM * 1.05 * share;
+  const duration = base.durationS * durationFactor * share;
+  return normalizeOsrmRoute(
+    { distance, duration, geometry: { coordinates: geometry }, legs: [{ distance, duration, summary: '', steps: [] }] },
+    { origin: TBILISI, destination: BATUMI },
+  );
+}
+
 export function tbilisiBatumiPlaces() {
   return parseOverpassElements(overpassFixture.elements as never, 'en');
 }

@@ -3,6 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { dueCamera, snapCamerasToRoute, type RouteCamera } from '../algorithms/cameras';
 import { dueHazard, findSharpCurves, hazardLabelKind, mergeHazards, roadSurface, snapLevelCrossings, weatherAtDistance, type RoadHazard } from '../algorithms/roadHazards';
 import { snapIncidentsToRoute, type RouteIncident } from '../algorithms/incidents';
+import { matchKnownRoad, projectorFor, roadsNearCar } from '../algorithms/roadMatching';
 import { initialDeviationState, updateDeviation } from '../algorithms/routeDeviation';
 import { createProgressTracker, edgeSpeedMps, hasArrived } from '../algorithms/routeProgress';
 import { timeAtDistance } from '../algorithms/routeTiming';
@@ -35,6 +36,7 @@ import {
   enrichRoute,
   fetchSampleForecasts,
   forecastLookupFn,
+  planOtherRoads,
   planRoute,
   planRouteOptions,
   refinePlanWithWeather,
@@ -52,6 +54,7 @@ import { VoiceQueue } from '../voice/queue';
 import { deriveRouteWeather, emptyDerived, type Derived } from './derive';
 import { clearDriveSession, saveDriveSession } from './driveSession';
 import { useSavedPlaces } from './savedPlaces';
+import { isLocationNotice } from './locationNotice';
 import { currentMessages, settingsSnapshot, useSettings } from './settings';
 
 export type RouteStatus = 'idle' | PlanStage | 'ready' | 'error';
@@ -218,6 +221,8 @@ export interface AppState {
   setDeparture(d: Departure): void;
   calculateRoute(): Promise<void>;
   selectRouteOption(i: number): Promise<void>;
+  /** While driving: continue on another known road (the ones listed as "other roads"), no network needed. */
+  switchToRoad(i: number): void;
   clearRoute(): void;
   loadWeather(opts?: { force?: boolean; reason?: RefreshReason }): Promise<void>;
   refreshIfStale(): Promise<void>;
@@ -423,6 +428,7 @@ function derive(s: AppState): Derived {
   return deriveRouteWeather({
     plan: s.plan,
     options: s.mode === 'planning' ? s.routeOptions : [],
+    knownRoads: s.mode === 'planning' ? [] : s.routeOptions,
     forecastFor: lookupFor(s.forecasts),
     mode: s.mode,
     departureMs: navigating && s.navStartedMs !== null ? s.navStartedMs : departureMsOf(s),
@@ -561,6 +567,7 @@ export const useAppStore = create<AppState>()(
           if (f.place?.kind !== 'here') return f;
           const start = await tripStart(ctrl.signal);
           if (start.approximate) approximateCity = start.approximate.city;
+          else if (isLocationNotice(get().notice?.text)) get().dismissNotice(); // the device gave a position: the old warning is out of date
           const name = start.approximate ? m.location.approxName : m.ui.currentLocation;
           return { text: name, place: { ...f.place, name, label: name, coordinate: start.coordinate } };
         };
@@ -664,6 +671,10 @@ export const useAppStore = create<AppState>()(
       await get().loadWeather({ reason: 'auto' });
     },
 
+    switchToRoad(i) {
+      switchDriveTo(i);
+    },
+
     clearRoute: () => {
       clearDriveSession();
       routeAbort?.abort();
@@ -717,7 +728,7 @@ export const useAppStore = create<AppState>()(
       const providers = getProviders();
       const m = currentMessages();
       // Every option's samples in one batched lookup (alternatives compare weather).
-      const samples = s.mode === 'planning' ? s.routeOptions.flatMap((o) => o.samples) : plan.samples;
+      const samples = s.mode === 'planning' ? s.routeOptions.flatMap((o) => o.samples) : [...plan.samples, ...reachableRoads(s).flatMap((o) => o.samples)];
       const longest = Math.max(plan.timed.totalTimeS, ...s.routeOptions.map((o) => o.timed.totalTimeS));
       const latestArrival = Math.max(
         s.derived.arrivalMs ?? 0,
@@ -993,12 +1004,19 @@ export const useAppStore = create<AppState>()(
       onProgress(vehicle, progress, pos.speedMps, true);
 
       const st = get();
-      if (
-        deviation.status === 'off-route' &&
-        !st.recalculating &&
-        now - lastRecalcAt > config.navigation.minRecalculationIntervalS * 1000
-      ) {
-        if (st.online) void recalculateFrom(pos.coordinate, pos.headingDeg);
+      if (deviation.status === 'off-route' && !st.recalculating) {
+        // Left the road — onto ANOTHER road we know (one offered at the start, or after the last re-route)?
+        // Then carry on along it at once: no waiting for a network round trip, and its forecast is already here.
+        const roads = st.routeOptions.map((o) => o.timed);
+        const known = matchKnownRoad(
+          roads,
+          { coordinate: pos.coordinate, headingDeg: pos.headingDeg, accuracyM: pos.accuracyM },
+          { except: roads.indexOf(s.plan.timed) },
+        );
+        if (known) switchDriveTo(known.index);
+        else if (st.online && now - lastRecalcAt > config.navigation.minRecalculationIntervalS * 1000) {
+          void recalculateFrom(pos.coordinate, pos.headingDeg);
+        }
       }
       if (hasArrived(progress)) {
         const m = currentMessages();
@@ -1315,14 +1333,18 @@ function startPlanTasks(plan: PlannedRoute, keepSignal = false) {
   useAppStore.setState({ incidents: [], reportPrompt: null });
   incidentsLoading = false;
   loadIncidents(plan.timed, signal);
-  if (plan.latePlaces) {
-    void plan.latePlaces.then((places) => {
-      const cur = useAppStore.getState().plan;
-      if (signal.aborted || !cur || cur.timed !== plan.timed) return;
-      replacePlan(applyLatePlaces(cur, places));
-      useAppStore.getState().rederive();
-    });
-  }
+  watchLatePlaces(plan, signal);
+}
+
+/** Name the route's samples with settlements that arrive after planning. */
+function watchLatePlaces(plan: PlannedRoute, signal: AbortSignal) {
+  if (!plan.latePlaces) return;
+  void plan.latePlaces.then((places) => {
+    const cur = useAppStore.getState().plan;
+    if (signal.aborted || !cur || cur.timed !== plan.timed) return;
+    replacePlan(applyLatePlaces(cur, places));
+    useAppStore.getState().rederive();
+  });
 }
 
 /**
@@ -1673,6 +1695,121 @@ export async function maybeOfferWeatherReroute(force = false): Promise<void> {
   }
 }
 
+/** Other known roads within reach of the car (the one being driven excluded). */
+function reachableRoads(s: AppState): PlannedRoute[] {
+  const current = s.plan;
+  if (!current || !s.vehicle || s.routeOptions.length < 2) return [];
+  return roadsNearCar(s.routeOptions.map((o) => o.timed), s.vehicle.coordinate)
+    .map((r) => s.routeOptions[r.index])
+    .filter((o) => o.timed !== current.timed);
+}
+
+/**
+ * Continue the drive on `routeOptions[index]`, another road the app already
+ * knows: the driver took it, or picked it from "other roads". Needs no
+ * network — its forecast is already loaded — and takes the car's place on it
+ * from the car's position, so ETA, guidance and weather follow at once.
+ */
+function switchDriveTo(index: number): void {
+  const store = useAppStore;
+  const cur = store.getState();
+  const road = cur.routeOptions[index];
+  const car = cur.vehicle;
+  if (!road || !car || cur.mode === 'planning' || !cur.plan || road.timed === cur.plan.timed) return;
+  const m = currentMessages();
+  const simulating = cur.mode === 'simulating';
+  const now = simulating ? cur.sim.nowMs : Date.now();
+  let progress: RouteProgress;
+  if (simulating) {
+    const along = projectorFor(road.timed)(car.coordinate).distanceAlongM;
+    progress = simProgress(road.timed, {
+      nowMs: now,
+      modelTimeS: timeAtDistance(road.timed, along),
+      distanceM: along,
+      coordinate: car.coordinate,
+      headingDeg: car.headingDeg ?? 0,
+      arrived: false,
+    });
+  } else {
+    tracker = createProgressTracker(road.timed);
+    progress = tracker(car.coordinate, now, { headingDeg: car.headingDeg, accuracyM: car.accuracyM });
+  }
+  spokenManeuvers.clear();
+  spokenCameras.clear();
+  spokenHazards.clear();
+  store.setState({
+    plan: road,
+    selectedOption: index,
+    // Positions on the old road mean nothing on this one (they are reloaded below).
+    speedLimits: null,
+    speedCameras: [],
+    roadHazards: [],
+    reportPrompt: null,
+    // This road's own clock: it started `modelTimeS` before the car got on it.
+    navStartedMs: now - progress.modelTimeS * 1000,
+    progress,
+    ...(simulating ? { sim: { ...cur.sim, modelTimeS: progress.modelTimeS } } : {}),
+    deviation: initialDeviationState,
+    recalculating: false,
+    weatherReroute: null,
+    navPrompt: null,
+    followVehicle: true,
+    selectedPointId: null,
+    poi: null,
+  });
+  store.setState({ derived: derive(store.getState()) });
+  store.setState({ guidance: computeGuidance(store.getState().derived.maneuvers, road.timed, progress.distanceAlongM) });
+  startPlanTasks(road);
+  rememberDrive();
+  loadDriveExtras();
+  store.getState().showNotice('success', m.ui.routeUpdated);
+  store.getState().say(m.voice.rerouted, 3);
+  if (road.warnings.includes('not-enriched')) void enrichKnownRoad(road);
+  else void store.getState().loadWeather({ reason: 'auto' });
+}
+
+/**
+ * Roads offered at the start were only timed + sampled. Once the drive is on
+ * one, add its place names and elevation (best effort) and refresh its weather.
+ * The road keeps its `timed` object, so work already started for it stays valid.
+ */
+async function enrichKnownRoad(road: PlannedRoute): Promise<void> {
+  const store = useAppStore;
+  const signal = planTasks?.signal ?? newPlanTasks();
+  try {
+    const enriched = await enrichRoute(getProviders(), road.timed.route, { signal, language: currentMessages().locale, timed: road.timed });
+    if (signal.aborted || store.getState().plan?.timed !== road.timed) return;
+    replacePlan(enriched);
+    watchLatePlaces(enriched, signal);
+  } catch (e) {
+    if (isAbortError(e)) return;
+  }
+  if (!signal.aborted && store.getState().plan?.timed === road.timed) await store.getState().loadWeather({ reason: 'auto' });
+}
+
+/**
+ * After a re-route, best effort: the other roads from where the driver
+ * turned, with their forecast, kept as "other roads" for as long as the car
+ * could still take them. Never delays the new directions.
+ */
+async function loadOtherRoads(plan: PlannedRoute, origin: Place, headingDeg: number | undefined, signal: AbortSignal | undefined): Promise<void> {
+  const store = useAppStore;
+  try {
+    const roads = await planOtherRoads(getProviders(), origin, plan.timed.route.destination, {
+      reference: plan.timed.route,
+      startBearingDeg: headingDeg,
+      language: currentMessages().locale,
+      signal,
+    });
+    const cur = store.getState();
+    if (signal?.aborted || cur.mode === 'planning' || !cur.plan || cur.plan.timed !== plan.timed || roads.length === 0) return;
+    store.setState({ routeOptions: [cur.plan, ...roads], selectedOption: 0 });
+    await store.getState().loadWeather({ reason: 'auto' });
+  } catch {
+    /* other roads are a nicety: the drive goes on without them */
+  }
+}
+
 /** Switch the drive to `plan`, a route computed from the vehicle position. */
 async function adoptRoute(plan: PlannedRoute, coordinate: LngLat, headingDeg: number | undefined): Promise<void> {
   const store = useAppStore;
@@ -1745,7 +1882,10 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
     });
     // Navigation ended while we were re-routing → drop the result (audit race).
     if (ctrl.signal.aborted || store.getState().mode === 'planning') return;
-    await adoptRoute(plan, coordinate, headingDeg);
+    const adopting = adoptRoute(plan, coordinate, headingDeg);
+    // The public router offers alternatives only between two points (no stops).
+    if (extraStops.length + aheadStops.length === 0) void loadOtherRoads(plan, origin, headingDeg, planTasks?.signal);
+    await adopting;
   } catch (e) {
     if (isAbortError(e)) return;
     store.setState({ recalculating: false });

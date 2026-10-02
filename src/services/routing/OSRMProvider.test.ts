@@ -1,6 +1,50 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rawTbilisiBatumi, tbilisiBatumiRoute, TBILISI, BATUMI } from '../../test/helpers';
-import { normalizeOsrmRoute } from './OSRMProvider';
+import { normalizeOsrmRoute, OSRMProvider } from './OSRMProvider';
+
+describe('OSRM alternatives request', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stubFetch(handler: (url: URL) => Response) {
+    const urls: URL[] = [];
+    vi.stubGlobal('fetch', async (input: string) => {
+      const url = new URL(input);
+      urls.push(url);
+      return handler(url);
+    });
+    return urls;
+  }
+  const ok = () => Response.json({ code: 'Ok', routes: [rawTbilisiBatumi(), rawTbilisiBatumi()] });
+  const osrm = new OSRMProvider('https://osrm.test', 'driving', 5000, undefined, 3);
+
+  it('asks for several alternatives — `true` would give at most one', async () => {
+    const urls = stubFetch(ok);
+    const routes = await osrm.calculateRoutes({ origin: TBILISI, destination: BATUMI, alternatives: true });
+    expect(urls).toHaveLength(1);
+    expect(urls[0].searchParams.get('alternatives')).toBe('3');
+    expect(routes).toHaveLength(2);
+  });
+
+  it('asks for none when none are wanted, or when stops make them impossible', async () => {
+    const urls = stubFetch(ok);
+    await osrm.calculateRoutes({ origin: TBILISI, destination: BATUMI });
+    await osrm.calculateRoutes({ origin: TBILISI, destination: BATUMI, alternatives: true, waypoints: [BATUMI] });
+    expect(urls.map((u) => u.searchParams.get('alternatives'))).toEqual(['false', 'false']);
+  });
+
+  it('retries with `true` when an older OSRM rejects the number', async () => {
+    const urls = stubFetch((u) => (u.searchParams.get('alternatives') === '3' ? new Response('bad', { status: 400 }) : ok()));
+    const routes = await osrm.calculateRoutes({ origin: TBILISI, destination: BATUMI, alternatives: true });
+    expect(urls.map((u) => u.searchParams.get('alternatives'))).toEqual(['3', 'true']);
+    expect(routes).toHaveLength(2);
+  });
+
+  it('does not retry other failures', async () => {
+    const urls = stubFetch(() => new Response('down', { status: 503 }));
+    await expect(osrm.calculateRoutes({ origin: TBILISI, destination: BATUMI, alternatives: true })).rejects.toMatchObject({ kind: 'http', status: 503 });
+    expect(urls).toHaveLength(1);
+  });
+});
 
 describe('OSRM normalization (Tbilisi → Batumi)', () => {
   const route = tbilisiBatumiRoute();

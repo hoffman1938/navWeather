@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setProviders } from '../services/providers';
 import type { RouteRequest } from '../services/routing/RoutingProvider';
 import { installFakeProviders } from '../test/harness';
-import type { FakeWeatherProvider } from '../test/helpers';
+import { tbilisiBatumiDetour, type FakeWeatherProvider } from '../test/helpers';
 import type { LngLat } from '../types/geo';
+import type { Route } from '../types/route';
 import { formatLocalTime } from '../utils/timezone';
 import { selectScrub } from './scrub';
 import { __resetStoreRuntime, useAppStore } from './store';
@@ -20,11 +21,13 @@ const initialState = useAppStore.getState();
 
 let weatherProvider: FakeWeatherProvider;
 let routingCalls: RouteRequest[];
+let alternativeRoads: Route[];
 
 function installProviders() {
   const h = installFakeProviders(BASE);
   weatherProvider = h.weather;
   routingCalls = h.routingCalls;
+  alternativeRoads = h.alternativeRoads;
 }
 
 async function planTbilisiBatumi() {
@@ -375,5 +378,87 @@ describe('weather exposure per route option', () => {
     expect(ex.fog).toBeGreaterThan(5);
     expect(ex.wind).toBeGreaterThan(30);
     expect(ex.snow).toBe(0);
+  });
+});
+
+describe('a forecast along every road', () => {
+  /** Rain only far in the north (above 42.4°N): the main road never gets there, a northern detour does. */
+  const rainInTheNorth = (lat: number, _lon: number, hourMs: number) => {
+    const h = (hourMs - BASE) / H;
+    const raining = lat > 42.4 && h >= 1;
+    return { temperature: 15 + h, code: raining ? 63 : 1, precipitation: raining ? 1.5 : 0, precipitationProbability: raining ? 80 : 5 };
+  };
+
+  it('offers several different roads, each with its own weather at the time you would be there', async () => {
+    weatherProvider.hourFn = rainInTheNorth;
+    alternativeRoads.push(tbilisiBatumiDetour(0.3, 0.7, 0.5, 1.15));
+    await planTbilisiBatumi();
+    const s = useAppStore.getState();
+    expect(routingCalls[0].alternatives).toBe(true);
+    expect(s.routeOptions).toHaveLength(2);
+    expect(s.derived.options).toHaveLength(2);
+
+    const [main, north] = s.derived.options;
+    expect(main.forecast).not.toBeNull();
+    expect(north.forecast).not.toBeNull();
+    // Dry on the main road, rain on the northern one — shown per road, not only for the selected one.
+    expect(main.forecast!.ribbon.some((seg) => seg.groupClass === 'rain')).toBe(false);
+    expect(north.forecast!.ribbon.some((seg) => seg.groupClass === 'rain')).toBe(true);
+    expect(main.wetMinutes).toBe(0);
+    expect(north.wetMinutes).toBeGreaterThan(20);
+    // The ribbon covers the whole road, start to finish.
+    for (const o of [main, north]) {
+      expect(o.forecast!.ribbon[0].from).toBe(0);
+      expect(o.forecast!.ribbon.at(-1)!.to).toBe(1);
+    }
+  });
+
+  it('shows stops with the time you would be there: first the start, last the destination, in the road\'s own timing', async () => {
+    weatherProvider.hourFn = rainInTheNorth;
+    alternativeRoads.push(tbilisiBatumiDetour(0.3, 0.7, 0.5, 1.15));
+    await planTbilisiBatumi();
+    const [main, north] = useAppStore.getState().derived.options;
+    for (const o of [main, north]) {
+      const stops = o.forecast!.stops;
+      expect(stops.length).toBeGreaterThanOrEqual(2);
+      expect(stops.length).toBeLessThanOrEqual(4);
+      expect(stops[0].localTime).toBe('08:00');
+      expect(stops[0].placeName).toBe('Tbilisi');
+      expect(stops.at(-1)!.placeName).toBe('Batumi');
+      expect(stops.at(-1)!.arrivalMs).toBeCloseTo(o.arrivalMs, -3);
+      // Arrival times only move forward, and the temperature is that of THAT hour (15° + 1°/h).
+      stops.forEach((st, i) => {
+        if (i > 0) expect(st.arrivalMs).toBeGreaterThan(stops[i - 1].arrivalMs);
+        expectTempFor(st.temperature, st.arrivalMs);
+      });
+    }
+    // The slower road arrives later.
+    expect(north.arrivalMs).toBeGreaterThan(main.arrivalMs);
+  });
+
+  it("keeps the router's best road first even when an alternative is faster", async () => {
+    alternativeRoads.push(tbilisiBatumiDetour(0.3, 0.7, 0.5, 0.9));
+    await planTbilisiBatumi();
+    const s = useAppStore.getState();
+    expect(s.routeOptions).toHaveLength(2);
+    expect(s.selectedOption).toBe(0);
+    expect(s.plan).toBe(s.routeOptions[0]);
+    expect(s.derived.options[1].durationS).toBeLessThan(s.derived.options[0].durationS);
+  });
+
+  it('drops a road that is just a copy of one already offered', async () => {
+    alternativeRoads.push(tbilisiBatumiDetour(0.3, 0.7, 0.0003, 1.02), tbilisiBatumiDetour(0.3, 0.7, 0.5, 1.15));
+    await planTbilisiBatumi();
+    expect(useAppStore.getState().routeOptions).toHaveLength(2);
+  });
+
+  it('never offers more roads than configured', async () => {
+    alternativeRoads.push(
+      tbilisiBatumiDetour(0.1, 0.3, 0.5, 1.1),
+      tbilisiBatumiDetour(0.4, 0.6, -0.5, 1.2),
+      tbilisiBatumiDetour(0.7, 0.9, 0.5, 1.3),
+    );
+    await planTbilisiBatumi();
+    expect(useAppStore.getState().routeOptions).toHaveLength(3);
   });
 });

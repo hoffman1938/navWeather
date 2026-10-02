@@ -29,14 +29,17 @@ public/          PWA manifest, icons, service worker, _headers (CSP)
 
 ```
 search / pin / link ─▶ Place ─▶ RoutingProvider (OSRM: full geometry, per-edge durations,
-                                steps with lanes/exits, alternatives)
+                                steps with lanes/exits, up to 3 alternatives)
+     ─▶ selectDistinctRoutes: the router's best road first, then only roads that really
+                              go another way (≥ 10 % and ≥ 1 km of their own, not absurdly slow)
      ─▶ buildTimedRoute: cumulative distance + time for every vertex
      ─▶ sampleRoute: settlements, passes (elevation), junctions, heading changes,
                      ≤45 min gaps; refined later where neighbouring forecasts differ
      ─▶ WeatherService: snap to 0.02° grid → dedupe → batch (many locations per request)
                         → TTL cache → stale fallback; model-run aware refresh
      ─▶ matchForecastToTime(forecast, ETA at the sample)    ← the core
-     ─▶ derive(): points, groups, summary, timeline, option exposure
+     ─▶ derive(): points, groups, summary, timeline, option exposure,
+                  and per road: forecast ribbon + stops (buildRoadForecast) + "via" roads
      ─▶ buildRouteIntelligence(): RouteEvent[] (weather, stops, speed limits,
                                    fuel/charging, breaks, incidents)
 ```
@@ -66,6 +69,29 @@ Weather is fetched once per route (and on new model runs / staleness); driving
 only re-matches cached forecasts to new ETAs, so position updates cost no
 network requests.
 
+### Choosing another road while driving
+
+The app keeps the roads it knows (`routeOptions`: the ones offered at the start,
+or the ones found after the last re-route). Two pure helpers in
+`algorithms/roadMatching.ts` answer questions without the network:
+
+```
+persistent off-route
+  ├─ matchKnownRoad: car within 30–60 m of another known road AND heading agrees (≤ 60°)
+  │     └─ switchDriveTo(i): new progress on that road, its forecast is already loaded;
+  │        names/elevation are added afterwards (same `timed` object, so work tied to it stays valid)
+  └─ otherwise recalculateFrom (as before): new directions first, quickly (one road)…
+        └─ …then, in the background, planOtherRoads: other distinct roads from that point,
+           with their forecasts — a failure there is harmless
+```
+
+`derived.otherRoads` lists known roads the car is within 60 m of that still differ
+from the current road ahead (`coincidesAhead`, cached per 500 m of progress — it costs
+tens of ms), each re-based to start at the car (`roadAhead`) so a road planned at
+the trip's start compares fairly with the one being driven. A road drops out of the
+list once the car passes its fork. `switchToRoad(i)` (the sheet's "Take this road",
+and the simulation) uses the same `switchDriveTo`.
+
 ## Providers
 
 Business logic only sees interfaces; `services/providers.ts` is the one place
@@ -73,7 +99,7 @@ that names implementations, chosen by `VITE_*` variables.
 
 | Interface | Default | Notes |
 | --- | --- | --- |
-| `RoutingProvider` | OSRM demo server | declares capabilities; `avoid` is empty because the demo server rejects `exclude` |
+| `RoutingProvider` | OSRM demo server | declares capabilities; `avoid` is empty because the demo server rejects `exclude`; asks for `alternatives=3` (plain `true` returns at most one), retrying with `true` if an older server answers 400 |
 | `WeatherProvider` (+ `WeatherService`) | Open-Meteo | batching, cache, stale fallback, model-run checks |
 | `GeocodingProvider` / `AutocompleteProvider` | Nominatim (1 req/s) / Photon | Nominatim forbids autocomplete |
 | `PlacesProvider`, `PoiProvider`, `SpeedLimitProvider` | Overpass | one shared sequential queue with endpoint fallback |

@@ -193,9 +193,32 @@ describe('tripStart: where a trip from "Your location" starts', () => {
     const p = tripStart(undefined, { secure: true, geo: g.geo });
     g.once[0].err(err(1));
     await expect(p).resolves.toEqual({ coordinate: [44.8, 41.69], approximate: { city: 'Tbilisi', reason: 'denied' } });
-    // Pressing Go right after doesn't wait for the device to fail again.
+  });
+
+  it('a refusal is asked again at once — allowing location must work on the very next try', async () => {
+    serve({ lat: 41.69, lon: 44.8, city: 'Tbilisi' });
+    const g = fakeGeo();
+    const first = tripStart(undefined, { secure: true, geo: g.geo });
+    g.once[0].err(err(1)); // blocked
+    await expect(first).resolves.toMatchObject({ approximate: { reason: 'denied' } });
+    // The user allows location in the browser and presses Go again, seconds later.
+    const second = tripStart(undefined, { secure: true, geo: g.geo });
+    expect(g.mock.getCurrentPosition).toHaveBeenCalledTimes(2);
+    g.once[1].ok(position(44.8, 41.7));
+    await expect(second).resolves.toEqual({ coordinate: [44.8, 41.7], approximate: null });
+  });
+
+  it('a slow failure (no signal yet) is remembered for a minute, so Go does not wait for it again', async () => {
+    serve({ lat: 41.69, lon: 44.8, city: 'Tbilisi' });
+    const g = fakeGeo();
+    const p = tripStart(undefined, { secure: true, geo: g.geo });
+    g.once[0].err(err(2)); // unavailable → tries the GPS
+    await Promise.resolve();
+    await Promise.resolve();
+    g.once[1].err(err(2));
+    await expect(p).resolves.toMatchObject({ approximate: { reason: 'unavailable' } });
     await expect(tripStart(undefined, { secure: true, geo: g.geo })).resolves.toMatchObject({ approximate: { city: 'Tbilisi' } });
-    expect(g.mock.getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(g.mock.getCurrentPosition).toHaveBeenCalledTimes(2);
   });
 
   it('works on an insecure page too (no device location there at all)', async () => {
