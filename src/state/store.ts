@@ -558,6 +558,9 @@ export const useAppStore = create<AppState>()(
         return;
       }
       set({ routeStatus: 'geocoding', routeError: null, poi: null, arrival: null, simulatedData: false });
+      // A start typed in by the user settles any earlier "location is blocked" warning: it no longer applies.
+      const fields = [get().origin, get().destination, ...get().waypoints];
+      if (!fields.some((f) => f.place?.kind === 'here') && isLocationNotice(get().notice?.text)) get().dismissNotice();
       const providers = getProviders();
       try {
         // "Your location" (in any field — it can be swapped) is resolved now, with a fresh fix —

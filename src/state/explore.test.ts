@@ -146,6 +146,25 @@ describe('a sticky location warning', () => {
     expect(useAppStore.getState().notice?.text).toBe('Forecast updated');
   });
 
+  it('a route from a start the user typed also clears it — it no longer applies', async () => {
+    blocked();
+    useAppStore.getState().setOriginPlace({ id: 'tbs', name: 'Tbilisi', label: 'Tbilisi', coordinate: [44.8, 41.69] });
+    useAppStore.getState().setDestinationPlace(BATUMI);
+    await useAppStore.getState().calculateRoute();
+    expect(useAppStore.getState().routeStatus).toBe('ready');
+    expect(useAppStore.getState().notice).toBeNull();
+  });
+
+  it('stays while the route still starts from "Your location"', async () => {
+    blocked();
+    stubGeolocation({ code: 1 });
+    useAppStore.getState().setDestinationPlace(BATUMI);
+    useAppStore.getState().setOriginPlace(herePlace());
+    await useAppStore.getState().calculateRoute();
+    expect(useAppStore.getState().routeError).toMatch(/Location is blocked/);
+    expect(useAppStore.getState().notice?.text).toMatch(/Location is blocked/);
+  });
+
   it('a route from the device position also clears it', async () => {
     blocked();
     stubGeolocation({ lon: 44.793, lat: 41.7151 });
