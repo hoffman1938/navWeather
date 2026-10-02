@@ -1,0 +1,260 @@
+/* Long Trip Mode */
+
+.ltrip-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--r-control);
+  background: var(--accent-soft);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.ltrip-banner strong {
+  color: var(--text);
+}
+.ltrip-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+.ltrip-banner--quiet {
+  background: transparent;
+  padding: 0;
+}
+
+.ltrip {
+  padding: 0 16px 8px;
+}
+.ltrip__label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.ltrip__eta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+.ltrip__eta-label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.ltrip__eta-time {
+  font-size: 22px;
+  font-weight: 700;
+}
+.ltrip__eta-note,
+.ltrip__note {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.ltrip__note {
+  margin: 4px 0;
+}
+.ltrip__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+  margin: 10px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.ltrip__tiles li {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+}
+.ltrip__tile-value {
+  font-size: 17px;
+  font-weight: 700;
+}
+.ltrip__tile-value--text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.ltrip__tile-label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.ltrip-advice {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--sev-high);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  font-size: 14px;
+}
+.ltrip-advice p {
+  margin: 4px 0 0;
+  color: var(--text-2);
+}
+
+.ltrip-night__card {
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+.ltrip-night__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ltrip-night__area,
+.ltrip-night__eta {
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  font-size: 16px;
+}
+.ltrip-night__eta {
+  text-align: right;
+}
+.ltrip-night__area small,
+.ltrip-night__eta small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.ltrip-night__alts {
+  margin-top: 8px;
+}
+.ltrip-night__alt {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+  text-align: left;
+}
+
+.ltrip-places__cat {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.ltrip-places__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ltrip-place {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.ltrip-place__name {
+  font-weight: 600;
+}
+.ltrip-place__why {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.ltrip-day {
+  border-top: 1px solid var(--border);
+}
+.ltrip-day__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 0;
+  text-align: left;
+}
+.ltrip-day__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.ltrip-day__chev {
+  transition: transform var(--dur) var(--ease);
+}
+.ltrip-day__chev.is-open {
+  transform: rotate(180deg);
+}
+
+.ltrip-timeline {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.ltrip-tl {
+  display: grid;
+  grid-template-columns: 48px 28px 1fr;
+  align-items: center;
+  gap: 0 8px;
+  min-height: 34px;
+}
+.ltrip-tl__time {
+  text-align: right;
+  font-weight: 600;
+  font-size: 14px;
+}
+.ltrip-tl__icon {
+  display: inline-flex;
+  justify-content: center;
+  color: var(--text-2);
+}
+.ltrip-tl__text {
+  font-size: 14px;
+  color: var(--text-2);
+}
+.ltrip-tl__text strong {
+  color: var(--text);
+}
+.ltrip-tl--overnight .ltrip-tl__text strong,
+.ltrip-tl--arrive .ltrip-tl__text strong {
+  color: var(--accent);
+}
+.ltrip-tl--weather .ltrip-tl__text strong {
+  color: var(--sev-high);
+}
+
+.ltrip-rec__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+}
+.ltrip-rec__text {
+  display: flex;
+  flex-direction: column;
+}
+.ltrip-rec__meta {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.ltrip-rec .ltrip-places,
+.ltrip-rec .linkbtn {
+  margin-left: 38px;
+}
+
+.ltrip-wx__row {
+  display: grid;
+  grid-template-columns: 70px 74px 24px 1fr;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  font-size: 14px;
+}
+.ltrip-wx__km,
+.ltrip-wx__when {
+  color: var(--text-2);
+}
