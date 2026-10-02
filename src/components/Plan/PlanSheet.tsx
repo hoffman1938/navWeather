@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Attribution } from '../Common/Attribution';
 import { conditionText, formatAgo, formatDistance, formatDuration, formatSpeed, formatTemp } from '../../i18n/format';
 import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
@@ -83,7 +84,7 @@ export function PlanSheet() {
           <AlongTheWay />
           <PlacesPanel />
           <DataSources />
-          <p className="attribution">{m.ui.attribution}</p>
+          <Attribution />
         </div>
       }
     />

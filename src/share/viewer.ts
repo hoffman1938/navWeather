@@ -1,3 +1,4 @@
+import { apiPaths } from '../api/v1';
 import { create } from 'zustand';
 import { matchForecastToTime } from '../algorithms/weatherMatching';
 import { getProviders } from '../services/providers';
@@ -76,7 +77,7 @@ function onVisible() {
   const { id, status } = useViewer.getState();
   if (document.visibilityState !== 'visible' || !id || status === 'ended' || status === 'notfound') return;
   const sid = session;
-  void fetch(`/api/share/${id}`, { cache: 'no-store' })
+  void fetch(apiPaths.shareItem(id), { cache: 'no-store' })
     .then(async (res) => {
       if (sid !== session) return;
       if (res.status === 404) useViewer.setState({ status: useViewer.getState().snapshot ? 'ended' : 'notfound' });
@@ -107,7 +108,7 @@ function closeAll() {
 async function firstLoad(id: string, sid: number) {
   // A plain GET first: tells "expired link" apart from "server unreachable".
   try {
-    const res = await fetch(`/api/share/${id}`, { cache: 'no-store' });
+    const res = await fetch(apiPaths.shareItem(id), { cache: 'no-store' });
     if (sid !== session) return;
     if (res.status === 404) {
       useViewer.setState({ status: 'notfound' });
@@ -125,7 +126,7 @@ function connect(id: string, sid: number) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   let ws: WebSocket;
   try {
-    ws = new WebSocket(`${proto}//${location.host}/api/share/${id}/ws`);
+    ws = new WebSocket(`${proto}//${location.host}${apiPaths.shareSocket(id)}`);
   } catch {
     startPolling(id, sid);
     return;
@@ -170,7 +171,7 @@ function startPolling(id: string, sid: number) {
   if (pollTimer) return;
   pollTimer = setInterval(async () => {
     try {
-      const res = await fetch(`/api/share/${id}`, { cache: 'no-store' });
+      const res = await fetch(apiPaths.shareItem(id), { cache: 'no-store' });
       if (sid !== session) return;
       if (res.status === 404) {
         useViewer.setState({ status: useViewer.getState().snapshot ? 'ended' : 'notfound' });

@@ -458,7 +458,9 @@ export const ru: Messages = {
     suggestions: (label: string) => `Варианты: ${label}`,
     findAlongRoute: 'Найти по маршруту',
     clear: 'Очистить',
-    attribution: 'Погода: Open-Meteo (CC BY 4.0) · Маршруты: OSRM · Данные карты © участники OpenStreetMap. Без аккаунта, история поездок не хранится.',
+    attribution:
+      'Погода: Open-Meteo (CC BY 4.0) · Маршруты: OSRM на серверах FOSSGIS · Поиск: Nominatim, Photon · Общественный транспорт: Transitous · Данные карты © участники OpenStreetMap. Без аккаунта, история поездок не хранится.',
+    fixMap: 'Сообщить об ошибке на карте',
   },
 
   detail: {

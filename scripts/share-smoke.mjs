@@ -1,21 +1,24 @@
 // End-to-end check of the live-location relay against a running Worker:
 //   npm run dev:api          (terminal 1)
-//   npm run test:share       (terminal 2)   [SHARE_BASE=https://… to test a deployment]
+//   npm run test:share       (terminal 2)   [SHARE_BASE=https://… to test a deployment; API=/api for the unversioned legacy paths]
 import assert from 'node:assert/strict';
 
 const BASE = process.env.SHARE_BASE ?? 'http://127.0.0.1:8787';
+// The versioned API by default; the Worker also answers the original unversioned paths.
+const API = process.env.API ?? '/api/v1';
+const api = (path) => path.replace(/^\/api\//, `${API}/`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const call = (path, init = {}) => fetch(BASE + path, { ...init, headers: { 'content-type': 'application/json', ...init.headers } });
+const call = (path, init = {}) => fetch(BASE + api(path), { ...init, headers: { 'content-type': 'application/json', ...init.headers } });
 let passed = 0;
 const ok = (name) => console.log(`  ✓ ${name}`, ++passed);
 
-console.log(`Live share relay @ ${BASE}`);
+console.log(`Live share relay @ ${BASE}${API}`);
 
 // 1. Validation on create.
 assert.equal((await call('/api/share', { method: 'POST', body: '{"minutes":1}' })).status, 400);
 assert.equal((await call('/api/share', { method: 'POST', body: 'nope' })).status, 400);
 assert.equal((await call('/api/share', { method: 'POST', body: '{"minutes":60}', headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
-assert.equal((await fetch(BASE + '/api/share', { method: 'POST', body: '{"minutes":60}', headers: { 'content-type': 'text/plain' } })).status, 415);
+assert.equal((await fetch(BASE + api('/api/share'), { method: 'POST', body: '{"minutes":60}', headers: { 'content-type': 'text/plain' } })).status, 415);
 ok('rejects invalid and cross-site create requests');
 
 // 2. Create.
@@ -34,7 +37,7 @@ assert.equal((await call('/api/share/AAAAAAAAAAAAAAAAAAAAAA')).status, 404);
 ok('snapshot readable; unknown ids are 404; names sanitized');
 
 // 4. WebSocket viewer receives live updates.
-const ws = new WebSocket(`${BASE.replace(/^http/, 'ws')}/api/share/${id}/ws`);
+const ws = new WebSocket(`${BASE.replace(/^http/, 'ws')}${api(`/api/share/${id}/ws`)}`);
 const messages = [];
 ws.addEventListener('message', (e) => messages.push(JSON.parse(e.data)));
 await new Promise((res, rej) => {

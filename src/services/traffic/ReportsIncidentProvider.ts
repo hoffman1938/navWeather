@@ -1,3 +1,4 @@
+import { apiPaths } from '../../api/v1';
 import { MAX_BBOX_AREA, type PublicReport, type ReportKind, type Vote } from '../../reports/protocol';
 import type { LngLat } from '../../types/geo';
 import type { Route } from '../../types/route';
@@ -99,7 +100,7 @@ function isPublicReport(x: unknown): x is PublicReport {
 }
 
 /**
- * DRIVER REPORTS through the app's own relay (`/api/reports`, a Cloudflare
+ * DRIVER REPORTS through the app's own relay (`/api/v1/reports`, a Cloudflare
  * Worker + Durable Object — see worker/reports.ts). Reports are unverified:
  * the route engine labels them "reported", never as fact.
  */
@@ -107,7 +108,7 @@ export class ReportsIncidentProvider implements IncidentProvider {
   readonly name = 'reports';
 
   constructor(
-    private baseUrl = '/api/reports',
+    private baseUrl: string = apiPaths.reports,
     private timeoutMs = 10_000,
   ) {}
 

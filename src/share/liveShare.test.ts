@@ -53,7 +53,7 @@ describe('sharer', () => {
     puts = [];
     putStatus = 200;
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === '/api/share' && init?.method === 'POST') {
+      if (url === '/api/v1/share' && init?.method === 'POST') {
         return new Response(JSON.stringify({ id: 'AAAAAAAAAAAAAAAAAAAAAA', key: 'secret', expiresAt: BASE + 3_600_000 }), {
           status: 201,
           headers: { 'content-type': 'application/json' },

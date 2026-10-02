@@ -111,7 +111,7 @@ describe('driver reports → incidents', () => {
     const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse({ confirms: 0, denies: 2, expiresAt: 1, active: false }));
     vi.stubGlobal('fetch', fetchMock);
     expect(await new ReportsIncidentProvider().vote('cccccccccccccccc', 'gone')).toEqual({ active: false });
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/reports/cccccccccccccccc/vote');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/reports/cccccccccccccccc/vote');
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ vote: 'gone' });
   });
 

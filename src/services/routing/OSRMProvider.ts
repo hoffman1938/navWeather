@@ -1,7 +1,7 @@
 import type { LngLat } from '../../types/geo';
 import type { Lane, Route, RouteLeg, RouteSegment, RouteStep, TimingSource } from '../../types/route';
 import { bboxOf } from '../../utils/distance';
-import { fetchJson, ProviderError } from '../http';
+import { fetchJson, ProviderError, RateLimiter } from '../http';
 import type { RouteRequest, RoutingCapabilities, RoutingProvider, TravelMatrix } from './RoutingProvider';
 
 // --- Raw OSRM response shapes (never leave this file) ---
@@ -50,6 +50,27 @@ interface OsrmResponse {
 
 const coordParam = ([lon, lat]: LngLat) => `${lon.toFixed(6)},${lat.toFixed(6)}`;
 
+/**
+ * One queue per server: the public OSRM servers (router.project-osrm.org and
+ * routing.openstreetmap.de, whose walking and cycling profiles share one host)
+ * allow at most 1 request per second per user. Route, re-route, via-point
+ * probes and the detour table all wait their turn on the same queue.
+ */
+const serverQueues = new Map<string, RateLimiter>();
+function queueFor(baseUrl: string, minIntervalMs: number): RateLimiter | null {
+  if (minIntervalMs <= 0) return null;
+  let origin: string;
+  try {
+    origin = new URL(baseUrl).origin;
+  } catch {
+    origin = baseUrl;
+  }
+  const key = `${origin}|${minIntervalMs}`;
+  let q = serverQueues.get(key);
+  if (!q) serverQueues.set(key, (q = new RateLimiter(minIntervalMs)));
+  return q;
+}
+
 export class OSRMProvider implements RoutingProvider {
   readonly name = 'osrm';
 
@@ -75,7 +96,19 @@ export class OSRMProvider implements RoutingProvider {
      * trip like Batumi → Tbilisi would never show more than two roads.
      */
     private maxAlternatives = 3,
-  ) {}
+    /** Least time between two requests to this server (ms); 0 = no limit (own server, tests). */
+    minIntervalMs = 0,
+  ) {
+    this.queue = queueFor(baseUrl, minIntervalMs);
+  }
+
+  private readonly queue: RateLimiter | null;
+
+  /** A request, in turn on this server's queue (see `serverQueues`). */
+  private get<T>(url: string, signal: AbortSignal | undefined): Promise<T> {
+    const run = () => fetchJson<T>(url, { provider: 'Routing service', signal, timeoutMs: this.timeoutMs });
+    return this.queue ? this.queue.schedule(run) : run();
+  }
 
   async calculateRoutes(req: RouteRequest): Promise<Route[]> {
     const via = this.capabilities.via && !req.waypoints?.length ? (req.via ?? []) : [];
@@ -114,11 +147,7 @@ export class OSRMProvider implements RoutingProvider {
       .map((a) => ({ tolls: 'toll', highways: 'motorway', ferries: 'ferry' })[a]);
     if (exclude.length) params.set('exclude', exclude.join(','));
     const url = `${this.base}/route/v1/${encodeURIComponent(this.profile)}/${coords}?${params}`;
-    const data = await fetchJson<OsrmResponse>(url, {
-      provider: 'Routing service',
-      signal: req.signal,
-      timeoutMs: this.timeoutMs,
-    });
+    const data = await this.get<OsrmResponse>(url, req.signal);
     if (data.code !== 'Ok' || !data.routes?.length) {
       const kind = data.code === 'NoRoute' || data.code === 'NoSegment' ? 'no-route' : 'invalid-response';
       throw new ProviderError(data.message ?? `Routing failed (${data.code})`, kind, 'Routing service');
@@ -135,10 +164,7 @@ export class OSRMProvider implements RoutingProvider {
       annotations: 'duration,distance',
     });
     const url = `${this.base}/table/v1/${encodeURIComponent(this.profile)}/${all.map(coordParam).join(';')}?${params}`;
-    const data = await fetchJson<{ code: string; durations?: (number | null)[][]; distances?: (number | null)[][] }>(
-      url,
-      { provider: 'Routing service', signal, timeoutMs: this.timeoutMs },
-    );
+    const data = await this.get<{ code: string; durations?: (number | null)[][]; distances?: (number | null)[][] }>(url, signal);
     if (data.code !== 'Ok' || !data.durations) {
       throw new ProviderError(`Travel matrix failed (${data.code})`, 'invalid-response', 'Routing service');
     }

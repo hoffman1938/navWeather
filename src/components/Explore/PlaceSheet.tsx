@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Attribution } from '../Common/Attribution';
 import { useDismiss } from '../../hooks/useDismiss';
 import { dailySummary, nextHours } from '../../algorithms/placeForecast';
 import { matchForecastToTime } from '../../algorithms/weatherMatching';
@@ -22,7 +23,6 @@ export function PlaceSheet() {
   const sheet = useExplore((s) => s.cardSheet);
   const name = useExplore((s) => s.card?.place.name ?? '');
   const placeId = useExplore((s) => s.card?.place.id);
-  const m = useMessages();
   // A card opened from search: close the suggestion list (it would cover the card).
   useEffect(() => {
     const el = document.activeElement as HTMLElement | null;
@@ -38,7 +38,7 @@ export function PlaceSheet() {
       extra={
         <div className="plan-extra">
           <PlaceDays />
-          <p className="attribution">{m.ui.attribution}</p>
+          <Attribution />
         </div>
       }
     />
