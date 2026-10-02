@@ -128,7 +128,7 @@ Every part runs on free services or free tiers, with no API keys and no card:
 | --- | --- | --- |
 | App + live sharing + driver reports | Cloudflare Workers **Free plan** (static assets, 2 SQLite Durable Objects, rate limits) | 100 000 Worker requests/day (static files don't count); plenty for personal use |
 | Map tiles | OpenFreeMap | free, no key |
-| Routing | OSRM public demo server | fair use, no uptime guarantee |
+| Routing | OSRM public demo server | non-commercial, at most 1 request/s (the app queues requests), no uptime guarantee |
 | Public transport | Transitous | open-source, **non-commercial** projects; link to its sources (shown with every trip); ask them before heavy use |
 | Weather, air quality, elevation | Open-Meteo | free for **non-commercial** use (≈10 000 calls/day) |
 | Search | Nominatim (1 request/s) and Photon | fair use |
@@ -187,6 +187,13 @@ unavailable).
 
 ## Docs
 
+Start with **[Project requirements](docs/PROJECT_REQUIREMENTS.md)** (single
+source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
+
+- [Platform audit 2026-10-02](docs/audit/2026-10-02-platform-audit.md) — findings, fixes, sources
+- [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md) · [Roadmap & MVP](docs/ROADMAP.md)
+- [API v1](docs/api/API_V1.md) · [Data model](docs/database/DATA_MODEL.md) · [Security](docs/security/SECURITY.md) · [Privacy](docs/legal/PRIVACY.md) · [Licensing matrix](docs/legal/LICENSING_MATRIX.md)
+- [Weather engine](docs/architecture/WEATHER_ENGINE.md) · [Maps, routing, GIS](docs/architecture/MAPS_ROUTING_GEO.md) · [Mobile strategy](docs/mobile/MOBILE_STRATEGY.md) · [Cost & scale](docs/operations/COST_AND_SCALE.md) · [Delivery](docs/operations/DELIVERY.md)
 - [Architecture](docs/ARCHITECTURE.md) — engines, data flow, providers, state, relay
 - [Environment](docs/ENVIRONMENT.md) — every variable and binding
 - [Testing](docs/TESTING.md) — what is covered, dev tools, what isn't tested
