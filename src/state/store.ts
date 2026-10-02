@@ -29,7 +29,7 @@ import type { ReportKind, Vote } from '../reports/protocol';
 import { LocationError, tripStart } from '../services/location';
 import type { PoiCategory } from '../services/places/PoiProvider';
 import { searchAlongRoute, type PoiResult } from '../services/placesAlongRoute';
-import { getProviders } from '../services/providers';
+import { getProviders, providersForMode } from '../services/providers';
 import {
   applyLatePlaces,
   describeError,
@@ -47,6 +47,7 @@ import {
 import type { LngLat, Place } from '../types/geo';
 import type { DeviationState, NavigationMode, RouteProgress, VehicleState } from '../types/navigation';
 import type { RouteSample } from '../types/route';
+import { NAVIGABLE_MODES, type TravelMode } from '../types/travel';
 import type { LocationForecast, WeatherAtTime, WeatherCondition } from '../types/weather';
 import { haversineM } from '../utils/distance';
 import { deviceTimeZone } from '../utils/timezone';
@@ -146,6 +147,8 @@ export interface AppState {
   destination: PlaceField;
   waypoints: PlaceField[];
   departure: Departure;
+  /** How the trip is made: decides the router and which driving extras apply. */
+  travelMode: TravelMode;
 
   routeStatus: RouteStatus;
   routeError: string | null;
@@ -219,6 +222,8 @@ export interface AppState {
   setWaypointPlace(i: number, place: Place | null): void;
   removeWaypoint(i: number): void;
   setDeparture(d: Departure): void;
+  /** Plan the trip another way (car, walking, bicycle, flight…); shows it at once when there is a trip to show. */
+  setTravelMode(mode: TravelMode): void;
   calculateRoute(): Promise<void>;
   selectRouteOption(i: number): Promise<void>;
   /** While driving: continue on another known road (the ones listed as "other roads"), no network needed. */
@@ -411,6 +416,11 @@ function departureMsOf(s: Pick<AppState, 'departure' | 'clockMs'>): number {
   return s.departure.mode === 'now' ? s.clockMs : s.departure.utcMs;
 }
 
+/** The providers for the trip's travel mode (its router; no road data for a flight). The car's when the mode has none. */
+function routeProviders() {
+  return providersForMode(getProviders(), useAppStore.getState().travelMode) ?? getProviders();
+}
+
 function lookupFor(forecasts: Map<string, LocationForecast>) {
   return forecastLookupFn(getProviders(), forecasts);
 }
@@ -440,10 +450,11 @@ function derive(s: AppState): Derived {
     units: settings.units,
     weatherPrefs: settings.weatherAlerts,
     speedLimits: s.speedLimits,
-    fuelRangeKm: settings.fuelRangeKm,
+    // Fuel, charging and driving breaks are for drivers.
+    fuelRangeKm: s.travelMode === 'drive' ? settings.fuelRangeKm : null,
     vehicle: settings.vehicle,
     incidents: s.incidents,
-    breakReminders: settings.breakReminders,
+    breakReminders: settings.breakReminders && s.travelMode === 'drive',
     speedCameras: settings.speedCameras ? s.speedCameras : [],
     extraEvents: [],
     previous: s.derived,
@@ -477,6 +488,7 @@ export const useAppStore = create<AppState>()(
     destination: { text: '', place: null },
     waypoints: [],
     departure: { mode: 'now' },
+    travelMode: 'drive',
     routeStatus: 'idle',
     routeError: null,
     plan: null,
@@ -545,6 +557,15 @@ export const useAppStore = create<AppState>()(
       if (s.plan) void get().loadWeather({ reason: 'auto' });
     },
 
+    setTravelMode: (travelMode) => {
+      const s = get();
+      if (s.mode !== 'planning' || travelMode === s.travelMode) return;
+      set({ travelMode });
+      const filled = (f: PlaceField) => !!f.place || !!f.text.trim();
+      // A trip is on screen (or was just asked for and failed): show it this way at once.
+      if (s.plan || (s.routeStatus === 'error' && filled(s.origin) && filled(s.destination))) void get().calculateRoute();
+    },
+
     async calculateRoute() {
       if (get().mode !== 'planning') get().stopNavigation();
       routeAbort?.abort();
@@ -557,11 +578,17 @@ export const useAppStore = create<AppState>()(
         set({ routeStatus: 'error', routeError: empty(get().origin) ? m.ui.enterStart : m.ui.enterDestination });
         return;
       }
+      if (get().travelMode === 'transit') {
+        // No free worldwide timetable data: say so, and show no road trip under a public-transport label.
+        get().clearRoute();
+        set({ routeStatus: 'error', routeError: m.travel.transitUnavailable });
+        return;
+      }
       set({ routeStatus: 'geocoding', routeError: null, poi: null, arrival: null, simulatedData: false });
       // A start typed in by the user settles any earlier "location is blocked" warning: it no longer applies.
       const fields = [get().origin, get().destination, ...get().waypoints];
       if (!fields.some((f) => f.place?.kind === 'here') && isLocationNotice(get().notice?.text)) get().dismissNotice();
-      const providers = getProviders();
+      const providers = routeProviders();
       try {
         // "Your location" (in any field — it can be swapped) is resolved now, with a fresh fix —
         // or, if the device can't give one, the connection's rough area (said so in the field and a notice).
@@ -655,7 +682,7 @@ export const useAppStore = create<AppState>()(
       if (option.warnings.includes('not-enriched')) {
         // Alternatives were only timed + sampled; add names/elevation now.
         try {
-          const enriched = await enrichRoute(getProviders(), option.timed.route, {
+          const enriched = await enrichRoute(routeProviders(), option.timed.route, {
             signal: newPlanTasks(),
             language: currentMessages().locale,
           });
@@ -904,7 +931,7 @@ export const useAppStore = create<AppState>()(
 
     // ---------------- Live GPS navigation ----------------
     async requestNavigation() {
-      if (!get().plan) return;
+      if (!get().plan || !NAVIGABLE_MODES.includes(get().travelMode)) return; // a flight is a plan, not a drive
       getVoiceQueue(); // create inside the user gesture
       getProviders().tts.unlock();
       if (typeof window !== 'undefined' && window.isSecureContext === false) {
@@ -1079,7 +1106,7 @@ export const useAppStore = create<AppState>()(
     // ---------------- Demo simulation ----------------
     startSimulation() {
       const s = get();
-      if (!s.plan) return;
+      if (!s.plan || !NAVIGABLE_MODES.includes(s.travelMode)) return;
       getVoiceQueue();
       getProviders().tts.unlock();
       spokenManeuvers.clear();
@@ -1173,7 +1200,7 @@ export const useAppStore = create<AppState>()(
     // ---------------- Places along the route ----------------
     async searchPoi(category, opts = {}) {
       const s = get();
-      const providers = getProviders();
+      const providers = routeProviders();
       if (!s.plan || !providers.poi) return [];
       set({ poi: { category, status: 'loading', results: [] } });
       const fromM = opts.aroundM !== undefined ? Math.max(0, opts.aroundM - 5000) : (s.progress?.distanceAlongM ?? 0);
@@ -1225,7 +1252,7 @@ export const useAppStore = create<AppState>()(
       let plan = offer.plan;
       if (plan.warnings.includes('not-enriched')) {
         // Alternatives are only timed + sampled; add place names/elevation (best effort).
-        plan = await enrichRoute(getProviders(), plan.timed.route, { signal: newPlanTasks(), language: currentMessages().locale }).catch(() => offer.plan);
+        plan = await enrichRoute(routeProviders(), plan.timed.route, { signal: newPlanTasks(), language: currentMessages().locale }).catch(() => offer.plan);
       }
       const cur = get();
       if (cur.mode === 'planning') return;
@@ -1391,7 +1418,8 @@ let camerasFor: PlannedRoute['timed'] | null = null;
  * starts or when one of them is switched on mid-drive.
  */
 export function loadDriveExtras() {
-  if (useAppStore.getState().mode === 'planning') return;
+  // Speed limits, speed cameras, sharp curves and level crossings are for drivers.
+  if (useAppStore.getState().mode === 'planning' || useAppStore.getState().travelMode !== 'drive') return;
   loadSpeedLimits();
   loadSpeedCameras();
   loadRoadHazards();
@@ -1445,7 +1473,7 @@ let driveSavedAt = 0;
 function rememberDrive() {
   const s = useAppStore.getState();
   if (s.mode !== 'navigating' || !s.plan) return;
-  saveDriveSession(s.plan.timed.route.destination, stopsAhead(s));
+  saveDriveSession(s.plan.timed.route.destination, stopsAhead(s), Date.now(), s.travelMode);
   driveSavedAt = Date.now();
 }
 
@@ -1641,7 +1669,7 @@ export async function maybeOfferWeatherReroute(force = false): Promise<void> {
   const headingDeg = s.vehicle.headingDeg;
   const routeFor = s.plan.timed; // the plan object is replaced as names arrive; the route isn't
   try {
-    const providers = getProviders();
+    const providers = routeProviders();
     const origin: Place = { id: `here:${from.join(',')}`, name: m.ui.currentLocation, label: m.ui.currentLocation, coordinate: from };
     const { primary, alternatives } = await planRouteOptions(providers, origin, timed.route.destination, {
       signal: ctrl.signal,
@@ -1780,7 +1808,7 @@ async function enrichKnownRoad(road: PlannedRoute): Promise<void> {
   const store = useAppStore;
   const signal = planTasks?.signal ?? newPlanTasks();
   try {
-    const enriched = await enrichRoute(getProviders(), road.timed.route, { signal, language: currentMessages().locale, timed: road.timed });
+    const enriched = await enrichRoute(routeProviders(), road.timed.route, { signal, language: currentMessages().locale, timed: road.timed });
     if (signal.aborted || store.getState().plan?.timed !== road.timed) return;
     replacePlan(enriched);
     watchLatePlaces(enriched, signal);
@@ -1798,7 +1826,7 @@ async function enrichKnownRoad(road: PlannedRoute): Promise<void> {
 async function loadOtherRoads(plan: PlannedRoute, origin: Place, headingDeg: number | undefined, signal: AbortSignal | undefined): Promise<void> {
   const store = useAppStore;
   try {
-    const roads = await planOtherRoads(getProviders(), origin, plan.timed.route.destination, {
+    const roads = await planOtherRoads(routeProviders(), origin, plan.timed.route.destination, {
       reference: plan.timed.route,
       startBearingDeg: headingDeg,
       language: currentMessages().locale,
@@ -1877,7 +1905,7 @@ async function recalculateFrom(coordinate: LngLat, headingDeg?: number, extraSto
   const route = s.plan.timed.route;
   const aheadStops = stopsAhead(s);
   try {
-    const plan = await planRoute(getProviders(), origin, route.destination, {
+    const plan = await planRoute(routeProviders(), origin, route.destination, {
       signal: ctrl.signal,
       startBearingDeg: headingDeg,
       waypoints: [...extraStops, ...aheadStops],

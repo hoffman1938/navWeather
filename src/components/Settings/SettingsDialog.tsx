@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { LOCALES, type Locale } from '../../i18n';
 import { googleVoicesFor } from '../../voice/voices';
 import { useMessages, useSettings, type Settings } from '../../state/settings';
@@ -9,10 +9,20 @@ import { CloseIcon, SpeakerIcon } from '../Icons/Icons';
 import { getProviders } from '../../services/providers';
 import './Settings.css';
 
+/** A titled group of settings, as one card. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="set-section">
+      <h3 className="set-title">{title}</h3>
+      <div className="set-card">{children}</div>
+    </section>
+  );
+}
+
 function Select<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange(v: T): void }) {
   return (
     <label className="set-row">
-      <span>{label}</span>
+      <span className="set-row__label">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value as T)}>
         {options.map(([v, l]) => (
           <option key={v} value={v}>
@@ -24,10 +34,44 @@ function Select<T extends string>({ label, value, options, onChange }: { label: 
   );
 }
 
+/** A few short choices side by side — one tap, everything visible (instead of a dropdown). */
+function Segmented<T extends string>({ label, value, options, onChange, hint }: { label: string; value: T; options: [T, string][]; onChange(v: T): void; hint?: string }) {
+  const id = useId();
+  return (
+    <div className={`set-row set-row--seg${hint ? ' set-row--stack' : ''}`}>
+      <span className="set-row__label">
+        <span id={id}>{label}</span>
+        {hint ? <small>{hint}</small> : null}
+      </span>
+      <div className="seg" role="radiogroup" aria-labelledby={id}>
+        {options.map(([v, l]) => (
+          <button key={v} type="button" role="radio" aria-checked={v === value} className={`seg__opt${v === value ? ' is-on' : ''}`} onClick={() => onChange(v)}>
+            {l}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Chips({ label, children }: { label: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <div className="set-row set-row--chips">
+      <span className="set-row__label" id={id}>
+        {label}
+      </span>
+      <div className="chips" role="group" aria-labelledby={id}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function Switch({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange(v: boolean): void; hint?: string }) {
   return (
     <label className="set-row set-row--switch">
-      <span>
+      <span className="set-row__label">
         {label}
         {hint ? <small>{hint}</small> : null}
       </span>
@@ -52,6 +96,13 @@ export function SettingsDialog() {
   };
   const types = s.weatherAlerts.types;
   const setType = (k: keyof typeof types, v: boolean) => up({ weatherAlerts: { ...s.weatherAlerts, types: { ...types, [k]: v } } });
+  const typeChips: [keyof typeof types, string][] = [
+    ['rain', S.typeRain],
+    ['snow', S.typeSnow],
+    ['fog', S.typeFog],
+    ['wind', S.typeWind],
+    ['temperature', S.typeTemperature],
+  ];
 
   return (
     <Dialog label={S.title} onClose={close} size="large">
@@ -61,9 +112,10 @@ export function SettingsDialog() {
           <CloseIcon size={20} />
         </button>
       </div>
-      <div className="set-group">
+
+      <Section title={S.sectionDisplay}>
         <Select<Locale> label={S.language} value={s.language} options={LOCALES.map((l) => [l.id, l.name])} onChange={(language) => up({ language })} />
-        <Select
+        <Segmented
           label={S.units}
           value={s.units.distance}
           options={[
@@ -72,7 +124,7 @@ export function SettingsDialog() {
           ]}
           onChange={(distance) => up({ units: { ...s.units, distance } })}
         />
-        <Select
+        <Segmented
           label={S.temperature}
           value={s.units.temperature}
           options={[
@@ -81,7 +133,7 @@ export function SettingsDialog() {
           ]}
           onChange={(temperature) => up({ units: { ...s.units, temperature } })}
         />
-        <Select
+        <Segmented
           label={S.wind}
           value={s.units.wind}
           options={[
@@ -91,26 +143,27 @@ export function SettingsDialog() {
           ]}
           onChange={(wind) => up({ units: { ...s.units, wind } })}
         />
-        <Select
+        <Segmented
           label={S.theme}
           value={s.theme}
+          hint={S.themeHint}
           options={[
             ['auto', S.themeAuto],
             ['light', S.themeLight],
             ['dark', S.themeDark],
+            ['sun', S.themeSun],
           ]}
           onChange={(theme) => up({ theme })}
         />
-      </div>
+      </Section>
 
-      <div className="set-group">
+      <Section title={S.sectionVoice}>
         <Switch label={S.voiceGuidance} checked={s.voice} onChange={(voice) => up({ voice })} hint={S.voiceRecognitionNote} />
         {s.voice ? <VoiceSettings /> : null}
-      </div>
+      </Section>
 
-      <div className="set-group">
-        <h3 className="label">{S.weatherAlerts}</h3>
-        <Select
+      <Section title={S.weatherAlerts}>
+        <Segmented
           label={S.alertOutput}
           value={s.alertOutput}
           options={[
@@ -121,7 +174,7 @@ export function SettingsDialog() {
           ]}
           onChange={(alertOutput) => up({ alertOutput })}
         />
-        <Select
+        <Segmented
           label={S.alertLevel}
           value={s.weatherAlerts.level}
           options={[
@@ -141,18 +194,20 @@ export function SettingsDialog() {
           ]}
           onChange={(alertTiming) => up({ alertTiming })}
         />
-        <Switch label={S.typeRain} checked={types.rain} onChange={(v) => setType('rain', v)} />
-        <Switch label={S.typeSnow} checked={types.snow} onChange={(v) => setType('snow', v)} />
-        <Switch label={S.typeFog} checked={types.fog} onChange={(v) => setType('fog', v)} />
-        <Switch label={S.typeWind} checked={types.wind} onChange={(v) => setType('wind', v)} />
-        <Switch label={S.typeTemperature} checked={types.temperature} onChange={(v) => setType('temperature', v)} />
-      </div>
+        <Chips label={S.alertTypes}>
+          {typeChips.map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={types[k]} className={`chip${types[k] ? ' is-on' : ''}`} onClick={() => setType(k, !types[k])}>
+              {label}
+            </button>
+          ))}
+        </Chips>
+      </Section>
 
-      <div className="set-group">
+      <Section title={S.sectionDriving}>
         <Switch label={S.speedWarnings} checked={s.speedWarnings} onChange={(speedWarnings) => up({ speedWarnings })} hint={m.ui.speedLimitNote} />
-        <Switch label={S.breakReminders} checked={s.breakReminders} onChange={(breakReminders) => up({ breakReminders })} hint={S.breakRemindersHint} />
-        <Switch label={S.roadHazards} checked={s.roadHazards} onChange={(roadHazards) => up({ roadHazards })} hint={S.roadHazardsHint} />
         <Switch label={S.speedCameras} checked={s.speedCameras} onChange={(speedCameras) => up({ speedCameras })} hint={S.speedCamerasHint} />
+        <Switch label={S.roadHazards} checked={s.roadHazards} onChange={(roadHazards) => up({ roadHazards })} hint={S.roadHazardsHint} />
+        <Switch label={S.breakReminders} checked={s.breakReminders} onChange={(breakReminders) => up({ breakReminders })} hint={S.breakRemindersHint} />
         {getProviders().incidents.name === 'reports' ? (
           <Switch
             label={S.driverReports}
@@ -169,7 +224,7 @@ export function SettingsDialog() {
           />
         ) : null}
         <Switch label={S.batterySaver} checked={s.batterySaver} onChange={(batterySaver) => up({ batterySaver })} hint={S.batterySaverHint} />
-        <Select
+        <Segmented
           label={S.vehicle}
           value={s.vehicle}
           options={[
@@ -179,7 +234,7 @@ export function SettingsDialog() {
           onChange={(vehicle) => up({ vehicle })}
         />
         <label className="set-row">
-          <span>
+          <span className="set-row__label">
             {S.fuelRange}
             <small>{S.fuelRangeHint}</small>
           </span>
@@ -196,14 +251,16 @@ export function SettingsDialog() {
             }}
           />
         </label>
-      </div>
+      </Section>
 
       <SavedPlacesSettings />
 
-      <p className="set-note">{S.privacy}</p>
-      <button className="btn btn-primary set-done" onClick={close}>
-        {S.done}
-      </button>
+      <p className="set-note set-privacy">{S.privacy}</p>
+      <div className="set-foot">
+        <button className="btn btn-primary set-done" onClick={close}>
+          {S.done}
+        </button>
+      </div>
     </Dialog>
   );
 }
@@ -238,11 +295,13 @@ function VoiceSettings() {
   return (
     <>
       <Select label={S.voiceChoice} value={known ? saved : 'auto'} options={options} onChange={choose} />
-      {!voices.length ? <p className="set-note">{S.noGoogleVoice}</p> : <p className="set-note">{S.voiceGoogleNote}</p>}
-      <button className="btn btn-quiet set-sample" onClick={() => getProviders().tts.preview?.(S.voiceSampleText, m.speechLang, known ? saved : 'auto')}>
-        <SpeakerIcon size={18} />
-        {S.voiceSample}
-      </button>
+      <div className="set-row set-row--note">
+        <p className="set-note">{!voices.length ? S.noGoogleVoice : S.voiceGoogleNote}</p>
+        <button className="btn btn-quiet set-sample" onClick={() => getProviders().tts.preview?.(S.voiceSampleText, m.speechLang, known ? saved : 'auto')}>
+          <SpeakerIcon size={18} />
+          {S.voiceSample}
+        </button>
+      </div>
     </>
   );
 }
@@ -256,28 +315,29 @@ function SavedPlacesSettings() {
   const label = (slot: string, name: string) =>
     slot === 'home' ? `${m.explore.home} · ${name}` : slot === 'work' ? `${m.explore.work} · ${name}` : slot === 'parking' ? m.parking.title : name;
   return (
-    <div className="set-group">
-      <h3 className="label">{S.savedPlaces}</h3>
+    <Section title={S.savedPlaces}>
       {saved.length ? (
-        <ul className="rows set-saved">
-          {saved.map((p) => (
-            <li key={`${p.slot}:${p.id}`}>
-              <span>{label(p.slot, p.name)}</span>
-              <button className="btn btn-quiet" onClick={() => useSavedPlaces.getState().remove(p.id, p.slot)}>
-                {S.remove}
-              </button>
-            </li>
-          ))}
-        </ul>
+        saved.map((p) => (
+          <div className="set-row set-saved" key={`${p.slot}:${p.id}`}>
+            <span className="set-row__label set-saved__name">{label(p.slot, p.name)}</span>
+            <button className="btn btn-quiet" onClick={() => useSavedPlaces.getState().remove(p.id, p.slot)}>
+              {S.remove}
+            </button>
+          </div>
+        ))
       ) : (
-        <p className="set-note">{S.noSaved}</p>
+        <div className="set-row set-row--note">
+          <p className="set-note">{S.noSaved}</p>
+        </div>
       )}
       <Switch label={S.rememberRecents} checked={remember} onChange={(on) => useSavedPlaces.getState().setRememberRecents(on)} hint={S.rememberRecentsHint} />
       {recents ? (
-        <button className="btn btn-quiet set-clear" onClick={() => useSavedPlaces.getState().clearRecents()}>
-          {S.clearRecents}
-        </button>
+        <div className="set-row set-row--note">
+          <button className="btn btn-quiet" onClick={() => useSavedPlaces.getState().clearRecents()}>
+            {S.clearRecents}
+          </button>
+        </div>
       ) : null}
-    </div>
+    </Section>
   );
 }

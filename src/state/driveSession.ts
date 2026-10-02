@@ -1,4 +1,5 @@
 import type { Place } from '../types/geo';
+import { NAVIGABLE_MODES, type TravelMode } from '../types/travel';
 
 /**
  * RESUME AFTER AN ACCIDENTAL RELOAD — while navigating, the destination and
@@ -14,6 +15,8 @@ export interface DriveSession {
   destination: Place;
   waypoints: Place[];
   savedAt: number;
+  /** How the trip was being made (a walk is resumed as a walk). */
+  mode: TravelMode;
 }
 
 function cleanPlace(p: unknown): Place | null {
@@ -28,9 +31,9 @@ function cleanPlace(p: unknown): Place | null {
   return { id: str(o.id, 100) || `${lat},${lon}`, name, label: str(o.label) || name, coordinate: [lon, lat], ...(typeof o.kind === 'string' ? { kind: str(o.kind, 40) } : {}) };
 }
 
-export function saveDriveSession(destination: Place, waypoints: Place[], now = Date.now()): void {
+export function saveDriveSession(destination: Place, waypoints: Place[], now = Date.now(), mode: TravelMode = 'drive'): void {
   try {
-    sessionStorage.setItem(KEY, JSON.stringify({ destination, waypoints, savedAt: now }));
+    sessionStorage.setItem(KEY, JSON.stringify({ destination, waypoints, savedAt: now, mode }));
   } catch {
     /* storage blocked: nothing to resume, which is fine */
   }
@@ -56,7 +59,8 @@ export function readDriveSession(now = Date.now()): DriveSession | null {
       return null;
     }
     const waypoints = Array.isArray(o.waypoints) ? o.waypoints.map(cleanPlace).filter((p): p is Place => p !== null).slice(0, 10) : [];
-    return { destination, waypoints, savedAt };
+    const mode = NAVIGABLE_MODES.includes(o.mode as TravelMode) ? (o.mode as TravelMode) : 'drive';
+    return { destination, waypoints, savedAt, mode };
   } catch {
     return null;
   }

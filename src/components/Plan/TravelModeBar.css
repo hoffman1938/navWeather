@@ -1,0 +1,35 @@
+.tmodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0 8px;
+}
+.tmode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: var(--tap);
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
+  color: var(--text-2);
+  background: transparent;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.tmode:hover {
+  background: var(--surface-2);
+}
+.tmode.is-on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 650;
+}
+.tmode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tmode__time {
+  font-size: 14px;
+  white-space: nowrap;
+}

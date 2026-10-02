@@ -11,9 +11,19 @@ describe('resume a drive after a reload (this tab only)', () => {
     const s = readDriveSession(1_000_000 + 10 * 60_000);
     expect(s?.destination.name).toBe('Batumi');
     expect(s?.waypoints.map((w) => w.name)).toEqual(['Kutaisi']);
-    expect(Object.keys(JSON.parse(sessionStorage.getItem('navweather.drive.v1')!))).toEqual(['destination', 'waypoints', 'savedAt']);
+    expect(Object.keys(JSON.parse(sessionStorage.getItem('navweather.drive.v1')!))).toEqual(['destination', 'waypoints', 'savedAt', 'mode']); // never a position or a route
     expect(readDriveSession(1_000_000 + 31 * 60_000)).toBeNull();
     expect(sessionStorage.length).toBe(0); // expired → removed
+  });
+
+  it('remembers how the trip was being made, so a walk is resumed as a walk', () => {
+    saveDriveSession(BATUMI, [], 1_000_000, 'walk');
+    expect(readDriveSession(1_000_000 + 60_000)?.mode).toBe('walk');
+    saveDriveSession(BATUMI, [], 1_000_000);
+    expect(readDriveSession(1_000_000 + 60_000)?.mode).toBe('drive');
+    // Only modes that can be followed turn by turn come back; anything else is a car trip.
+    sessionStorage.setItem('navweather.drive.v1', JSON.stringify({ destination: BATUMI, waypoints: [], savedAt: 1_000_000, mode: 'flight' }));
+    expect(readDriveSession(1_000_000 + 60_000)?.mode).toBe('drive');
   });
 
   it('rejects damaged data and clears on stop', () => {

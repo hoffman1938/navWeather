@@ -69,6 +69,7 @@ describe('drive extras', () => {
   });
 
   it('switching cameras on mid-drive loads them now, once per route', async () => {
+    useSettings.getState().update({ speedCameras: false }); // cameras are on by default; this driver turned them off
     await plan();
     useAppStore.getState().startSimulation();
     expect(calls.cameras).toBe(0);

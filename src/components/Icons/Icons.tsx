@@ -179,3 +179,39 @@ export const LayersIcon = ({ size, className }: P) => (
     <path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" />
   </svg>
 );
+
+/** Travel-mode glyphs. */
+export const CarIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M5 16v-4.2L6.6 7.6A2 2 0 0 1 8.5 6.3h7a2 2 0 0 1 1.9 1.3L19 11.8V16" />
+    <path d="M3.5 12h17M4.5 16h15v2.5h-3.2V16M7.7 16v2.5H4.5" />
+    <circle cx="7.8" cy="13.6" r="0.6" fill="currentColor" />
+    <circle cx="16.2" cy="13.6" r="0.6" fill="currentColor" />
+  </svg>
+);
+export const WalkIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="13" cy="4.5" r="1.8" />
+    <path d="M10.2 21l2.1-6.2-2.6-2.6 1.1-4.7 3 2.9 3 .9M9.7 12.2L7.5 14.6M12.3 14.8l2.9 2.3.7 3.9" />
+  </svg>
+);
+export const BikeIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="6" cy="16" r="3.6" />
+    <circle cx="18" cy="16" r="3.6" />
+    <path d="M6 16l3.6-6.6h5L18 16M9.6 9.4L12 16M8.2 7.6h2.6M14.4 9.4l-.9-2h2.2" />
+  </svg>
+);
+export const TransitIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <rect x="5" y="3.5" width="14" height="13" rx="2.5" />
+    <path d="M5 11h14M8.5 20l1-3.5M15.5 20l-1-3.5M9 7.2h6" />
+    <circle cx="8.6" cy="13.8" r="0.7" fill="currentColor" />
+    <circle cx="15.4" cy="13.8" r="0.7" fill="currentColor" />
+  </svg>
+);
+export const FlightIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M3 12.6l7.2-2.1L14 4.2l2 .6-1.7 5.8 5.4-.6 1.5 1.5-5.4 1.9-1.3 5-1.8-.4-.6-4.3-3.4 1.2-2.3 2.3-1-1 1.9-2.6z" />
+  </svg>
+);

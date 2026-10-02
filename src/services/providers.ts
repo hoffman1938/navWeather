@@ -19,6 +19,8 @@ import {
 } from '../voice/providers';
 import type { Locale } from '../i18n';
 import { useSettings } from '../state/settings';
+import type { TravelMode } from '../types/travel';
+import { FlightEstimateProvider } from './routing/FlightEstimateProvider';
 import { OSRMProvider } from './routing/OSRMProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
 import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
@@ -30,7 +32,10 @@ import type { WeatherProvider } from './weather/WeatherProvider';
 import { WeatherService } from './weather/WeatherService';
 
 export interface Providers {
+  /** The car router. Other modes: `routingByMode` (see `providersForMode`). */
   routing: RoutingProvider;
+  /** Routers for the other ways to travel. A mode without one (public transport) is not available. */
+  routingByMode?: Partial<Record<Exclude<TravelMode, 'drive'>, RoutingProvider>>;
   geocoding: GeocodingProvider;
   autocomplete: AutocompleteProvider;
   /** Lightweight reverse geocoder for naming route points. */
@@ -63,6 +68,12 @@ export function createProviders(cfg: AppConfig = config): Providers {
   const routing: RoutingProvider =
     // Ask for as many alternatives as roads we show: the distinct-road filter then has spares to drop.
     p.routing === 'osrm' ? new OSRMProvider(e.osrm, 'driving', 20000, undefined, cfg.routing.maxRoutes) : unknown('routing', p.routing);
+
+  // Walking and cycling: OSM community instances of the same router (no per-edge lane data, no table service assumed).
+  const onFoot = (base: string): RoutingProvider =>
+    new OSRMProvider(base, 'driving', 20000, { alternatives: true, avoid: [], laneGuidance: false, matrix: false, multiStop: true, via: true }, cfg.routing.maxRoutes);
+  const routingByMode: Providers['routingByMode'] =
+    p.routing === 'osrm' ? { walk: onFoot(e.osrmFoot), bike: onFoot(e.osrmBike), flight: new FlightEstimateProvider() } : { flight: new FlightEstimateProvider() };
 
   const geocoding: GeocodingProvider =
     p.geocoding === 'nominatim'
@@ -126,6 +137,7 @@ export function createProviders(cfg: AppConfig = config): Providers {
 
   return {
     routing,
+    routingByMode,
     geocoding,
     autocomplete,
     reverseGeocoding: photon,
@@ -166,6 +178,18 @@ let singleton: Providers | null = null;
 export function getProviders(): Providers {
   if (!singleton) singleton = createProviders();
   return singleton;
+}
+
+/**
+ * The providers to plan and navigate a trip made `mode`: the same as the
+ * app's, with that mode's router. A flight has no places or road data along
+ * it. null when the mode has no router (public transport).
+ */
+export function providersForMode(base: Providers, mode: TravelMode): Providers | null {
+  if (mode === 'drive') return base;
+  const routing = base.routingByMode?.[mode];
+  if (!routing) return null;
+  return mode === 'flight' ? { ...base, routing, places: null, elevation: null, poi: null, speedLimits: null } : { ...base, routing };
 }
 
 export function setProviders(p: Providers | null): void {

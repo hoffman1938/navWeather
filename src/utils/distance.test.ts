@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { LngLat } from '../types/geo';
 import {
+  bearingDelta,
   bearingDeg,
   cumulativeDistances,
+  destinationPoint,
   haversineM,
   lowerIndex,
   pointAtDistance,
@@ -92,5 +94,31 @@ describe('bearingDeg', () => {
   it('points north / east correctly', () => {
     expect(bearingDeg([0, 0], [0, 1])).toBeCloseTo(0, 3);
     expect(bearingDeg([0, 0], [1, 0])).toBeCloseTo(90, 3);
+  });
+});
+
+describe('destinationPoint', () => {
+  const tbilisi: LngLat = [44.8, 41.69];
+
+  it('lands the asked distance away, in the asked direction', () => {
+    for (const [bearing, dist] of [[0, 10_000], [90, 25_000], [180, 40_000], [270, 6_000], [45, 100_000]] as const) {
+      const p = destinationPoint(tbilisi, bearing, dist);
+      expect(haversineM(tbilisi, p)).toBeCloseTo(dist, -1);
+      expect(bearingDelta(bearingDeg(tbilisi, p), bearing)).toBeLessThan(0.5);
+    }
+  });
+
+  it('north is more latitude, east more longitude; zero distance is where you are', () => {
+    expect(destinationPoint(tbilisi, 0, 10_000)[1]).toBeGreaterThan(tbilisi[1]);
+    expect(destinationPoint(tbilisi, 90, 10_000)[0]).toBeGreaterThan(tbilisi[0]);
+    const same = destinationPoint(tbilisi, 123, 0);
+    expect(same[0]).toBeCloseTo(tbilisi[0], 9);
+    expect(same[1]).toBeCloseTo(tbilisi[1], 9);
+  });
+
+  it('wraps across the date line', () => {
+    const p = destinationPoint([179.9, 0], 90, 50_000);
+    expect(p[0]).toBeLessThan(-179);
+    expect(p[0]).toBeGreaterThanOrEqual(-180);
   });
 });

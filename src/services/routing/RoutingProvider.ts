@@ -10,6 +10,12 @@ export interface RouteRequest {
   waypoints?: Place[];
   /** Current heading, used when re-routing a moving vehicle to avoid U-turns. */
   startBearingDeg?: number;
+  /**
+   * Silent via points: the road passes through them, but they are not stops (no
+   * arrival, no instruction). Used to look for other roads. Needs `capabilities.via`;
+   * not combined with `waypoints` or `alternatives`.
+   */
+  via?: LngLat[];
   /** Ask for alternative routes (only honoured if the provider supports it). */
   alternatives?: boolean;
   /** Only options listed in `capabilities.avoid` may be passed. */
@@ -25,6 +31,8 @@ export interface RoutingCapabilities {
   /** Travel-time matrix (used for real detour times to places along the route). */
   matrix: boolean;
   multiStop: boolean;
+  /** Can route through silent via points (see `RouteRequest.via`). */
+  via?: boolean;
 }
 
 export interface TravelMatrix {

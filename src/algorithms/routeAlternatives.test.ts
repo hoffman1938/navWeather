@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { normalizeOsrmRoute } from '../services/routing/OSRMProvider';
 import { BATUMI, rawTbilisiBatumi, TBILISI, tbilisiBatumiDetour, tbilisiBatumiRoute } from '../test/helpers';
 import type { LngLat } from '../types/geo';
-import { routeVia, selectDistinctRoutes, sharedFraction } from './routeAlternatives';
+import type { Route } from '../types/route';
+import { haversineM } from '../utils/distance';
+import { doublesBack, probePoints, routeVia, selectDistinctRoutes, sharedFraction } from './routeAlternatives';
 
 const base = tbilisiBatumiRoute();
 
@@ -102,5 +104,60 @@ describe('routeVia', () => {
     };
     expect(routeVia(route)).toEqual(['E60', 'Ring road']);
     expect(routeVia({ ...route, legs: [{ ...route.legs[0], steps: [step('', undefined, 1000)] }] })).toEqual([]);
+  });
+});
+
+describe('probePoints', () => {
+  it('puts a point on each side of the road at each fraction, far enough to be another road', () => {
+    const pts = probePoints(base);
+    expect(pts).toHaveLength(4); // 2 places along the road × left and right
+    for (const p of pts) {
+      const nearest = Math.min(...base.geometry.filter((_, i) => i % 5 === 0).map((c) => haversineM(c, p)));
+      // 12 % of 357 km would be 43 km: capped at 40 km from where it was taken.
+      expect(nearest).toBeGreaterThan(20_000);
+      expect(nearest).toBeLessThan(41_000);
+    }
+    // The two points of a pair are on opposite sides of the road, ~80 km apart.
+    expect(haversineM(pts[0], pts[1])).toBeGreaterThan(60_000);
+  });
+
+  it('scales the offset down for a short trip, but never below 6 km', () => {
+    const short = { ...base, geometry: base.geometry.slice(0, 120) }; // ≈ 11 km
+    const [a] = probePoints(short);
+    const nearest = Math.min(...short.geometry.map((c) => haversineM(c, a)));
+    expect(nearest).toBeGreaterThanOrEqual(5_500);
+    expect(nearest).toBeLessThan(8_000);
+  });
+
+  it('nothing to probe on an empty road', () => {
+    expect(probePoints({ ...base, geometry: [] })).toEqual([]);
+  });
+});
+
+describe('doublesBack', () => {
+  const road = (coords: LngLat[]): Route =>
+    normalizeOsrmRoute(
+      { distance: 1, duration: 1, geometry: { coordinates: coords }, legs: [{ distance: 1, duration: 1, summary: '', steps: [] }] },
+      { origin: TBILISI, destination: BATUMI },
+    );
+
+  it('is ~0 for a road that goes somewhere and on', () => {
+    expect(doublesBack(base)).toBeLessThan(0.01);
+    expect(doublesBack(tbilisiBatumiDetour(0.3, 0.7, 0.5))).toBeLessThan(0.01);
+  });
+
+  it('sees an out-and-back spur: the way back is over road already driven', () => {
+    const g = base.geometry;
+    const k = 1000;
+    const out: LngLat[] = Array.from({ length: 25 }, (_, i) => [g[k][0], g[k][1] + (i + 1) * 0.01]);
+    const spur = road([...g.slice(0, k + 1), ...out, ...[...out].reverse(), ...g.slice(k + 1)]);
+    expect(doublesBack(spur)).toBeGreaterThan(0.04);
+  });
+
+  it('a hairpin that returns within a few km is not doubling back', () => {
+    const g = base.geometry;
+    const k = 1000;
+    const out: LngLat[] = Array.from({ length: 10 }, (_, i) => [g[k][0], g[k][1] + (i + 1) * 0.005]); // ≈ 5.5 km
+    expect(doublesBack(road([...g.slice(0, k + 1), ...out, ...[...out].reverse(), ...g.slice(k + 1)]))).toBeLessThan(0.01);
   });
 });

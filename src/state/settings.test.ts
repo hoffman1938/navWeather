@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSettings, parseSettings } from './settings';
+import { defaultSettings, parseSettings, useSettings } from './settings';
 
 describe('stored settings', () => {
   const base = defaultSettings();
@@ -49,3 +49,31 @@ describe('stored settings', () => {
     expect(parseSettings('42', base)).toEqual(base);
   });
 });
+
+describe('speed camera alerts are on by default', () => {
+  const base = defaultSettings();
+
+  it('on for a new user', () => {
+    expect(base.speedCameras).toBe(true);
+    expect(parseSettings(null, base).speedCameras).toBe(true);
+  });
+
+  it('on for someone whose stored "off" was only the old default, not their choice', () => {
+    expect(parseSettings(JSON.stringify({ speedCameras: false }), base).speedCameras).toBe(true);
+  });
+
+  it('off for someone who switched them off themselves — and it stays off', () => {
+    const stored = JSON.stringify({ speedCameras: false, speedCamerasChosen: true });
+    expect(parseSettings(stored, base)).toMatchObject({ speedCameras: false, speedCamerasChosen: true });
+  });
+
+  it('switching them in the app counts as a choice', () => {
+    useSettings.getState().reset();
+    expect(useSettings.getState().speedCamerasChosen).toBe(false);
+    useSettings.getState().update({ speedCameras: false });
+    const saved = parseSettings(localStorage.getItem('navweather.settings.v1'), base);
+    expect(saved).toMatchObject({ speedCameras: false, speedCamerasChosen: true });
+    useSettings.getState().reset();
+  });
+});
+

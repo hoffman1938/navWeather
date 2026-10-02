@@ -74,7 +74,7 @@ export function useExploreLayer(mapRef: RefObject<MLMap | null>, styleVersion: n
     };
 
     const camera = (fix: LngLat, first: boolean) => {
-      if (first) map.flyTo({ center: fix, zoom: Math.max(map.getZoom(), 14), duration: opts.reduced ? 0 : 900 });
+      if (first) map.flyTo({ center: fix, zoom: Math.max(map.getZoom(), 15.5), duration: opts.reduced ? 0 : 900 });
       else map.easeTo({ center: fix, duration: opts.reduced ? 0 : 500 });
     };
 

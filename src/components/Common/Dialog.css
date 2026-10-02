@@ -22,7 +22,7 @@
   box-shadow: var(--shadow-float);
 }
 .dialog--large {
-  width: min(520px, 100%);
+  width: min(560px, 100%);
 }
 .dialog h2 {
   margin: 0 0 6px;

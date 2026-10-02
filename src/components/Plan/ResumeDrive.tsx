@@ -30,6 +30,7 @@ export function ResumeDrive({ onDone }: { onDone: () => void }) {
     getProviders().tts.unlock();
     useExplore.getState().useMyLocationAsOrigin(true);
     const st = useAppStore.getState();
+    st.setTravelMode(session.mode);
     st.setDestinationPlace(session.destination);
     session.waypoints.forEach((w, i) => {
       useAppStore.getState().addWaypoint();

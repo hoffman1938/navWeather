@@ -97,7 +97,7 @@ const coincideCache = new WeakMap<TimedRoute, WeakMap<TimedRoute, { bucket: numb
  * Costs tens of milliseconds, and the answer only changes as the car moves
  * on, so it is remembered per pair of roads for each 500 m of progress.
  */
-export function coincidesAhead(road: TimedRoute, alongM: number, current: TimedRoute, bufferM = 120, share = 0.9): boolean {
+export function coincidesAhead(road: TimedRoute, alongM: number, current: TimedRoute, bufferM = 120, share = 0.93): boolean {
   const remaining = road.totalDistM - alongM;
   if (remaining <= 0) return true;
   const bucket = Math.floor(alongM / 500);

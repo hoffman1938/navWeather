@@ -32,6 +32,17 @@ export function bearingDeg(a: LngLat, b: LngLat): number {
   return (Math.atan2(y, x) / DEG + 360) % 360;
 }
 
+/** The point `distanceM` away from `from` along an initial bearing (great circle). */
+export function destinationPoint(from: LngLat, bearing: number, distanceM: number): LngLat {
+  const d = distanceM / EARTH_RADIUS_M;
+  const b = bearing * DEG;
+  const lat1 = from[1] * DEG;
+  const lon1 = from[0] * DEG;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
+  const lon2 = lon1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  return [((lon2 / DEG + 540) % 360) - 180, lat2 / DEG];
+}
+
 /** Smallest absolute difference between two bearings (0–180). */
 export function bearingDelta(a: number, b: number): number {
   const d = Math.abs(a - b) % 360;

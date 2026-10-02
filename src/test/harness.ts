@@ -1,5 +1,6 @@
 import { normalizeOsrmRoute } from '../services/routing/OSRMProvider';
 import { StyleUrlMapProvider } from '../services/map/MapProvider';
+import { FlightEstimateProvider } from '../services/routing/FlightEstimateProvider';
 import type { Poi, PoiProvider } from '../services/places/PoiProvider';
 import { setProviders, type Providers } from '../services/providers';
 import type { RouteRequest, RoutingProvider } from '../services/routing/RoutingProvider';
@@ -22,6 +23,8 @@ import {
 export interface Harness {
   weather: FakeWeatherProvider;
   routingCalls: RouteRequest[];
+  /** Requests the fake walking / bicycle routers received (the car router's are in `routingCalls`). */
+  modeCalls: Record<'walk' | 'bike', RouteRequest[]>;
   /**
    * Other roads the fake router returns after the best one, for requests
    * that start in Tbilisi and ask for alternatives (empty by default).
@@ -40,6 +43,23 @@ export function installFakeProviders(baseMs: number): Harness {
   const weather = new FakeWeatherProvider(baseMs);
   const routingCalls: RouteRequest[] = [];
   const alternativeRoads: Route[] = [];
+  const modeCalls: Harness['modeCalls'] = { walk: [], bike: [] };
+  /** The fixture road, `factor` times slower: walking ≈ 9×, a bicycle ≈ 3×. */
+  const slowRouter = (key: 'walk' | 'bike', factor: number): RoutingProvider => ({
+    name: `fake-${key}`,
+    capabilities: { alternatives: true, avoid: [], laneGuidance: false, matrix: false, multiStop: true },
+    async calculateRoutes(req) {
+      modeCalls[key].push(req);
+      return [
+        tbilisiBatumiRoute((raw) => {
+          raw.duration *= factor;
+          raw.legs[0].duration *= factor;
+          raw.legs[0].annotation!.duration = raw.legs[0].annotation!.duration!.map((d) => d * factor);
+          raw.legs[0].steps.forEach((s) => (s.duration *= factor));
+        }),
+      ];
+    },
+  });
   const tts = new FakeTTS();
   const recognition = new FakeRecognition();
   const poiState = { calls: 0, results: [] as Poi[] };
@@ -98,6 +118,7 @@ export function installFakeProviders(baseMs: number): Harness {
 
   const providers: Providers = {
     routing,
+    routingByMode: { walk: slowRouter('walk', 9), bike: slowRouter('bike', 3), flight: new FlightEstimateProvider() },
     geocoding: {
       name: 'fake-geo',
       async geocode(q) {
@@ -131,6 +152,6 @@ export function installFakeProviders(baseMs: number): Harness {
     speechRecognition: recognition,
   };
   setProviders(providers);
-  const harness: Harness = { weather, routingCalls, alternativeRoads, rerouteAlternatives: null, tts, recognition, poi: poiState, providers };
+  const harness: Harness = { weather, routingCalls, modeCalls, alternativeRoads, rerouteAlternatives: null, tts, recognition, poi: poiState, providers };
   return harness;
 }

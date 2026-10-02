@@ -46,6 +46,15 @@
   margin: 2px 0 0;
   color: var(--text-2);
 }
+.rhead__note {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.rhead--modes {
+  display: block;
+  padding-bottom: 0;
+}
 .rhead__actions {
   display: flex;
   align-items: center;
