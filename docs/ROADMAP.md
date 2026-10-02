@@ -1,5 +1,9 @@
 # Roadmap and MVP
 
+> ⚠️ **Superseded by [PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md)** (zero cost, [ADR-014](architecture/decisions/ADR-014-zero-cost.md),
+> 2026-10-03). Paid items below (Workers Paid, paid Open-Meteo key, custom domain, paid compute, store apps) are
+> removed; kept as history.
+
 Requirements: [PROJECT_REQUIREMENTS](PROJECT_REQUIREMENTS.md). Iteration log
 (Russian): [PLAN.md](PLAN.md). Complexity: S (days) · M (1–3 weeks) · L (1–2
 months) · XL (quarter+), for one experienced engineer.

@@ -1,5 +1,10 @@
 # IMPLEMENTATION ROADMAP — navWeather (после аудита 2026-10-03)
 
+> ⚠️ **Заменён** [PRODUCTION_READINESS_PLAN](../PRODUCTION_READINESS_PLAN.md) по решению владельца «ничего платного»
+> ([ADR-014](../architecture/decisions/ADR-014-zero-cost.md), 2026-10-03). Платные шаги ниже (Workers Paid, платный
+> ключ Open-Meteo, Containers/VM, свой домен, магазины приложений) **исключены**; порядок работ и задачи — в новом плане.
+> Документ сохранён как история.
+
 > Основа: [MASTER_AUDIT.md](MASTER_AUDIT.md) · [FEATURE_GAP_ANALYSIS.md](FEATURE_GAP_ANALYSIS.md).
 > Сложность: S — дни · M — 1–3 недели · L — 1–2 месяца · XL — квартал+ (один опытный инженер).
 > Требования и их статусы: [docs/PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md).

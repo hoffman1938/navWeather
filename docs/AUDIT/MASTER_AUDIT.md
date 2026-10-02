@@ -7,7 +7,10 @@
 > Предыдущий аудит: [2026-10-02-platform-audit.md](2026-10-02-platform-audit.md) (часть его выводов
 > подтверждена, часть статусов «VERIFIED» в требованиях — завышена, см. §5).
 > Сопутствующие документы: [FEATURE_GAP_ANALYSIS.md](FEATURE_GAP_ANALYSIS.md) ·
-> [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md).
+> [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) (заменён).
+> **Обновление 2026-10-03:** владелец решил, что приложение полностью бесплатное ([ADR-014](../architecture/decisions/ADR-014-zero-cost.md)).
+> Платные варианты в §12 и §20 исключены; путь к production — [PRODUCTION_READINESS_PLAN](../PRODUCTION_READINESS_PLAN.md).
+> При планировании найдены дефекты B-22 и B-23 (§4).
 
 ---
 
@@ -322,6 +325,8 @@
 | B-17 | P3 | Соль псевдонима отчётов меняется раз в сутки: проверки «свой отчёт / повторный голос» сбрасываются в полночь UTC; в течение суток отчёты одного IP связаны | чтение кода | `worker/reports.ts` (`who`) — CONFIRMED (код) |
 | B-19 | P2 | Голос: «найди заправку через 100 км» / «через 100 километров» — расстояние игнорируется, ищется в 0–60 км | чтение кода | `src/voice/parser.ts`, `store.ts` (`searchPoi`) — CONFIRMED (код) |
 | B-20 | P2 | Если указан остаток, но не размер бака/расход, после первой заправки остальные не планируются — без предупреждения | `fillRangeM = fullRangeM` (undefined); совет `enter-range` только при отсутствии остатка | `schedule.ts`, `planner.ts` — CONFIRMED (код) |
+| B-22 | P1 | Кэш мест и границ в Worker построен на Cache API, который **не работает на `*.workers.dev`** → каждый вызов идёт в публичный Overpass | официальная документация Cloudflare (2026-10-03) | `worker/trips.ts` (`edgeCache`, `tripBorders`) — CONFIRMED (документация) |
+| B-23 | P1 | Планировщик Long Trip на Worker превышает лимит CPU плана Free (10 мс): 10.5 мс на 1,600 км, 78 мс на 3,800 км в тёплом V8 (холодный изолят медленнее) | временный замер (удалён) | `worker/trips.ts`, `src/trip/planning/*` — CONFIRMED (замер) |
 | B-21 | P2 | Отсутствие прогноза в рисках поездки трактуется как «нет опасности»; коды передаются максимум на 96 ч | `HAZARD_CODES[Math.max(0, -1)]` → `null`; `weatherSamples(…, hours = 96)` | `src/trip/weather/risks.ts`, `src/services/trip/requests.ts` — CONFIRMED (код) |
 
 ---

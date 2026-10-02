@@ -146,9 +146,12 @@ Every part runs on free services or free tiers, with no API keys and no card:
 | Places, speed limits, cameras | Overpass (OpenStreetMap) | fair use, often slow |
 | Device voices, speech recognition | built into the browser | free |
 
-If you ever make it a paid/commercial product, Open-Meteo needs a paid plan
-(or self-hosting) and the public OSRM/Nominatim servers should be replaced by
-your own — the provider interfaces make that a configuration change.
+**It stays that way:** the app is free for everyone and non-commercial — no ads,
+no subscriptions, no paid features — and it runs on free tiers only, at $0 a
+month ([ADR-014](docs/architecture/decisions/ADR-014-zero-cost.md)). Free
+services have limits, so the app uses free fallbacks (another router, another
+tile source, another weather service) and says so when a free limit is reached.
+The path to production: [docs/PRODUCTION_READINESS_PLAN.md](docs/PRODUCTION_READINESS_PLAN.md).
 
 ## Honest limits
 
@@ -201,6 +204,7 @@ unavailable).
 Start with **[Project requirements](docs/PROJECT_REQUIREMENTS.md)** (single
 source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
 
+- **[Production readiness plan](docs/PRODUCTION_READINESS_PLAN.md)** — the exact, zero-cost path to production (stages, tasks, gates)
 - [Master audit 2026-10-03](docs/AUDIT/MASTER_AUDIT.md) — status of every requirement, confirmed defects, cost, roadmap ([gap analysis](docs/AUDIT/FEATURE_GAP_ANALYSIS.md), [implementation roadmap](docs/AUDIT/IMPLEMENTATION_ROADMAP.md))
 - [Platform audit 2026-10-02](docs/AUDIT/2026-10-02-platform-audit.md) — findings, fixes, sources
 - [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md) · [Roadmap & MVP](docs/ROADMAP.md)

@@ -30,6 +30,9 @@ weather. It is not "a map site" or "a weather site" — keep that direction.
   docs updated? tests present? debt recorded?
 
 ## Rules that must not be broken
+- **Zero cost, free for users (ADR-014, owner, 2026-10-03):** never add a paid plan, key, hosting, domain,
+  store account or paid feature; no ads or subscriptions. Free tiers only; the core must keep working when our
+  Worker quota is exhausted. Work follows `docs/PRODUCTION_READINESS_PLAN.md`.
 - Only real data: no source → "not available"; simulations labelled; driver
   reports are "reported", never fact. Weather wording: forecast vs derived
   estimate vs official warning (docs/architecture/WEATHER_ENGINE.md §6).
@@ -68,6 +71,7 @@ and push it. Commit messages: what and why; reference requirement IDs.
 - Mobile/CarPlay/Android Auto: `docs/mobile/` · UX/SEO/analytics/i18n: `docs/product/`
 - Cost & scale, CI/CD, testing, DR: `docs/operations/`
 - Feature specs (source of truth per feature): `docs/features/` (Long Trip Mode)
+- **Path to production: `docs/PRODUCTION_READINESS_PLAN.md`** (stages, tasks PR-x.y, release gates G1–G12)
 - Latest audit: `docs/AUDIT/MASTER_AUDIT.md` (2026-10-03: status of every requirement, confirmed defects `B-xx`),
   with `docs/AUDIT/FEATURE_GAP_ANALYSIS.md` and `docs/AUDIT/IMPLEMENTATION_ROADMAP.md`;
   previous: `docs/AUDIT/2026-10-02-platform-audit.md`

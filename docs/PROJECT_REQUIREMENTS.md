@@ -24,6 +24,20 @@ DEPRECATED · FUTURE.
 
 ---
 
+## 0. Binding constraints (owner decision, 2026-10-03)
+
+Decision: [ADR-014](architecture/decisions/ADR-014-zero-cost.md). Plan:
+[PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md). These constraints override any older requirement that
+assumed a paid step; such requirements are marked DEPRECATED or BLOCKED below with the reason and date (never
+deleted).
+
+| ID | Constraint | Priority | Status |
+| --- | --- | --- | --- |
+| REQ-COST-005 | **Zero operating cost:** no paid plan, API key plan, hosting, domain, store account or billing service; Cloudflare Workers Free on `*.workers.dev`; free public services and open data; a service that needs a payment method only as an optional accelerator, never in the critical path | P0 | IN PROGRESS (paid steps removed from plans; code already runs on free tiers) |
+| REQ-COST-006 | **Free for users, non-commercial:** no subscriptions, ads, paid features or in-app purchases; stated in the app | P0 | IN PROGRESS (true today; in-app statement planned, PR-0.1/PR-4.1) |
+| REQ-COST-007 | **Core independent of our Worker quota:** search, routing, weather at ETA, alerts, navigation and Long Trip planning work when `/api/*` is exhausted (429) | P0 | DEFECT (Long Trip planning and places/borders depend on the Worker — B-23, B-22) |
+| REQ-COST-008 | Capacity ceilings of the free stack documented; per-feature budgets, back-off and a degradation ladder; users told when a free limit is reached | P1 | PLANNED (plan §5–§6) |
+
 ## 1. Product vision
 
 navWeather is a navigation platform whose core is **NAVIGATION + ROUTE + TIME +
@@ -84,23 +98,24 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-TRIP-012 | Border crossings along the route (OSM countries), shown in dashboard and timeline | P2 | VERIFIED | `trip/borders.ts`, `/api/v1/trips/borders` |
 | REQ-TRIP-013 | Vehicle-specific planning: car/van/motorcycle/truck/EV (stops and places); truck road restrictions | P2 | PARTIALLY (restrictions BLOCKED until Valhalla, ADR-004) | `stops/places.ts`, `recommend.ts` |
 | REQ-TRIP-014 | Preferences: pace, hotel stars and distance, food, fuel brand (device-only) | P1 | IMPLEMENTED | `SettingsDialog.tsx` (Long trips) |
-| REQ-TRIP-015 | Planner stateless on Cloudflare; no stored trips, no position logs; Queues/D1 not used | P0 | IMPLEMENTED | `worker/trips.ts`, ADR-013 |
+| REQ-TRIP-015 | Planner stateless on Cloudflare; no stored trips, no position logs; Queues/D1 not used | P0 | IMPLEMENTED; AMENDED by ADR-014 — the web app plans on the client (REQ-TRIP-022); the stateless endpoint stays for other clients | `worker/trips.ts`, ADR-013 |
 | REQ-TRIP-016 | Jurisdiction-specific driving/rest rules for commercial drivers | P3 | PLANNED (needs verified rules) | — |
 | REQ-TRIP-017 | Cheapest-fuel and live hotel availability | P3 | BLOCKED (no open/verified data source) | — |
 | REQ-TRIP-018 | Remaining range is tracked along the drive (declared range − distance since the last fill) and sent with every replan and re-route (added 2026-10-03) | P0 | PLANNED (fixes B-01) | `state/trip.ts`, `replanning/progress.ts` |
 | REQ-TRIP-019 | Plausible days for any departure time: overnights only in the local evening/night window, a meal at least every ~6 h awake, night driving (00:00–06:00) flagged with advice to start in the morning — never changed silently (added 2026-10-03) | P1 | PLANNED (fixes B-04) | `planning/schedule.ts`, `config.ts` |
 | REQ-TRIP-020 | Time spent at a planned stop, up to its planned departure, is not a delay (added 2026-10-03) | P1 | PLANNED (fixes B-03) | `replanning/progress.ts` |
 | REQ-TRIP-021 | The plan is refreshed when its inputs arrive or change while planning: late settlements, new or longer forecasts (debounced, no notification spam) (added 2026-10-03) | P1 | PLANNED (fixes B-05, B-07) | `state/trip.ts` |
+| REQ-TRIP-022 | Long Trip planning runs in the browser (Web Worker) with the same `src/trip` module; works offline and is not limited by the Workers Free 10 ms CPU (measured 10.5 ms at 1,600 km, 78 ms at 3,800 km) (added 2026-10-03, ADR-014) | P1 | PLANNED (fixes B-23) | `services/trip/requests.ts`, `state/trip.ts` |
 
 ## 4. Supported platforms
 
 | ID | Platform | Priority | Status |
 | --- | --- | --- | --- |
 | REQ-PLAT-001 | Web (desktop, tablet, iPhone, Android), installable PWA | P0 | IMPLEMENTED |
-| REQ-PLAT-002 | iOS native app | P2 | PLANNED (Phase 4, [MOBILE](mobile/MOBILE_STRATEGY.md)) |
-| REQ-PLAT-003 | Android native app | P2 | PLANNED (Phase 5) |
-| REQ-PLAT-004 | Apple CarPlay (navigation entitlement) | P3 | FUTURE (Phase 6) |
-| REQ-PLAT-005 | Android Auto (Car App Library, NAVIGATION category) | P3 | FUTURE (Phase 7) |
+| REQ-PLAT-002 | iOS native app | P2 | BLOCKED — Reason: Apple Developer Program fee (zero-cost decision, ADR-014) · Date: 2026-10-03; the installable PWA is the iOS product |
+| REQ-PLAT-003 | Android native app | P2 | PLANNED only through free channels (APK / F-Droid, needs an open-source repo); Google Play BLOCKED by its fee (ADR-014, 2026-10-03) |
+| REQ-PLAT-004 | Apple CarPlay (navigation entitlement) | P3 | BLOCKED — Reason: needs a paid Apple developer account (ADR-014) · Date: 2026-10-03 |
+| REQ-PLAT-005 | Android Auto (Car App Library, NAVIGATION category) | P3 | BLOCKED — Reason: Android Auto apps are distributed through Google Play, which has a fee (ADR-014) · Date: 2026-10-03 |
 | REQ-PLAT-006 | Wearables, vehicle integrations, public API | P3 | FUTURE |
 
 ## 5. Architecture principles
@@ -132,12 +147,14 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-CF-002 | Durable Objects only where a single coordinated state is needed (live share per link, reports) | P1 | IMPLEMENTED | `worker/liveShare.ts`, `worker/reports.ts` |
 | REQ-CF-003 | Per-client rate limits on every write and on report listing | P0 | IMPLEMENTED | `wrangler.toml [[ratelimits]]`, `worker/index.ts` |
 | REQ-CF-004 | D1 introduced only with optional accounts (Phase 3) | P2 | PLANNED | [DATA_MODEL](database/DATA_MODEL.md), `database/migrations/0001_accounts.sql` (proposed, not applied) |
-| REQ-CF-005 | Shared edge cache for weather (Worker + Cache API/KV) before a beta beyond ~25 daily users | P1 | PLANNED | [ADR-005](architecture/decisions/ADR-005-weather-provider.md), [COST](operations/COST_AND_SCALE.md) |
-| REQ-CF-006 | Queues, R2, Cron Triggers only when a listed trigger occurs | P2 | PLANNED | [TARGET_ARCHITECTURE](architecture/TARGET_ARCHITECTURE.md) §2 |
-| REQ-CF-007 | Workers Paid plan ($5/month minimum) before public beta | P1 | PLANNED | [COST](operations/COST_AND_SCALE.md) §3 |
+| REQ-CF-005 | Shared edge cache for weather (Worker + Cache API/KV) before a beta beyond ~25 daily users | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (Cache API has no effect on `*.workers.dev`; KV Free allows 1,000 writes/day) → replaced by REQ-WX-011 / REQ-WX-012 | [ADR-005](architecture/decisions/ADR-005-weather-provider.md), [COST](operations/COST_AND_SCALE.md) |
+| REQ-CF-006 | Queues, R2, Cron Triggers only when a listed trigger occurs | P2 | PLANNED — only products available on Workers Free (ADR-014) | [TARGET_ARCHITECTURE](architecture/TARGET_ARCHITECTURE.md) §2 |
+| REQ-CF-007 | Workers Paid plan ($5/month minimum) before public beta | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (Workers Free only; budgets and degradation instead, REQ-COST-008) | [COST](operations/COST_AND_SCALE.md) §3 |
 | REQ-CF-008 | Shard the single `Reports` object by region before it nears ~1,000 req/s | P2 | PLANNED | [SCALE](operations/COST_AND_SCALE.md) |
 | REQ-CF-009 | Report listing as one corridor request instead of up to 24 box requests | P1 | PLANNED | `services/traffic/ReportsIncidentProvider.ts`, [API_V1](api/API_V1.md) |
-| REQ-CF-010 | Trip planner endpoints (`/api/v1/trips/plan|places|borders`) stateless, rate-limited (`TRIP_LIMITER`), places/borders edge-cached | P1 | IMPLEMENTED | `worker/trips.ts`, `wrangler.toml` |
+| REQ-CF-010 | Trip planner endpoints (`/api/v1/trips/plan|places|borders`) stateless, rate-limited (`TRIP_LIMITER`), places/borders edge-cached | P1 | DEFECT (B-22: places/borders 'edge cache' uses the Cache API, which does nothing on `*.workers.dev`); web path moves to static data and client borders (REQ-DATA-006, PR-2.3/2.4) | `worker/trips.ts`, `wrangler.toml` |
+| REQ-CF-011 | No feature relies on the Cache API while the app runs on `*.workers.dev`; shared caches use Durable Object SQLite (Free: 100k rows written/day) or static assets (added 2026-10-03) | P1 | PLANNED (fixes B-22) | `worker/trips.ts` |
+| REQ-CF-012 | Per-feature request budgets on Workers Free (100k requests/day, DO 100k/day): reports corridor, adaptive live-share cadence, back-off on 429, rate limits on every endpoint incl. `/whereami` (added 2026-10-03) | P1 | PLANNED | `worker/*`, `share/liveShare.ts`, `ReportsIncidentProvider.ts` |
 
 ## 7. Map architecture
 
@@ -150,18 +167,20 @@ separate licences and failure modes ([MAPS_ROUTING_GEO](architecture/MAPS_ROUTIN
 | --- | --- | --- | --- | --- |
 | REQ-MAP-001 | MapLibre GL JS rendering of OpenFreeMap vector styles (light/dark) | P0 | IMPLEMENTED | `components/Map/RouteMap.tsx`, `services/map/MapProvider.ts` |
 | REQ-MAP-002 | Attribution visible: "OpenFreeMap © OpenMapTiles Data from OpenStreetMap" on the map; data/routing credits + "Report a map error" in the sheets | P0 | IMPLEMENTED | `RouteMap.tsx` (AttributionControl), `components/Common/Attribution.tsx` |
-| REQ-MAP-003 | A self-hostable fallback tile source (PMTiles on R2) before public launch | P2 | PLANNED | [ADR-006](architecture/decisions/ADR-006-map-stack.md) |
+| REQ-MAP-003 | A self-hostable fallback tile source (PMTiles on R2) before public launch | P2 | PLANNED, changed by ADR-014: fallback = VersaTiles public tiles (REQ-MAP-005); PMTiles in the R2 free tier optional | [ADR-006](architecture/decisions/ADR-006-map-stack.md) |
 | REQ-MAP-004 | No bulk/automated tile downloading (OpenFreeMap ToS) | P0 | IMPLEMENTED | service worker never caches tiles (`public/sw.js`) |
+| REQ-MAP-005 | Automatic fallback from OpenFreeMap to VersaTiles (free, no key) with the right attribution (added 2026-10-03) | P1 | PLANNED | `services/map/MapProvider.ts`, `RouteMap.tsx` |
 
 ## 8. Routing architecture
 
 | ID | Requirement | Priority | Status | Traceability |
 | --- | --- | --- | --- | --- |
 | REQ-ROUTE-001 | Respect the public OSRM servers' policy: ≤1 request/s per user, light non-commercial use | P0 | IMPLEMENTED | per-server queue in `OSRMProvider.ts` (`VITE_OSRM_MIN_INTERVAL_MS`); `OSRMProvider.test.ts` |
-| REQ-ROUTE-002 | Self-hosted router before public beta (public OSRM is non-commercial, no SLA) | P0 | PLANNED | [ADR-004](architecture/decisions/ADR-004-routing-engine.md) — Valhalla recommended |
+| REQ-ROUTE-002 | Self-hosted router before public beta (public OSRM is non-commercial, no SLA) | P0 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (paid compute) → replaced by REQ-ROUTE-006; own router optional on free infrastructure (plan PR-8.1) | [ADR-004](architecture/decisions/ADR-004-routing-engine.md) — Valhalla recommended |
 | REQ-ROUTE-003 | Avoid tolls/highways/ferries, truck profiles once the router supports them | P2 | BLOCKED (public server) | ADR-004 |
 | REQ-ROUTE-004 | Live traffic only from a real provider; "not available" otherwise | P2 | IMPLEMENTED (none) | `services/traffic/TrafficProvider.ts` |
 | REQ-ROUTE-005 | Public transport from open timetables (Transitous), labelled, switchable off | P2 | IMPLEMENTED | `TransitousProvider.ts`; [ADR-011](architecture/decisions/ADR-011-public-transport.md) |
+| REQ-ROUTE-006 | Free routing fallback chain: OSRM demo → FOSSGIS `routed-car` → optional own router (owner hardware via Cloudflare Tunnel), one ≤1 req/s queue per server, attribution of the server used (added 2026-10-03) | P1 | PLANNED | `services/routing/*`, `providers.ts` |
 
 ## 9. Weather architecture
 
@@ -173,12 +192,14 @@ Details: [WEATHER_ENGINE](architecture/WEATHER_ENGINE.md).
 | REQ-WX-002 | Forecast values never extrapolated past the forecast horizon; interval vs instant semantics | P0 | VERIFIED | `weatherMatching.ts`; tests |
 | REQ-WX-003 | Every value labelled RAW FORECAST, DERIVED ESTIMATE or OFFICIAL WARNING in UI and voice | P0 | PARTIALLY (forecast/estimate yes; official warnings not integrated) | `components/Plan/DataSources.tsx`; REQ-WX-006 |
 | REQ-WX-004 | Stale forecasts shown as stale; model-run-aware refresh; offline keeps last forecast | P0 | VERIFIED | `WeatherService.ts`, `store.ts refreshIfStale` |
-| REQ-WX-005 | Weather requests through a shared edge cache with a paid key before a beta beyond ~25 daily users or any commercial use (the app as a whole passes the free tier's 10,000 calls/day at ~30 DAU) | P1 | PLANNED | ADR-005, COST_AND_SCALE §2 |
+| REQ-WX-005 | Weather requests through a shared edge cache with a paid key before a beta beyond ~25 daily users or any commercial use (the app as a whole passes the free tier's 10,000 calls/day at ~30 DAU) | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (no paid key) → replaced by REQ-WX-011 / REQ-WX-012; Open-Meteo limit per IP vs per app to be confirmed in writing (plan PR-0.5) | ADR-005, COST_AND_SCALE §2 |
 | REQ-WX-006 | Official warnings (national services / MeteoAlarm where licensed), labelled "official" | P2 | PLANNED (source & licence REQUIRE VERIFICATION per country) | ADR-005 |
 | REQ-WX-007 | Request ≤10 weather variables per call where possible (Open-Meteo counts more as extra calls) | P2 | PLANNED (currently 14) | `OpenMeteoProvider.ts`; [COST](operations/COST_AND_SCALE.md) |
 | REQ-WX-008 | The forecast horizon requested covers the whole trip including planned stops, from the first load (added 2026-10-03) | P1 | DEFECT (B-06: 48 h on the first load — 77 of 145 points without a forecast on a 4.5-day trip until the next refresh) | `state/store.ts` (`loadWeather`), `WeatherService.ts` |
 | REQ-WX-009 | One set of weather hazard thresholds (rain, heavy rain, snow, freezing, fog, low visibility, wind, storm, temperature), configurable in one module, documented with their rationale and used by alerts, trip risks, road comparison, departure advice and the road-surface estimate (added 2026-10-03) | P1 | DEFECT (B-08: values differ across 7 files, e.g. gusts 60 vs 70 km/h, freezing ≤1 vs ≤0.5 °C) | `intelligence/weatherAlerts.ts`, `trip/weather/hazards.ts`, `state/derive.ts`, `algorithms/departurePlanner.ts`, `algorithms/roadHazards.ts` |
 | REQ-WX-010 | Extreme temperature alerts (heat, severe cold) with configurable thresholds (added 2026-10-03) | P2 | PLANNED | `intelligence/weatherAlerts.ts` |
+| REQ-WX-011 | Weather stays client-direct (free, per device): ≤10 variables, persistent device cache keyed by grid cell + model run, smaller weather layer, per-device daily call counter with a soft cap (added 2026-10-03) | P1 | PLANNED | `services/weather/*`, `useWeatherLayer.ts` |
+| REQ-WX-012 | Weather fallback: MET Norway (CC BY 4.0, free) through the Worker with an identifying User-Agent, `Expires` honoured, cached in a Durable Object; then stale cache with label (added 2026-10-03) | P1 | PLANNED | `worker/weather.ts` (new) |
 
 ## 10. Authentication architecture
 
@@ -188,7 +209,7 @@ everything that works today keeps working with no account.
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
 | REQ-AUTH-001 | No account needed for search, routing, weather, navigation, sharing, reports | P0 | IMPLEMENTED |
-| REQ-AUTH-002 | Optional account (passkeys + email link) only to sync saved places/settings across devices | P2 | PLANNED (Phase 3) |
+| REQ-AUTH-002 | Optional account (passkeys + email link) only to sync saved places/settings across devices | P2 | FUTURE — passkeys only (email sending is not free from Workers; ADR-014, 2026-10-03) |
 | REQ-AUTH-003 | Opaque server sessions (HttpOnly cookie on web, Bearer token in Keychain/Keystore on mobile); no long-lived JWTs | P2 | PLANNED |
 | REQ-AUTH-004 | In-app account deletion (Apple 5.1.1(v), Google Play) + web deletion page | P2 | PLANNED (required before mobile launch with accounts) |
 | REQ-AUTH-005 | Third-party sign-in (Apple/Google) only together, and only if demand exists (Apple 4.8) | P3 | FUTURE |
@@ -203,7 +224,8 @@ everything that works today keeps working with no account.
 | REQ-DATA-002 | D1 for accounts, sessions, settings, saved places (when accounts ship) | P2 | PLANNED |
 | REQ-DATA-003 | Never store positions, routes or trip history on the server unless a user opts in to a named feature | P0 | IMPLEMENTED |
 | REQ-DATA-004 | Real-time state (live share, reports) in Durable Objects with expiry | P1 | IMPLEMENTED |
-| REQ-DATA-005 | Weather cache in Cache API/KV, never D1 | P1 | PLANNED (with REQ-WX-005) |
+| REQ-DATA-005 | Weather cache in Cache API/KV, never D1 | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (Cache API/KV weather cache) → REQ-WX-011 device cache, REQ-WX-012 DO cache for the fallback |
+| REQ-DATA-006 | OSM data for the launch region (settlements, hotels, fuel, charging, food, rest areas, speed cameras, level crossings, speed limits) pre-built weekly by GitHub Actions from free OSM extracts and served as static assets (free, unlimited); public Overpass only outside the region; country borders from public-domain Natural Earth on the client (added 2026-10-03) | P1 | PLANNED |
 
 ## 12. API architecture
 
@@ -229,8 +251,8 @@ everything that works today keeps working with no account.
 | REQ-SEC-003 | Writes: same-origin only (Sec-Fetch-Site), JSON content type, size-capped bodies, rate limits | P0 | VERIFIED (smoke) |
 | REQ-SEC-004 | Capability links with ≥128-bit ids; sharer key stored only as SHA-256 | P0 | VERIFIED |
 | REQ-SEC-005 | Reporter/voter identity only as daily-salted hash; no IP stored | P0 | IMPLEMENTED |
-| REQ-SEC-006 | Turnstile on account creation / email login when accounts ship | P2 | PLANNED |
-| REQ-SEC-007 | WAF + Cloudflare rate-limiting rules on the zone before public launch | P1 | PLANNED (needs custom domain) |
+| REQ-SEC-006 | Turnstile on account creation / email login when accounts ship | P2 | FUTURE — Turnstile is free; only relevant if accounts ship |
+| REQ-SEC-007 | WAF + Cloudflare rate-limiting rules on the zone before public launch | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (WAF/zone rules need a purchased domain) → Workers rate-limit binding + validation (REQ-CF-012); a free domain is optional (plan PR-8.3) |
 | REQ-SEC-008 | Dependency updates monitored (Dependabot) and CI on every PR | P1 | IMPLEMENTED (`.github/`) |
 
 ## 14. Privacy requirements
@@ -243,7 +265,7 @@ everything that works today keeps working with no account.
 | REQ-PRIV-002 | Route history, if ever offered, is OFF by default and opt-in, device-first | P0 | IMPLEMENTED (not offered) |
 | REQ-PRIV-003 | Third parties receive only what each request needs (coordinates for routing/weather); documented per provider | P0 | IMPLEMENTED (documented here and in PRIVACY) |
 | REQ-PRIV-004 | Logs and analytics never contain precise coordinates or bbox/route query strings | P0 | IMPLEMENTED (observability off); must hold when logs are enabled |
-| REQ-PRIV-005 | Privacy Policy, Terms, data-deletion page published before public beta (legal review) | P1 | PLANNED |
+| REQ-PRIV-005 | Privacy Policy, Terms, data-deletion page published before public beta (legal review) | P1 | PLANNED — free templates and a self-review checklist instead of a paid legal review (ADR-014); not legal advice |
 | REQ-PRIV-006 | Consent banner not needed while only strictly-necessary device storage is used; re-assess with analytics | P1 | IMPLEMENTED (no cookies/trackers) |
 
 ## 15. Legal / licensing requirements
@@ -255,7 +277,7 @@ SAFE / REQUIRES REVIEW / NOT SUITABLE verdict, with source and verification date
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
 | REQ-LEGAL-001 | Attribution for OSM, OpenMapTiles, OpenFreeMap, Open-Meteo (CC BY 4.0), routing servers, Transitous | P0 | IMPLEMENTED |
-| REQ-LEGAL-002 | Before ANY commercial use (ads, subscriptions): replace/upgrade Open-Meteo free, OSRM demo, Overpass public, Transitous, Nominatim public | P0 | PLANNED (gate) |
+| REQ-LEGAL-002 | Before ANY commercial use (ads, subscriptions): replace/upgrade Open-Meteo free, OSRM demo, Overpass public, Transitous, Nominatim public | P0 | CHANGED by ADR-014 — the app stays non-commercial (REQ-COST-006), so the free/non-commercial terms of Open-Meteo, OSRM demo, FOSSGIS and Transitous apply; capacity and fair use are handled by REQ-COST-008 |
 | REQ-LEGAL-003 | Repository public under an OSI licence if Transitous stays in use (its terms) | P1 | BLOCKED (owner decision; repo is private) |
 | REQ-LEGAL-004 | Speed-camera alerts: legality varies by country; user responsibility shown in Settings | P1 | IMPLEMENTED (on by default — REQUIRES REVIEW, see Open questions) |
 
@@ -293,9 +315,9 @@ large targets, nothing to read for long ([UX_AND_GROWTH](product/UX_AND_GROWTH.m
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-SCALE-001 | Upstream weather calls bounded by geography × refresh rate, not by user count (shared cache) | P1 | PLANNED |
+| REQ-SCALE-001 | Upstream weather calls bounded by geography × refresh rate, not by user count (shared cache) | P1 | CHANGED by ADR-014 — upstream weather calls are bounded per device (REQ-WX-011); a shared cache only with a free domain |
 | REQ-SCALE-002 | No single Durable Object on the hot path of every user at >1,000 req/s | P2 | PLANNED (shard Reports) |
-| REQ-SCALE-003 | Self-hosted routing/geocoding/POI before public beta | P1 | PLANNED |
+| REQ-SCALE-003 | Self-hosted routing/geocoding/POI before public beta | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 → static OSM data (REQ-DATA-006) and free fallback chains (REQ-ROUTE-006); own services optional (plan §7 Этап 8) |
 
 Model: [COST_AND_SCALE](operations/COST_AND_SCALE.md).
 
@@ -305,7 +327,7 @@ Model: [COST_AND_SCALE](operations/COST_AND_SCALE.md).
 | --- | --- | --- | --- |
 | REQ-MOB-001 | Engines free of React/DOM so they can run in a mobile JS runtime or be ported | P0 | IMPLEMENTED |
 | REQ-MOB-002 | Every server feature reachable via `/api/v1` with Bearer-token auth (no cookie-only flows) | P1 | PLANNED (accounts) |
-| REQ-MOB-003 | Decide mobile stack via a time-boxed spike (background location, CarPlay, Android Auto) | P2 | PLANNED ([ADR-010](architecture/decisions/ADR-010-mobile-stack.md), PROPOSED) |
+| REQ-MOB-003 | Decide mobile stack via a time-boxed spike (background location, CarPlay, Android Auto) | P2 | PLANNED, limited by ADR-014: store apps blocked by fees; the spike only for free channels (PWA, APK / F-Droid) |
 | REQ-MOB-004 | Voice layer as platform-neutral instruction IDs + params, rendered by a per-platform TTS adapter | P1 | IMPLEMENTED (web) / PLANNED (mobile) |
 | REQ-MOB-005 | Location behind a `LocationProvider` interface (today an injectable browser `geolocation`) (added 2026-10-03) | P2 | PLANNED |
 | REQ-MOB-006 | Notifications behind a `NotificationProvider` interface; alerts can reach a backgrounded app where the platform allows (added 2026-10-03) | P2 | PLANNED (alerts are foreground-only today) |
@@ -332,7 +354,7 @@ from a web app. Status: FUTURE (P3).
 | --- | --- | --- | --- |
 | REQ-OFF-001 | Offline app shell; loaded route, instructions and cached forecasts keep working, labelled stale | P0 | VERIFIED |
 | REQ-OFF-002 | Never promise offline navigation the stack can't do (no offline routing/tiles on web today) | P0 | IMPLEMENTED |
-| REQ-OFF-003 | Downloadable regions (PMTiles) and on-device routing only in native apps (Valhalla tiles) | P3 | FUTURE |
+| REQ-OFF-003 | Downloadable regions (PMTiles) and on-device routing only in native apps (Valhalla tiles) | P3 | FUTURE — native apps blocked by store fees (ADR-014); offline regions possible in the PWA only within browser storage limits |
 
 ## 24. Internationalization requirements
 
@@ -391,22 +413,28 @@ and backward compatible. Status: PLANNED.
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-COST-001 | Free tiers during MVP; every paid step has a written trigger | P0 | IMPLEMENTED (documented) |
+| REQ-COST-001 | Free tiers during MVP; every paid step has a written trigger | P0 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 → REQ-COST-005 (zero cost permanently; no paid steps) |
 | REQ-COST-002 | Batch, deduplicate (0.02° grid) and cache forecasts; refresh only on staleness or new model run | P0 | VERIFIED (client) |
-| REQ-COST-003 | Browser → Worker → cache → provider for paid/keyed providers (never a key in the client) | P1 | PLANNED |
-| REQ-COST-004 | Per-request estimates kept current in COST_AND_SCALE | P1 | IMPLEMENTED |
+| REQ-COST-003 | Browser → Worker → cache → provider for paid/keyed providers (never a key in the client) | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (no paid/keyed providers); the MET Norway fallback still goes browser → Worker → provider (REQ-WX-012) |
+| REQ-COST-004 | Per-request estimates kept current in COST_AND_SCALE | P1 | CHANGED — COST_AND_SCALE becomes a zero-cost capacity model (plan PR-2.13) |
 
 ## 30. MVP scope
 
 See [ROADMAP](ROADMAP.md) §MVP for MUST / SHOULD / COULD / NOT NOW.
-Summary: the current web app already exceeds the MVP feature set; the
-remaining MVP work is **compliance and operability** — self-hosted routing,
-provider terms, legal pages, monitoring, real-device testing.
+Summary: the current web app already exceeds the MVP feature set. Since
+2026-10-03 the path to production is
+[PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md) (zero cost, ADR-014):
+driver-safety defects first, then the free architecture (client-side planning,
+static OSM data, fallback chains, budgets), weather thresholds, UX honesty,
+quality gates, operations and legal pages, beta. Release only when its 12 gates
+pass.
 
 ## 31. Future roadmap
 
-Phases 0–8 in [ROADMAP](ROADMAP.md): architecture → web MVP → private beta →
-public beta → iOS → Android → CarPlay → Android Auto → international.
+Stages 0–7 (+ optional stage 8) in
+[PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md). The older phases in
+[ROADMAP](ROADMAP.md) remain as history; iOS, CarPlay, Android Auto and Google
+Play are BLOCKED by store fees (ADR-014), Android only through free channels.
 
 ## 32. Known limitations
 
@@ -415,7 +443,11 @@ public beta → iOS → Android → CarPlay → Android Auto → international.
 - No live traffic and no official incident feed for Georgia.
 - No official weather warnings yet; road-surface wording is a derived estimate.
 - Public OSRM, Overpass, Nominatim, Photon, Transitous and Open-Meteo free are
-  fair-use/non-commercial services with no SLA.
+  fair-use/non-commercial services with no SLA; the app is non-commercial
+  (ADR-014) and uses fallback chains instead of paid SLAs.
+- Zero cost means finite capacity: Workers Free allows 100,000 requests/day
+  per account; Worker-backed features (live sharing, driver reports) degrade
+  beyond ~4,000–6,000 DAU (plan §5); static assets are unlimited.
 - Transitous covers Tbilisi buses/metro; Georgian Railway is listed in its
   sources but returned no itineraries for Tbilisi → Batumi on 2026-10-02.
 - Geocoding can pick a same-named place elsewhere (e.g. "Tavisupleba Square" →
@@ -452,11 +484,15 @@ public beta → iOS → Android → CarPlay → Android Auto → international.
 | Cloudflare Workers, Durable Objects, rate limiting | hosting, API, live share, reports | SAFE |
 | OpenFreeMap (+ OpenMapTiles schema, OSM data) | vector tiles | SAFE (attribution; no SLA) |
 | MapLibre GL JS | rendering | SAFE (BSD-3-Clause) |
-| OSRM public demo + FOSSGIS routing servers | car/walk/bike routing | NOT SUITABLE for production; OK for development/private beta |
+| OSRM public demo + FOSSGIS routing servers | car/walk/bike routing; FOSSGIS `routed-car` as car fallback | REQUIRES REVIEW — allowed for a non-commercial app at reasonable volume (ADR-014); no SLA → fallback chain (REQ-ROUTE-006) |
 | Nominatim (OSMF) | typed search | REQUIRES REVIEW (no autocomplete; 1 req/s; heavy users self-host) |
 | Photon (komoot) | autocomplete, reverse | REQUIRES REVIEW (fair use, terms informal) |
-| Overpass public instances | places, POIs, speed limits, cameras; trip stop places and borders (from the Worker) | NOT SUITABLE for production volume |
-| Open-Meteo (free) | forecasts, elevation, air quality | SAFE non-commercial / REQUIRES paid plan commercially |
+| Overpass public instances | places, POIs, speed limits, cameras; trip stop places and borders (from the Worker) | NOT SUITABLE for production volume → only outside the launch region after REQ-DATA-006 |
+| Geofabrik OSM extracts (ODbL) | weekly static OSM data for the launch region (planned) | SAFE (attribution, ODbL) |
+| Natural Earth admin-0 boundaries | client-side border detection (planned) | SAFE (public domain) |
+| VersaTiles public tiles | map fallback (planned) | REQUIRES REVIEW (free, no key; assets "may change") |
+| MET Norway Locationforecast | weather fallback via the Worker (planned) | SAFE (CC BY 4.0; identifying User-Agent, honour `Expires`) |
+| Open-Meteo (free) | forecasts, elevation, air quality | SAFE non-commercial (the app stays non-commercial, ADR-014); per-IP vs per-app limit REQUIRES confirmation |
 | Transitous | public transport | REQUIRES REVIEW (open-source + non-commercial + contact) |
 | Browser speech (Google voices in Chrome) | TTS, push-to-talk | REQUIRES REVIEW (text/audio go to the browser vendor; disclosed) |
 
@@ -484,9 +520,8 @@ transport · ADR-012 offline · ADR-013 long-trip planner (stateless Worker).
 2. **Code licence / public repository.** Transitous' terms require an
    open-source project; the repo is private with no licence. Open-source it,
    or replace Transitous (no free alternative found) / drop public transport.
-3. **Commercial intent and timing.** Ads or subscriptions make Open-Meteo,
-   OSRM demo, Overpass, Transitous and GraphHopper-free unusable as-is
-   (REQ-LEGAL-002). When is the switch planned?
+3. ~~**Commercial intent and timing.**~~ **Answered 2026-10-03:** never — the
+   app is free and non-commercial with zero operating cost (ADR-014).
 4. **Speed-camera alerts default ON** (README) vs PLAN.md §5 "off by default".
    Legality differs by country; recommended default OFF outside countries
    where they are known to be legal (legal review).
@@ -499,7 +534,7 @@ transport · ADR-012 offline · ADR-013 long-trip planner (stateless Worker).
 | Item | Why | Owner |
 | --- | --- | --- |
 | Open-Meteo per-location call counting and plan prices | pricing page shows allowances, not prices; counting of multi-location requests not stated | before commercial plan |
-| Cloudflare Cache API on `*.workers.dev` | docs unclear; use a custom domain for edge caching | before REQ-WX-005 |
+| ~~Cloudflare Cache API on `*.workers.dev`~~ | **Answered 2026-10-03:** it has no effect there (official docs) → B-22, REQ-CF-011 | done |
 | Workers Logs option to exclude invocation URLs | needed for REQ-PRIV-004 | before REQ-OBS-002 |
 | Cloudflare Containers for an always-on router (sleep/inactivity behaviour) | ADR-004 Growth option | before routing migration |
 | Valhalla `format=osrm` compatibility with our OSRM normaliser | eases ADR-004 migration | spike |
@@ -508,11 +543,11 @@ transport · ADR-012 offline · ADR-013 long-trip planner (stateless Worker).
 | CCPA/CPRA thresholds | official site unreachable at verification time | before US launch |
 | Georgian Law on Personal Data Protection (2023) obligations for this app | legal review | before Georgian public launch |
 | Tomorrow.io free-tier terms | pricing page returned 404 | only if considered |
-| Workers CPU per trip-plan request on the Free plan (10 ms) | long plans may exceed it | measure after deployment (REQ-CF-007) |
+| Workers CPU per trip-plan request on the Free plan (10 ms) | measured locally 2026-10-03: 10.5 ms at 1,600 km, 78 ms at 3,800 km → exceeds → client-side planning (REQ-TRIP-022) | done (decision) |
 | Overpass usage from the Worker for trips (places, borders) | public instance asks for light use; edge cache helps | before public beta (self-host, ADR-004) |
 | Whether a production deployment exists and works | no deployment URL or record found on 2026-10-03 | owner |
 | CI runs on GitHub Actions | workflow present; run history not checked (no `gh` access) | owner |
-| Open-Meteo plan prices | not published; third-party sites quote ~$29/month for Standard (1M calls) | before REQ-WX-005 |
+| Open-Meteo free limit: per IP or per application? | terms don't say; decides the capacity ceiling of the core (plan §5) | before beta (PR-0.5) |
 
 ---
 

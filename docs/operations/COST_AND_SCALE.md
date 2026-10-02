@@ -1,5 +1,10 @@
 # Cost control and scalability model
 
+> ⚠️ **Superseded for all paid steps by [ADR-014](../architecture/decisions/ADR-014-zero-cost.md) (2026-10-03): the app is
+> free for users and costs $0 to run.** Paid plans, keys, compute and domains below are history, not plans. The
+> zero-cost capacity model, budgets and degradation ladder are in
+> [PRODUCTION_READINESS_PLAN](../PRODUCTION_READINESS_PLAN.md) §5–§6; this file is rewritten in task PR-2.13.
+
 All numbers are **ESTIMATES** from the request patterns in the code
 (2026-10-02) unless marked **KNOWN** (verified list price) or
 **PROVIDER-DEPENDENT** (price not published / not verified). Cloudflare list
