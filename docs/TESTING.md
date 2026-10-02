@@ -33,6 +33,8 @@ npm run test:reports  # end-to-end checks of the driver-reports relay
 | Sun, clocks, cameras | `routeIntelligence.test.ts`, `algorithms/cameras.test.ts` | sun azimuth, glare only into a low sun under clear sky, time-zone change wording, cameras snapped and announced once |
 | Names and grammar | `i18n/script.test.ts` | Georgian OSM names → Latin/Cyrillic (streets, road numbers) |
 | Store end-to-end | `state/store.test.ts`, `state/scenarios.test.ts` | Tbilisi → Batumi: plan, weather, refresh, simulate, alerts, deviation + recalculation, network loss, arrival summary, assistant |
+| Several roads | `algorithms/routeAlternatives.test.ts`, `services/routing/OSRMProvider.test.ts`, `state/store.test.ts › a forecast along every road`, `components/Plan/RouteOptions.test.tsx` | near-copies of a road dropped, order and cap; `alternatives=3` and the fallback; each road has its own ribbon/stops/arrival (rain only on the northern road); naming ("Fastest", "Alternative 1…"), card per road |
+| Choosing a road while driving | `state/roads.test.ts`, `components/Drive/OtherRoads.test.tsx` | taking a known road switches at once (no routing request, offline too, forecast kept, names added later, same road object); crossing a road or a stopped car doesn't; unknown road → new directions, then other roads from there (a failing router is harmless); other roads listed until the fork is passed; "Take this road", simulation, "show another route" |
 | PWA | `test/serviceWorker.test.ts` | shell only; provider, tile and `/api` traffic never cached |
 | Driver reports | `services/traffic/ReportsIncidentProvider.test.ts`, `state/reports.test.ts`, `reports/protocol.test.ts`, `scripts/reports-smoke.mjs` | route boxes (count/area caps, full coverage), clock skew, partial outages, failure wording; real drives only, offline, "still there?" once and never for your own or in a simulation, 5-minute refresh, off switch; relay rules |
 | Drive extras | `state/driveExtras.test.ts` | cameras without limit warnings, loading when switched on mid-drive, never the old route's cameras after a re-route |
@@ -85,6 +87,11 @@ area is unavailable too (short message, and Go says the start is missing).
 
 ## Not tested (be explicit)
 
+- The live OSRM demo server's answer to `alternatives=3` for real trips (the sandbox this was
+  built in could not reach it): how many distinct roads it finds for a given trip, and its
+  latency with alternatives, are unverified — the code is tested against fixtures and fakes.
+- Real GPS behaviour at a fork (heading noise at low speed, parallel roads): the matching rules
+  (30–60 m, heading within 60°, no heading → plan a new route) are unit-tested, not road-tested.
 - Real iOS Safari and Android Chrome devices (only emulation).
 - Microphone speech recognition end to end (browser speech APIs need a user
   device; the parser and assistant are unit-tested).

@@ -61,7 +61,8 @@ export function createProviders(cfg: AppConfig = config): Providers {
   const photon = new PhotonProvider(e.photon, cfg.geocoding.language);
 
   const routing: RoutingProvider =
-    p.routing === 'osrm' ? new OSRMProvider(e.osrm) : unknown('routing', p.routing);
+    // Ask for as many alternatives as roads we show: the distinct-road filter then has spares to drop.
+    p.routing === 'osrm' ? new OSRMProvider(e.osrm, 'driving', 20000, undefined, cfg.routing.maxRoutes) : unknown('routing', p.routing);
 
   const geocoding: GeocodingProvider =
     p.geocoding === 'nominatim'

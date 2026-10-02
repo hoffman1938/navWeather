@@ -200,7 +200,8 @@ export async function answer(text: string): Promise<string> {
       return A.recalculating;
 
     case 'alternatives': {
-      const n = s.mode === 'planning' ? s.routeOptions.length - 1 : 0;
+      // Planning: the other roads offered. Driving: the ones the car can still take from here.
+      const n = s.mode === 'planning' ? s.routeOptions.length - 1 : s.derived.otherRoads.length;
       if (n > 0) s.setSheet('expanded');
       return A.alternatives(n);
     }

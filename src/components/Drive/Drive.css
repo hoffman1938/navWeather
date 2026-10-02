@@ -477,6 +477,47 @@
   gap: 16px;
 }
 
+/* Other roads the car can still take: name + button on top, the forecast across the full width below. */
+.oroad {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+}
+.oroad__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.oroad__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.oroad__name {
+  font-weight: 600;
+}
+.oroad__meta {
+  font-size: 14px;
+  color: var(--text-2);
+}
+.oroad__delta {
+  white-space: nowrap;
+}
+.oroad__wx {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.oroad__head > .btn {
+  flex: none;
+  max-width: 45%;
+  white-space: normal;
+  text-align: right;
+  line-height: 1.2;
+}
+
 /* Arrival: trip summary */
 .arrive-head {
   display: grid;

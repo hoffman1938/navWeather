@@ -1,4 +1,5 @@
 import { localizeScript } from '../i18n/script';
+import { otherDistinctRoutes, selectDistinctRoutes } from '../algorithms/routeAlternatives';
 import { snapPlacesToRoute } from '../algorithms/placesAlongRoute';
 import { nameSamples, refineSamplesForWeather, mergeSamples, sampleRoute } from '../algorithms/routeSampling';
 import { buildTimedRoute, positionAtDistance } from '../algorithms/routeTiming';
@@ -73,6 +74,8 @@ export interface PlanOptions {
   avoid?: AvoidOption[];
   /** Language for place names along the route. */
   language?: string;
+  /** Most roads to offer, the best one included (default: config). */
+  maxRoutes?: number;
 }
 
 export interface RouteOptionsResult {
@@ -105,7 +108,9 @@ export async function planRouteOptions(
     avoid: options.avoid,
     signal,
   });
-  const localized = routes.map((r) => localizeRouteNames(r, options.language ?? 'en'));
+  // Only genuinely different roads: routers return near-copies of the best route.
+  const distinct = selectDistinctRoutes(routes, { max: options.alternatives ? (options.maxRoutes ?? config.routing.maxRoutes) : 1 });
+  const localized = distinct.map((r) => localizeRouteNames(r, options.language ?? 'en'));
   const withTraffic = await Promise.all(localized.map((r) => providers.traffic.applyTraffic(r, signal)));
   onStage?.('places');
   const primary = await enrichRoute(providers, withTraffic[0], {
@@ -115,6 +120,32 @@ export async function planRouteOptions(
   });
   const alternatives = withTraffic.slice(1).map((r) => basicPlan(buildTimedRoute(r)));
   return { primary, alternatives };
+}
+
+/**
+ * Roads from `origin` to the destination that are really different from
+ * `reference` (the road already taken): timed + sampled only, with place
+ * names and elevation added when one is chosen. Used while driving, after the
+ * driver turned onto a new road.
+ */
+export async function planOtherRoads(
+  providers: Providers,
+  origin: Place,
+  destination: Place,
+  options: { reference: Route; signal?: AbortSignal; startBearingDeg?: number; language?: string; maxRoads?: number },
+): Promise<PlannedRoute[]> {
+  const { signal } = options;
+  const routes = await providers.routing.calculateRoutes({
+    origin,
+    destination,
+    startBearingDeg: options.startBearingDeg,
+    alternatives: true,
+    signal,
+  });
+  const others = otherDistinctRoutes(options.reference, routes, { max: options.maxRoads ?? Math.max(0, config.routing.maxRoutes - 1) });
+  const localized = others.map((r) => localizeRouteNames(r, options.language ?? 'en'));
+  const withTraffic = await Promise.all(localized.map((r) => providers.traffic.applyTraffic(r, signal)));
+  return withTraffic.map((r) => basicPlan(buildTimedRoute(r)));
 }
 
 /** Single best route (navigation re-routes, tests). */
@@ -153,10 +184,16 @@ export function basicPlan(timed: TimedRoute): PlannedRoute {
 export async function enrichRoute(
   providers: Providers,
   route: Route,
-  options: { signal?: AbortSignal; placesDeadlineMs?: number; language?: string } = {},
+  options: {
+    signal?: AbortSignal;
+    placesDeadlineMs?: number;
+    language?: string;
+    /** Keep this timed route (same object) instead of building a new one — work tied to it stays valid. */
+    timed?: TimedRoute;
+  } = {},
 ): Promise<PlannedRoute> {
   const { signal } = options;
-  const timed = buildTimedRoute(route);
+  const timed = options.timed ?? buildTimedRoute(route);
   const warnings: string[] = [];
   const totalKm = timed.totalDistM / 1000;
   // Places are a nicety (names + anchors) — never let a slow server block the forecast.

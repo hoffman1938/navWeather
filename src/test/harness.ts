@@ -6,6 +6,7 @@ import type { RouteRequest, RoutingProvider } from '../services/routing/RoutingP
 import { NoIncidentProvider } from '../services/traffic/IncidentProvider';
 import { NoTrafficProvider } from '../services/traffic/TrafficProvider';
 import { WeatherService } from '../services/weather/WeatherService';
+import type { Route } from '../types/route';
 import { haversineM } from '../utils/distance';
 import {
   BATUMI,
@@ -21,6 +22,13 @@ import {
 export interface Harness {
   weather: FakeWeatherProvider;
   routingCalls: RouteRequest[];
+  /**
+   * Other roads the fake router returns after the best one, for requests
+   * that start in Tbilisi and ask for alternatives (empty by default).
+   */
+  alternativeRoads: Route[];
+  /** Other roads the fake router offers from a re-route origin (when alternatives are asked for). */
+  rerouteAlternatives: ((req: RouteRequest) => Route[]) | null;
   tts: FakeTTS;
   recognition: FakeRecognition;
   poi: { calls: number; results: Poi[] };
@@ -31,6 +39,7 @@ export interface Harness {
 export function installFakeProviders(baseMs: number): Harness {
   const weather = new FakeWeatherProvider(baseMs);
   const routingCalls: RouteRequest[] = [];
+  const alternativeRoads: Route[] = [];
   const tts = new FakeTTS();
   const recognition = new FakeRecognition();
   const poiState = { calls: 0, results: [] as Poi[] };
@@ -40,7 +49,7 @@ export function installFakeProviders(baseMs: number): Harness {
     capabilities: { alternatives: false, avoid: [], laneGuidance: true, matrix: true, multiStop: true },
     async calculateRoutes(req) {
       routingCalls.push(req);
-      if (req.origin.id === TBILISI.id) return [tbilisiBatumiRoute()];
+      if (req.origin.id === TBILISI.id) return [tbilisiBatumiRoute(), ...(req.alternatives ? alternativeRoads : [])];
       // Re-route: remainder of the fixture from the vertex closest to the origin.
       const raw = rawTbilisiBatumi();
       const coords = raw.geometry.coordinates;
@@ -66,7 +75,7 @@ export function installFakeProviders(baseMs: number): Harness {
           },
         ],
       };
-      return [normalizeOsrmRoute(sliced, req)];
+      return [normalizeOsrmRoute(sliced, req), ...(req.alternatives && harness.rerouteAlternatives ? harness.rerouteAlternatives(req) : [])];
     },
     // Detour: straight-line distance at 15 m/s (deterministic).
     async travelMatrix(sources, destinations) {
@@ -122,5 +131,6 @@ export function installFakeProviders(baseMs: number): Harness {
     speechRecognition: recognition,
   };
   setProviders(providers);
-  return { weather, routingCalls, tts, recognition, poi: poiState, providers };
+  const harness: Harness = { weather, routingCalls, alternativeRoads, rerouteAlternatives: null, tts, recognition, poi: poiState, providers };
+  return harness;
 }

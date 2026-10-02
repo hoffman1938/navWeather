@@ -58,6 +58,7 @@ If you point any of these at another host, add that host to `connect-src` in
 | `VITE_WEATHER_MIN_FORECAST_HOURS` | `48` | minimum horizon requested |
 | `VITE_WEATHER_UPDATE_CHECK_MINUTES` | `10` | how often to check for a new model run |
 | `VITE_OPEN_METEO_UPDATE_MODELS` | `ecmwf_ifs025,dwd_icon,ncep_gfs025` | models whose run times are checked |
+| `VITE_ROUTE_OPTIONS_MAX` | `3` | roads offered to choose from, the best included (1–4); OSRM is asked for that many alternatives so the distinct-road filter has spares |
 | `VITE_SAMPLE_MAX_INTERVAL_MINUTES` | `45` | max driving time between weather samples |
 | `VITE_SAMPLE_MAX_REFINEMENT_POINTS` | `10` | extra samples where weather changes |
 | `VITE_OFF_ROUTE_MIN_THRESHOLD_M` / `_MAX_` | `30` / `100` | off-route distance range |

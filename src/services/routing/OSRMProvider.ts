@@ -69,18 +69,37 @@ export class OSRMProvider implements RoutingProvider {
       matrix: true,
       multiStop: true,
     },
+    /**
+     * Alternatives to ask for. `alternatives=true` yields at most ONE, so a
+     * trip like Batumi → Tbilisi would never show more than two roads.
+     */
+    private maxAlternatives = 3,
   ) {}
 
   async calculateRoutes(req: RouteRequest): Promise<Route[]> {
     const points = [req.origin, ...(req.waypoints ?? []), req.destination];
+    // OSRM only computes alternatives for two-point requests.
+    const wantsAlternatives = !!req.alternatives && this.capabilities.alternatives && points.length === 2;
+    const count = wantsAlternatives ? Math.max(1, Math.round(this.maxAlternatives)) : 0;
+    try {
+      return await this.request(req, points, count > 1 ? String(count) : count === 1 ? 'true' : 'false');
+    } catch (e) {
+      // Older self-hosted OSRM only understands true/false: retry rather than lose the trip.
+      if (count > 1 && e instanceof ProviderError && e.kind === 'http' && e.status === 400) {
+        return this.request(req, points, 'true');
+      }
+      throw e;
+    }
+  }
+
+  private async request(req: RouteRequest, points: RouteRequest['origin'][], alternatives: string): Promise<Route[]> {
     const coords = points.map((p) => coordParam(p.coordinate)).join(';');
     const params = new URLSearchParams({
       overview: 'full',
       geometries: 'geojson',
       steps: 'true',
       annotations: 'duration,distance',
-      // OSRM only computes alternatives for two-point requests.
-      alternatives: req.alternatives && this.capabilities.alternatives && points.length === 2 ? 'true' : 'false',
+      alternatives,
     });
     if (req.startBearingDeg !== undefined && Number.isFinite(req.startBearingDeg)) {
       params.set('bearings', [`${Math.round(req.startBearingDeg) % 360},60`, ...points.slice(1).map(() => '')].join(';'));

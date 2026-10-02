@@ -81,6 +81,10 @@ export const config = {
     updateCheckMinutes: num('VITE_WEATHER_UPDATE_CHECK_MINUTES', 10),
     openMeteoUpdateModels: list('VITE_OPEN_METEO_UPDATE_MODELS', ['ecmwf_ifs025', 'dwd_icon', 'ncep_gfs025']),
   },
+  routing: {
+    /** Roads offered to choose from (the best one included), each with its own forecast. */
+    maxRoutes: Math.max(1, Math.min(4, Math.round(num('VITE_ROUTE_OPTIONS_MAX', 3)))),
+  },
   sampling: {
     maxIntervalMinutes: num('VITE_SAMPLE_MAX_INTERVAL_MINUTES', 45),
     /** Extra points added between samples whose weather differs a lot. */

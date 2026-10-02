@@ -14,6 +14,7 @@ import { ElevationProfile } from '../Plan/ElevationProfile';
 import { TimeScrubber } from '../TimeScrubber/TimeScrubber';
 import { WeatherStrip } from '../WeatherStrip/WeatherStrip';
 import { AheadList } from './AheadList';
+import { OtherRoads } from './OtherRoads';
 import './Drive.css';
 
 /** Driving: ETA bar + the next important thing; "Ahead" when pulled up. */
@@ -29,6 +30,7 @@ export function DriveSheet() {
       body={<AheadList />}
       extra={
         <div className="drive-extra">
+          <OtherRoads />
           <WeatherStrip />
           <ElevationProfile />
           <TimeScrubber />

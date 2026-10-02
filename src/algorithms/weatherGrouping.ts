@@ -216,6 +216,15 @@ export function selectDisplayPoints(
 
 /** Route stretches with notable weather, for subtle coloring of the route line. */
 export function weatherRouteSegments(points: RouteWeatherPoint[], totalDistM: number): WeatherRouteSegment[] {
+  return weatherRibbon(points, totalDistM).filter((s) => isNotableClass(s.groupClass));
+}
+
+/**
+ * The whole route as consecutive stretches by weather class — clear and
+ * cloudy included — covering every point that has a forecast; each point
+ * speaks for the half-way marks to its neighbours.
+ */
+export function weatherRibbon(points: RouteWeatherPoint[], totalDistM: number): WeatherRouteSegment[] {
   const pts = points.filter(hasWeather);
   const out: WeatherRouteSegment[] = [];
   pts.forEach((p, i) => {
@@ -229,7 +238,7 @@ export function weatherRouteSegments(points: RouteWeatherPoint[], totalDistM: nu
     if (last && last.groupClass === cls && Math.abs(last.endM - startM) < 1) last.endM = endM;
     else out.push({ startM, endM, groupClass: cls });
   });
-  return out.filter((s) => isNotableClass(s.groupClass));
+  return out;
 }
 
 /** One-glance summary: headline + per-stretch highlights. */
