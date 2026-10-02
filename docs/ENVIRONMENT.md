@@ -31,6 +31,7 @@ Worker route instead (see `worker/`).
 | --- | --- |
 | `VITE_OSRM_BASE_URL` | `https://router.project-osrm.org` |
 | `VITE_OSRM_FOOT_URL` / `VITE_OSRM_BIKE_URL` | `https://routing.openstreetmap.de/routed-foot` / `…/routed-bike` (walking and cycling; the demo server above only does cars) |
+| `VITE_TRANSIT_URL` | `https://api.transitous.org` (public transport, MOTIS `plan` API; set empty to switch public transport off) |
 | `VITE_OPEN_METEO_BASE_URL` | `https://api.open-meteo.com` |
 | `VITE_OPEN_METEO_AIR_URL` | `https://air-quality-api.open-meteo.com` |
 | `VITE_NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` |

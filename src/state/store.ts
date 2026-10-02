@@ -22,7 +22,7 @@ import {
 } from '../intelligence/driverAlerts';
 import { dueManeuverPrompt, markSpoken, spokenPrompt } from '../navigation/instructions';
 import { computeGuidance, type Guidance } from '../navigation/maneuvers';
-import { isAbortError, mapWithConcurrency } from '../services/http';
+import { isAbortError, mapWithConcurrency, ProviderError } from '../services/http';
 import type { IncidentKind } from '../services/traffic/IncidentProvider';
 import { reportFailure, reportToIncident } from '../services/traffic/ReportsIncidentProvider';
 import type { ReportKind, Vote } from '../reports/protocol';
@@ -416,6 +416,11 @@ function departureMsOf(s: Pick<AppState, 'departure' | 'clockMs'>): number {
   return s.departure.mode === 'now' ? s.clockMs : s.departure.utcMs;
 }
 
+/** When the trip on screen starts: a public-transport trip at its timetabled time, anything else when you leave. */
+function tripStartMs(s: Pick<AppState, 'departure' | 'clockMs' | 'plan'>): number {
+  return s.plan?.timed.route.transit?.departMs ?? departureMsOf(s);
+}
+
 /** The providers for the trip's travel mode (its router; no road data for a flight). The car's when the mode has none. */
 function routeProviders() {
   return providersForMode(getProviders(), useAppStore.getState().travelMode) ?? getProviders();
@@ -441,7 +446,7 @@ function derive(s: AppState): Derived {
     knownRoads: s.mode === 'planning' ? [] : s.routeOptions,
     forecastFor: lookupFor(s.forecasts),
     mode: s.mode,
-    departureMs: navigating && s.navStartedMs !== null ? s.navStartedMs : departureMsOf(s),
+    departureMs: navigating && s.navStartedMs !== null ? s.navStartedMs : tripStartMs(s),
     nowMs: clockNow(s),
     progress: navigating ? s.progress : null,
     vehicleCoordinate: s.vehicle?.coordinate ?? null,
@@ -553,6 +558,11 @@ export const useAppStore = create<AppState>()(
     setDeparture: (departure) => {
       set({ departure, clockMs: Date.now() });
       const s = get();
+      // Public transport runs to a timetable: another departure time is another trip, not the same one later.
+      if (s.mode === 'planning' && s.plan?.timed.route.transit) {
+        void get().calculateRoute();
+        return;
+      }
       if (s.mode === 'planning') set({ derived: derive(s) });
       if (s.plan) void get().loadWeather({ reason: 'auto' });
     },
@@ -578,8 +588,8 @@ export const useAppStore = create<AppState>()(
         set({ routeStatus: 'error', routeError: empty(get().origin) ? m.ui.enterStart : m.ui.enterDestination });
         return;
       }
-      if (get().travelMode === 'transit') {
-        // No free worldwide timetable data: say so, and show no road trip under a public-transport label.
+      if (!providersForMode(getProviders(), get().travelMode)) {
+        // Public transport switched off (no timetable service configured): say so, and show no road trip under its label.
         get().clearRoute();
         set({ routeStatus: 'error', routeError: m.travel.transitUnavailable });
         return;
@@ -624,6 +634,7 @@ export const useAppStore = create<AppState>()(
           waypoints,
           alternatives: true,
           language: m.locale,
+          departAtMs: departureMsOf({ departure: get().departure, clockMs: Date.now() }),
           onStage: (stage) => set({ routeStatus: stage }),
         });
         if (ctrl.signal.aborted) return;
@@ -666,7 +677,11 @@ export const useAppStore = create<AppState>()(
             ? tripLocationErrorText(e.kind)
             : (e as Error)?.message === 'same-place'
               ? m.ui.samePlace
-              : describeError(e, m.ui.unableRoute, m);
+              : e instanceof ProviderError && e.kind === 'no-route' && get().travelMode === 'transit'
+                ? m.travel.transitNone
+                : describeError(e, m.ui.unableRoute, m);
+        // Nothing found by public transport: no old trip (of another mode) stays on the map under its label.
+        if (get().travelMode === 'transit' && get().plan) get().clearRoute();
         set({ routeStatus: 'error', routeError: msg });
       } finally {
         if (routeAbort === ctrl) routeAbort = null;
@@ -763,6 +778,7 @@ export const useAppStore = create<AppState>()(
       const latestArrival = Math.max(
         s.derived.arrivalMs ?? 0,
         departureMsOf(s) + longest * 1000,
+        ...s.routeOptions.map((o) => o.timed.route.transit?.arriveMs ?? 0),
         s.mode === 'simulating' ? s.sim.nowMs + plan.timed.totalTimeS * 1000 : 0,
       );
       const isCurrent = () => !ctrl.signal.aborted && get().plan?.timed === routeKey;
@@ -802,7 +818,7 @@ export const useAppStore = create<AppState>()(
         if (!current.refined && !lookup.error) {
           const st = get();
           const arrivalById = new Map(st.derived.points.map((p) => [p.id, p.arrivalMs]));
-          const dep = departureMsOf(st);
+          const dep = tripStartMs(st);
           const { plan: refined, lookup: extra } = await refinePlanWithWeather(
             providers,
             current,

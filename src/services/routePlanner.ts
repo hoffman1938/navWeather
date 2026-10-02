@@ -76,6 +76,8 @@ export interface PlanOptions {
   language?: string;
   /** Most roads to offer, the best one included (default: config). */
   maxRoutes?: number;
+  /** When the trip starts (UTC ms): public transport is planned on the timetable from then. */
+  departAtMs?: number;
 }
 
 export interface RouteOptionsResult {
@@ -107,11 +109,15 @@ export async function planRouteOptions(
     startBearingDeg: options.startBearingDeg,
     alternatives: options.alternatives,
     avoid: options.avoid,
+    departAtMs: options.departAtMs,
+    language,
     signal,
   });
-  // Only genuinely different roads: routers return near-copies of the best route.
+  // Only genuinely different roads: routers return near-copies of the best route. Public-transport trips are
+  // different departures and lines, often on the same streets — each is a choice of its own.
   const maxRoutes = options.alternatives ? (options.maxRoutes ?? config.routing.maxRoutes) : 1;
-  const distinct = selectDistinctRoutes(routes, { max: maxRoutes });
+  const timetabled = routes.some((r) => r.transit);
+  const distinct = timetabled ? routes.slice(0, maxRoutes) : selectDistinctRoutes(routes, { max: maxRoutes });
   // Routers often find no alternative at all. Look for more roads in the background, while the best one's
   // place names and elevation load, so choosing between roads costs almost no extra waiting.
   const probing =
@@ -127,7 +133,11 @@ export async function planRouteOptions(
   });
   const viaRoutes = await probing;
   if (signal?.aborted) throw new ProviderError('Request aborted', 'aborted', 'Planner');
-  const others = options.alternatives ? otherDistinctRoutes(distinct[0], [...distinct.slice(1), ...viaRoutes], { max: maxRoutes - 1 }) : [];
+  const others = !options.alternatives
+    ? []
+    : timetabled
+      ? distinct.slice(1)
+      : otherDistinctRoutes(distinct[0], [...distinct.slice(1), ...viaRoutes], { max: maxRoutes - 1 });
   const alternatives = await Promise.all(
     others.map(async (r) => basicPlan(buildTimedRoute(await providers.traffic.applyTraffic(localizeRouteNames(r, language), signal)))),
   );
@@ -234,11 +244,16 @@ export async function planRoute(
   return (await planRouteOptions(providers, origin, destination, { ...options, alternatives: false })).primary;
 }
 
-/** Street names and road numbers in the UI's script (OSM often has Georgian only). */
+/** Street names, road numbers and stop / headsign names in the UI's script (OSM and GTFS often have Georgian only). */
 export function localizeRouteNames(route: Route, language: string): Route {
   const fix = (s?: string) => (s ? localizeScript(s, language) : s);
+  const transit = route.transit && {
+    ...route.transit,
+    legs: route.transit.legs.map((l) => ({ ...l, fromName: fix(l.fromName) ?? '', toName: fix(l.toName) ?? '', headsign: fix(l.headsign) })),
+  };
   return {
     ...route,
+    ...(transit ? { transit } : {}),
     legs: route.legs.map((leg) => ({
       ...leg,
       steps: leg.steps.map((st) => ({ ...st, name: fix(st.name) ?? '', ref: fix(st.ref), destinations: fix(st.destinations), rotaryName: fix(st.rotaryName) })),

@@ -49,6 +49,8 @@ export const config = {
     /** OpenStreetMap community routing instances for walking and cycling (the demo server above only does cars). */
     osrmFoot: str('VITE_OSRM_FOOT_URL', 'https://routing.openstreetmap.de/routed-foot'),
     osrmBike: str('VITE_OSRM_BIKE_URL', 'https://routing.openstreetmap.de/routed-bike'),
+    /** Public transport: Transitous (MOTIS) over operators' open timetables. Empty turns public transport off. */
+    transit: env.VITE_TRANSIT_URL === '' ? '' : str('VITE_TRANSIT_URL', 'https://api.transitous.org'),
     openMeteo: str('VITE_OPEN_METEO_BASE_URL', 'https://api.open-meteo.com'),
     openMeteoAir: str('VITE_OPEN_METEO_AIR_URL', 'https://air-quality-api.open-meteo.com'),
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),

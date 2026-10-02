@@ -15,6 +15,7 @@ import { DepartureChart, DepartureTip } from './DeparturePlanner';
 import { ElevationProfile } from './ElevationProfile';
 import { DepartureSelector } from './DepartureSelector';
 import { RouteOptions } from './RouteOptions';
+import { TRANSIT_SOURCES_URL, TransitOptions, TransitSteps } from './TransitTrip';
 import { TravelModeBar } from './TravelModeBar';
 import { NAVIGABLE_MODES } from '../../types/travel';
 import { ResumeDrive, takeResumableDrive } from './ResumeDrive';
@@ -32,6 +33,7 @@ export function PlanSheet() {
   const routeStatus = useAppStore((s) => s.routeStatus);
   const sheet = useAppStore((s) => s.sheet);
   const destination = useAppStore((s) => s.plan?.timed.route.destination.name ?? '');
+  const transit = useAppStore((s) => !!s.plan?.timed.route.transit);
   const m = useMessages();
 
   if (!hasPlan) {
@@ -64,7 +66,7 @@ export function PlanSheet() {
       header={<RouteHeader />}
       body={
         <>
-          <RouteOptions />
+          {transit ? <TransitOptions /> : <RouteOptions />}
           <WeatherHeadline />
           <DepartureTip />
           <WeatherStrip />
@@ -72,6 +74,7 @@ export function PlanSheet() {
       }
       extra={
         <div className="plan-extra">
+          <TransitSteps />
           <DepartureChart />
           <HeadsUp />
           <ElevationProfile />
@@ -134,6 +137,13 @@ function RouteHeader() {
             {arrivalMs ? ` · ${m.ui.arrive(formatLocalTime(arrivalMs, destTz))}` : ''}
           </p>
           {travelMode === 'flight' ? <p className="rhead__note">{m.travel.flightNote}</p> : null}
+          {route.transit ? (
+            <p className="rhead__note">
+              <a href={TRANSIT_SOURCES_URL} target="_blank" rel="noopener noreferrer">
+                {m.transit.sources}
+              </a>
+            </p>
+          ) : null}
           <DepartureSelector />
         </div>
         {navigable ? (
@@ -148,7 +158,7 @@ function RouteHeader() {
             </button>
           </div>
         ) : (
-          <p className="rhead__note">{m.travel.flightPlanOnly}</p>
+          <p className="rhead__note">{route.transit ? m.transit.planOnly : m.travel.flightPlanOnly}</p>
         )}
       </div>
     </>

@@ -555,12 +555,41 @@ export const en = {
     bike: 'Bicycle',
     transit: 'Public transport',
     flight: 'Flight',
-    transitUnavailable:
-      "Public transport isn't available yet: it needs timetable data, and there is no free source for it. Pick another way to travel, or use a local transport app.",
+    transitUnavailable: 'Public transport is switched off here: no timetable service is set up. Pick another way to travel.',
+    transitNone:
+      'No public transport found for this trip at this time. Timetables come from operators that publish them openly, and this area may not be covered.',
     transitLink: 'Check timetables in Google Maps',
     flightNote: 'Straight-line estimate — no airports, schedules or prices.',
     flightPlanOnly: 'A flight is a plan only; turn-by-turn is for car, walking and bicycle.',
   } as Record<string, string>,
+
+  transit: {
+    planOnly: 'A public-transport trip is a plan: follow the stops below. Turn-by-turn is for car, walking and bicycle.',
+    sources: 'Timetables: Transitous and its sources',
+    steps: 'Step by step',
+    change: 'Change here',
+    walk: 'Walk',
+    times: (from: string, to: string) => `${from} – ${to}`,
+    leaveFrom: (time: string, stop: string) => `${time} from ${stop}`,
+    transfers: (n: number) => (n === 0 ? 'no transfers' : n === 1 ? '1 transfer' : `${n} transfers`),
+    stops: (n: number) => (n === 1 ? '1 stop' : `${n} stops`),
+    toward: (headsign: string) => `towards ${headsign}`,
+    walkTo: (place: string) => (place ? `to ${place}` : 'to your destination'),
+    live: 'live times',
+    vehicle: {
+      walk: 'Walk',
+      bus: 'Bus',
+      tram: 'Tram',
+      subway: 'Metro',
+      rail: 'Train',
+      ferry: 'Ferry',
+      cable: 'Cable car',
+      plane: 'Flight',
+      other: 'Transit',
+    } as Record<string, string>,
+    data: 'Timetables',
+    dataDetail: 'published by operators, via Transitous',
+  },
 
   location: {
     show: 'Show my location',
@@ -699,6 +728,7 @@ export const en = {
     status: {
       forecast: 'Forecast',
       estimated: 'Estimated',
+      scheduled: 'Scheduled',
       stale: 'Stale',
       unavailable: 'Not available',
       simulated: 'Simulated',

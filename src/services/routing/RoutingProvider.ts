@@ -20,6 +20,10 @@ export interface RouteRequest {
   alternatives?: boolean;
   /** Only options listed in `capabilities.avoid` may be passed. */
   avoid?: AvoidOption[];
+  /** When the trip starts (UTC ms). Timetabled routers (public transport) need it; road routers ignore it. */
+  departAtMs?: number;
+  /** Language for names the router gives (stops); road routers ignore it. */
+  language?: string;
   signal?: AbortSignal;
 }
 

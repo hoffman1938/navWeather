@@ -128,9 +128,11 @@ describe('announcement timing', () => {
     expect(navigationZoom(null, 10)).toBeGreaterThan(navigationZoom(null, 30));
   });
 
-  it('auto-zoom is close enough to read the road, even at highway speed', () => {
-    expect(navigationZoom(null, 30)).toBeGreaterThanOrEqual(14.75); // was 13.25: a regional map
-    expect(navigationZoom(null, 8)).toBeGreaterThanOrEqual(16);
-    expect(navigationZoom(150, 30)).toBeGreaterThan(16);
+  it('auto-zoom is street level like a phone navigation app, even at highway speed', () => {
+    expect(navigationZoom(null, 30)).toBeGreaterThanOrEqual(15.5); // was 13.25, then 14.75: too far out
+    expect(navigationZoom(null, 8)).toBeGreaterThanOrEqual(17);
+    expect(navigationZoom(null, 1.4)).toBeGreaterThanOrEqual(17); // walking
+    expect(navigationZoom(150, 8)).toBeGreaterThanOrEqual(17.75);
+    expect(navigationZoom(150, 30)).toBeGreaterThan(17);
   });
 });

@@ -17,7 +17,8 @@ function useDeparturePlan(): { plan: DeparturePlan | null; tz: string } {
   const slot = useAppStore((s) => Math.floor(s.clockMs / SLOT));
   const tz = useAppStore((s) => s.derived.points[0]?.timezone ?? deviceTimeZone());
   const plan = useMemo(() => {
-    if (!route || forecasts.size === 0) return null;
+    // Public transport keeps to a timetable: leaving later is another trip, not this one shifted — no comparison.
+    if (!route || forecasts.size === 0 || route.timed.route.transit) return null;
     const now = slot * SLOT;
     const chosen = departure.mode === 'at' ? departure.utcMs : Date.now();
     return planDepartures(route.samples, route.timed.totalTimeS, forecastLookupFn(getProviders(), forecasts), chosen, now);

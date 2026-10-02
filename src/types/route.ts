@@ -82,6 +82,45 @@ export interface Route {
   segmentSource: TimingSource;
   bbox: BBox;
   computedAt: number;
+  /** A public-transport trip: timetabled, so it starts at a set time (not whenever you leave). */
+  transit?: TransitTrip;
+}
+
+/** What a public-transport leg is ridden in ('walk': on foot between stops). */
+export type TransitVehicle = 'walk' | 'bus' | 'tram' | 'subway' | 'rail' | 'ferry' | 'cable' | 'plane' | 'other';
+
+/** One part of a public-transport trip: a walk, or one ride on one line. */
+export interface TransitLeg {
+  vehicle: TransitVehicle;
+  /** Line as signed ("476", "M1"); none for a walk. */
+  line?: string;
+  /** Line colours from the timetable ("#0033b4"), when it has them. */
+  color?: string;
+  textColor?: string;
+  /** Where the vehicle is heading, as shown on it. */
+  headsign?: string;
+  agency?: string;
+  fromName: string;
+  toName: string;
+  /** UTC ms. */
+  departMs: number;
+  arriveMs: number;
+  distanceM: number;
+  /** Stops ridden (the one you get off at included); 0 for a walk. */
+  stops: number;
+  /** Times include live delays from the operator. */
+  realTime: boolean;
+  /** Geometry vertex range of this leg. */
+  fromIndex: number;
+  toIndex: number;
+}
+
+export interface TransitTrip {
+  /** When the trip starts (the walk to the first stop) and ends, UTC ms. */
+  departMs: number;
+  arriveMs: number;
+  transfers: number;
+  legs: TransitLeg[];
 }
 
 /**

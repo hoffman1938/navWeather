@@ -3,13 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setProviders } from '../../services/providers';
 import { useSettings } from '../../state/settings';
 import { __resetStoreRuntime, useAppStore } from '../../state/store';
-import { installFakeProviders } from '../../test/harness';
+import { installFakeProviders, type Harness } from '../../test/harness';
 import { SearchPanel, transitTimetablesUrl } from '../Search/SearchPanel';
 import { PlanSheet } from './PlanSheet';
 import { TravelModeBar } from './TravelModeBar';
 
 const BASE = Date.UTC(2026, 8, 26, 4, 0);
 const initial = useAppStore.getState();
+let harness: Harness;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -18,7 +19,7 @@ beforeEach(() => {
   useAppStore.setState(initial, true);
   useSettings.getState().reset();
   useSettings.getState().update({ language: 'en' });
-  installFakeProviders(BASE);
+  harness = installFakeProviders(BASE);
 });
 
 afterEach(() => {
@@ -81,11 +82,37 @@ describe('the plan header per mode', () => {
 });
 
 describe('public transport', () => {
-  it('explains plainly that it is not available, and offers timetables elsewhere (a link, opened only if tapped)', async () => {
-    await plan();
+  it('shows the trips found: times, the lines to take, each step — a plan, with the timetables credited', async () => {
     useAppStore.getState().setTravelMode('transit');
+    await plan();
+    useAppStore.getState().setSheet('expanded'); // the steps and data sources are in the pulled-up sheet
+    render(<PlanSheet />);
+    const options = screen.getAllByRole('radio').filter((r) => r.className.includes('ropt'));
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveAttribute('aria-checked', 'true');
+    expect(options[0].textContent).toMatch(/871/);
+    expect(options[0].textContent).toMatch(/from Tbilisi Central/);
+    expect(options[0].textContent).toMatch(/no transfers/);
+    expect(options[1].textContent).toMatch(/873/);
+    // Step by step: walk, board, ride, get off.
+    expect(screen.getByText('Step by step')).toBeInTheDocument();
+    expect(screen.getByText(/towards Batumi/)).toBeInTheDocument();
+    expect(screen.getByText(/2 stops/)).toBeInTheDocument();
+    // A plan only, and the timetable sources are linked (Transitous' terms).
+    expect(screen.getByText(/public-transport trip is a plan/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Start/ })).toBeNull();
+    expect(screen.getByRole('link', { name: /Transitous/ })).toHaveAttribute('href', 'https://transitous.org/sources/');
+    // No "when to leave" comparison: leaving later is another trip on the timetable.
+    expect(screen.queryByText('When to leave')).toBeNull();
+  });
+
+  it('when nothing is found, says so plainly and offers timetables elsewhere (a link, opened only if tapped)', async () => {
+    await plan();
+    harness.transit.found = false;
+    useAppStore.getState().setTravelMode('transit');
+    await vi.waitFor(() => expect(useAppStore.getState().routeStatus).toBe('error'));
     render(<SearchPanel />);
-    expect(screen.getByRole('alert').textContent).toMatch(/Public transport isn't available/);
+    expect(screen.getByRole('alert').textContent).toMatch(/No public transport found/);
     const link = screen.getByRole('link', { name: 'Check timetables in Google Maps' });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link.getAttribute('rel')).toContain('noopener');

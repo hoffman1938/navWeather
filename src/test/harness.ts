@@ -1,6 +1,8 @@
 import { normalizeOsrmRoute } from '../services/routing/OSRMProvider';
 import { StyleUrlMapProvider } from '../services/map/MapProvider';
 import { FlightEstimateProvider } from '../services/routing/FlightEstimateProvider';
+import { motisToRoutes, type MotisItinerary } from '../services/routing/TransitousProvider';
+import { ProviderError } from '../services/http';
 import type { Poi, PoiProvider } from '../services/places/PoiProvider';
 import { setProviders, type Providers } from '../services/providers';
 import type { RouteRequest, RoutingProvider } from '../services/routing/RoutingProvider';
@@ -23,8 +25,10 @@ import {
 export interface Harness {
   weather: FakeWeatherProvider;
   routingCalls: RouteRequest[];
-  /** Requests the fake walking / bicycle routers received (the car router's are in `routingCalls`). */
-  modeCalls: Record<'walk' | 'bike', RouteRequest[]>;
+  /** Requests the fake walking / bicycle / public-transport routers received (the car router's are in `routingCalls`). */
+  modeCalls: Record<'walk' | 'bike' | 'transit', RouteRequest[]>;
+  /** Whether the fake timetable has a trip for the request (false: "no public transport found"). */
+  transit: { found: boolean };
   /**
    * Other roads the fake router returns after the best one, for requests
    * that start in Tbilisi and ask for alternatives (empty by default).
@@ -43,7 +47,53 @@ export function installFakeProviders(baseMs: number): Harness {
   const weather = new FakeWeatherProvider(baseMs);
   const routingCalls: RouteRequest[] = [];
   const alternativeRoads: Route[] = [];
-  const modeCalls: Harness['modeCalls'] = { walk: [], bike: [] };
+  const modeCalls: Harness['modeCalls'] = { walk: [], bike: [], transit: [] };
+  const transitState = { found: true };
+  /**
+   * A fake timetable: a train leaves the station near the start 17 min after the requested time and an hour
+   * later, a 5-min walk at each end. Times follow `departAtMs`, as a real timetable's would.
+   */
+  const transitRouter: RoutingProvider = {
+    name: 'fake-transit',
+    capabilities: { alternatives: true, avoid: [], laneGuidance: false, matrix: false, multiStop: false },
+    async calculateRoutes(req) {
+      modeCalls.transit.push(req);
+      if (!transitState.found) throw new ProviderError('No public transport found', 'no-route', 'fake-transit');
+      const at = req.departAtMs ?? Date.now();
+      const iso = (ms: number) => new Date(ms).toISOString();
+      const [olon, olat] = req.origin.coordinate;
+      const [dlon, dlat] = req.destination.coordinate;
+      const stationA = { name: 'Tbilisi Central', lat: olat + 0.004, lon: olon };
+      const stationB = { name: 'Batumi Central', lat: dlat + 0.004, lon: dlon };
+      const trip = (leave: number, line: string, rideMin: number): MotisItinerary => {
+        const board = leave + 5 * 60_000;
+        const off = board + rideMin * 60_000;
+        return {
+          startTime: iso(leave),
+          endTime: iso(off + 5 * 60_000),
+          transfers: 0,
+          legs: [
+            { mode: 'WALK', from: { name: 'START', lat: olat, lon: olon }, to: stationA, startTime: iso(leave), endTime: iso(board), distance: 450 },
+            {
+              mode: 'REGIONAL_RAIL',
+              from: stationA,
+              to: stationB,
+              startTime: iso(board),
+              endTime: iso(off),
+              routeShortName: line,
+              routeColor: 'c62828',
+              routeTextColor: 'ffffff',
+              headsign: 'Batumi',
+              intermediateStops: [{ name: 'Kutaisi', lat: 42.27, lon: 42.7 }],
+            },
+            { mode: 'WALK', from: stationB, to: { name: 'END', lat: dlat, lon: dlon }, startTime: iso(off), endTime: iso(off + 5 * 60_000), distance: 450 },
+          ],
+        };
+      };
+      const routes = motisToRoutes({ itineraries: [trip(at + 12 * 60_000, '871', 320), trip(at + 72 * 60_000, '873', 300)] }, req);
+      return req.alternatives ? routes : routes.slice(0, 1);
+    },
+  };
   /** The fixture road, `factor` times slower: walking ≈ 9×, a bicycle ≈ 3×. */
   const slowRouter = (key: 'walk' | 'bike', factor: number): RoutingProvider => ({
     name: `fake-${key}`,
@@ -118,7 +168,7 @@ export function installFakeProviders(baseMs: number): Harness {
 
   const providers: Providers = {
     routing,
-    routingByMode: { walk: slowRouter('walk', 9), bike: slowRouter('bike', 3), flight: new FlightEstimateProvider() },
+    routingByMode: { walk: slowRouter('walk', 9), bike: slowRouter('bike', 3), flight: new FlightEstimateProvider(), transit: transitRouter },
     geocoding: {
       name: 'fake-geo',
       async geocode(q) {
@@ -152,6 +202,17 @@ export function installFakeProviders(baseMs: number): Harness {
     speechRecognition: recognition,
   };
   setProviders(providers);
-  const harness: Harness = { weather, routingCalls, modeCalls, alternativeRoads, rerouteAlternatives: null, tts, recognition, poi: poiState, providers };
+  const harness: Harness = {
+    weather,
+    routingCalls,
+    modeCalls,
+    transit: transitState,
+    alternativeRoads,
+    rerouteAlternatives: null,
+    tts,
+    recognition,
+    poi: poiState,
+    providers,
+  };
   return harness;
 }

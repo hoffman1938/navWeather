@@ -26,7 +26,7 @@ export function addRouteLayers(map: MLMap) {
   const beforeId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
   // lineMetrics → line-progress, so the driven part is a gradient stop, not a re-uploaded line.
   if (!map.getSource('route')) map.addSource('route', { type: 'geojson', data: EMPTY_FC, lineMetrics: true });
-  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy', 'cameras', 'hazards', 'incidents', 'alternatives']) {
+  for (const id of ['route-weather', 'endpoints', 'focus', 'pois', 'me-accuracy', 'cameras', 'hazards', 'incidents', 'alternatives', 'transit', 'transit-stops']) {
     if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: EMPTY_FC });
   }
   const lineLayout = { 'line-join': 'round', 'line-cap': 'round' } as const;
@@ -143,6 +143,59 @@ export function addRouteLayers(map: MLMap) {
     },
     beforeId,
   );
+  // Public transport (instead of the route line): walks dotted, each ride in its line's colour, stops as rings.
+  map.addLayer(
+    {
+      id: 'transit-walk',
+      type: 'line',
+      source: 'transit',
+      filter: ['==', ['get', 'walk'], true],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': route,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 9, 3, 14, 5, 17, 7],
+        'line-dasharray': [0, 2],
+      },
+    },
+    beforeId,
+  );
+  map.addLayer(
+    {
+      id: 'transit-ride-casing',
+      type: 'line',
+      source: 'transit',
+      filter: ['!=', ['get', 'walk'], true],
+      layout: lineLayout,
+      paint: { 'line-color': casing, 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 5, 9, 9, 14, 15] },
+    },
+    beforeId,
+  );
+  map.addLayer(
+    {
+      id: 'transit-ride',
+      type: 'line',
+      source: 'transit',
+      filter: ['!=', ['get', 'walk'], true],
+      layout: lineLayout,
+      paint: {
+        'line-color': ['coalesce', ['get', 'color'], route],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 3, 9, 5.5, 14, 10],
+      },
+    },
+    beforeId,
+  );
+  map.addLayer({
+    id: 'transit-stops',
+    type: 'circle',
+    source: 'transit-stops',
+    minzoom: 10,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 15, 6],
+      'circle-color': surface,
+      'circle-stroke-color': ['coalesce', ['get', 'color'], route],
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 15, 3],
+    },
+  });
   map.addLayer({
     id: 'focus-halo',
     type: 'circle',

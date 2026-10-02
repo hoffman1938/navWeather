@@ -22,6 +22,7 @@ import { useSettings } from '../state/settings';
 import type { TravelMode } from '../types/travel';
 import { FlightEstimateProvider } from './routing/FlightEstimateProvider';
 import { OSRMProvider } from './routing/OSRMProvider';
+import { TransitousProvider } from './routing/TransitousProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
 import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
 import { NoIncidentProvider, type IncidentProvider } from './traffic/IncidentProvider';
@@ -72,8 +73,10 @@ export function createProviders(cfg: AppConfig = config): Providers {
   // Walking and cycling: OSM community instances of the same router (no per-edge lane data, no table service assumed).
   const onFoot = (base: string): RoutingProvider =>
     new OSRMProvider(base, 'driving', 20000, { alternatives: true, avoid: [], laneGuidance: false, matrix: false, multiStop: true, via: true }, cfg.routing.maxRoutes);
-  const routingByMode: Providers['routingByMode'] =
+  const routingByMode: NonNullable<Providers['routingByMode']> =
     p.routing === 'osrm' ? { walk: onFoot(e.osrmFoot), bike: onFoot(e.osrmBike), flight: new FlightEstimateProvider() } : { flight: new FlightEstimateProvider() };
+  // Public transport: timetables operators publish, through Transitous (no key). Off when the URL is set empty.
+  if (e.transit) routingByMode.transit = new TransitousProvider(e.transit, cfg.geocoding.language);
 
   const geocoding: GeocodingProvider =
     p.geocoding === 'nominatim'
@@ -183,13 +186,16 @@ export function getProviders(): Providers {
 /**
  * The providers to plan and navigate a trip made `mode`: the same as the
  * app's, with that mode's router. A flight has no places or road data along
- * it. null when the mode has no router (public transport).
+ * it; a bus ride no speed limits or stops for fuel. null when the mode has no
+ * router (public transport switched off).
  */
 export function providersForMode(base: Providers, mode: TravelMode): Providers | null {
   if (mode === 'drive') return base;
   const routing = base.routingByMode?.[mode];
   if (!routing) return null;
-  return mode === 'flight' ? { ...base, routing, places: null, elevation: null, poi: null, speedLimits: null } : { ...base, routing };
+  if (mode === 'flight') return { ...base, routing, places: null, elevation: null, poi: null, speedLimits: null };
+  if (mode === 'transit') return { ...base, routing, poi: null, speedLimits: null };
+  return { ...base, routing };
 }
 
 export function setProviders(p: Providers | null): void {

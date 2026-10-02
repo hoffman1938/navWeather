@@ -101,7 +101,7 @@ that names implementations, chosen by `VITE_*` variables.
 
 | Interface | Default | Notes |
 | --- | --- | --- |
-| `RoutingProvider` per travel mode | car: OSRM demo; walk/bike: OSM community OSRM instances (`routing.openstreetmap.de/routed-foot|bike`); flight: `FlightEstimateProvider`; transit: none | `providersForMode(base, mode)` gives the mode's router (a flight has no places/elevation/road data); `travelMode` lives in the app store |
+| `RoutingProvider` per travel mode | car: OSRM demo; walk/bike: OSM community OSRM instances (`routing.openstreetmap.de/routed-foot|bike`); flight: `FlightEstimateProvider`; transit: `TransitousProvider` (MOTIS `plan` at `api.transitous.org`) | `providersForMode(base, mode)` gives the mode's router (a flight has no places/elevation/road data; transit no POIs or speed limits); `travelMode` lives in the app store |
 | `RoutingProvider` | OSRM demo server | declares capabilities; `avoid` is empty because the demo server rejects `exclude`; asks for `alternatives=3` (plain `true` returns at most one), retrying with `true` if an older server answers 400 |
 | `WeatherProvider` (+ `WeatherService`) | Open-Meteo | batching, cache, stale fallback, model-run checks |
 | `GeocodingProvider` / `AutocompleteProvider` | Nominatim (1 req/s) / Photon | Nominatim forbids autocomplete |
@@ -230,5 +230,13 @@ extras are gated on `travelMode === 'drive'`: speed limits, cameras, curves and
 crossings (`loadDriveExtras`), break reminders and fuel/charging advice (`derive`).
 Only `NAVIGABLE_MODES` (drive, walk, bike) can be started or simulated. A flight is the
 great-circle line with 25 min on the ground + 800 km/h, labelled as an estimate;
-transit has no router and `calculateRoute` reports that plainly. The saved drive
-session remembers the mode so a reload resumes a walk as a walk.
+transit is timetabled: `RouteRequest.departAtMs` asks Transitous for itineraries from
+the chosen departure, each becomes a `Route` with `route.transit` (legs with line,
+colours, stops, times and geometry ranges; a wait at a stop is timed into the leg
+after it, so times along the line end at the timetabled arrival). Every itinerary
+is an option (no distinct-road filtering), `derive` starts each at its own
+`transit.departMs`, a new departure time re-plans, and the "when to leave"
+comparison is off (a later departure is another trip). The map draws transit legs
+instead of the route line (walks dotted, rides in the line colour). No itinerary →
+`no-route` → "no public transport found". `VITE_TRANSIT_URL=` (empty) switches it
+off. The saved drive session remembers the mode so a reload resumes a walk as a walk.

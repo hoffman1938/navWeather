@@ -1,0 +1,706 @@
+{
+ "itineraries": [
+  {
+   "startTime": "2026-10-02T09:58:00Z",
+   "endTime": "2026-10-02T10:57:00Z",
+   "transfers": 2,
+   "legs": [
+    {
+     "mode": "WALK",
+     "startTime": "2026-10-02T09:58:00Z",
+     "endTime": "2026-10-02T10:03:00Z",
+     "realTime": false,
+     "distance": 332.0,
+     "from": {
+      "name": "START",
+      "lat": 41.7234622,
+      "lon": 44.720083
+     },
+     "to": {
+      "name": "Residential Complex \"\"Shatili\"\"",
+      "lat": 41.72560500000001,
+      "lon": 44.71971500000001
+     },
+     "legGeometry": {
+      "points": "ybrqnAi|nhtAd@dK??oGo@??YuF??aLvA??yTvC??wHz@??eV`D??iFh@??aUdC??qS`D??Bl@??w@H??u@H_A]??oAsW??}BR??t@fQ",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "BUS",
+     "startTime": "2026-10-02T10:03:00Z",
+     "endTime": "2026-10-02T10:13:00Z",
+     "realTime": false,
+     "headsign": "სადგურის მოედანი - მინდელის ქ.",
+     "routeShortName": "476",
+     "displayName": "476",
+     "routeColor": "0033b4",
+     "routeTextColor": "ffffff",
+     "agencyName": "Tbilisi Transport Company",
+     "from": {
+      "name": "Residential Complex \"\"Shatili\"\"",
+      "lat": 41.72560500000001,
+      "lon": 44.71971500000001
+     },
+     "to": {
+      "name": "Zurab Zhvania Square",
+      "lat": 41.730965000000005,
+      "lon": 44.76694500000001
+     },
+     "intermediateStops": [
+      {
+       "name": "Public School #128",
+       "lat": 41.72590300000001,
+       "lon": 44.72261400000001
+      },
+      {
+       "name": "Besarion Zhghenti Street",
+       "lat": 41.72617300000001,
+       "lon": 44.725384000000005
+      },
+      {
+       "name": "Public School #126",
+       "lat": 41.726425000000006,
+       "lon": 44.72796
+      },
+      {
+       "name": "Ramaz Chkhikvadze Street",
+       "lat": 41.726788000000006,
+       "lon": 44.73172
+      },
+      {
+       "name": "Irakli Gamrekeli Street",
+       "lat": 41.72713000000001,
+       "lon": 44.73512300000001
+      },
+      {
+       "name": "Komarov School",
+       "lat": 41.72737000000001,
+       "lon": 44.737610000000004
+      },
+      {
+       "name": "Mamia Gurieli Street",
+       "lat": 41.727642,
+       "lon": 44.740326
+      },
+      {
+       "name": "Ferdinand Tavadze Street",
+       "lat": 41.72854600000001,
+       "lon": 44.74345
+      },
+      {
+       "name": "Delisi Street",
+       "lat": 41.729000000000006,
+       "lon": 44.747242
+      },
+      {
+       "name": "Mikheil Asatiani Street",
+       "lat": 41.72937000000001,
+       "lon": 44.750679999999996
+      },
+      {
+       "name": "Akvsenti Megrelidze Street",
+       "lat": 41.72957600000001,
+       "lon": 44.752705000000006
+      },
+      {
+       "name": "Public School #203",
+       "lat": 41.729794000000005,
+       "lon": 44.755226
+      },
+      {
+       "name": "Budapest Street",
+       "lat": 41.730083,
+       "lon": 44.758250000000004
+      },
+      {
+       "name": "Tashkenti Street",
+       "lat": 41.730610000000006,
+       "lon": 44.76348
+      }
+     ],
+     "legGeometry": {
+      "points": "wjvqnA}dnhtAu@gQuKe}Bo@sMeAcTAa@yEkaAg@oKi@cLy@kPqCyj@MyCa@sIMkCW{Fu@iOaAiTgAcTMyB{D{|@a@mJu@gPeAiUoCen@MsDkHy~A}@iRiCwk@iA{V_@gIo@uLy@_QsAeZg@}KsBoc@w@aQm@sM[{GUkFOcDs@gOeE_~@cAuT}Du{@QuDMiCe@qKmFyjAScEeFohAE{@YqHWgGSeEMsCu@sKo@eF_@_Do@eF_AsFyAaHgBcJeDuN_Jo[yLo^qDmNgCkN_CoM_CoLc@iC]qCaCqa@cF}mA{Ai\\QeDK{BcAkTuA}Yo@oNuB}c@c@oJiGirAg@yKsAsYm@aMOaD[kHYyFmAmWcBi^OmDwAqZ}Aa]eAkUmFeiAy@_R]wGc@aJaA{Ts@sPgF_fAeBy^MqCaCch@gAuUe@mJKuB}@}Rm@aNk@oJOkCMkDUwF]eJQqDwBcf@w@qQuBge@oIqmBSmEQsDe@uKOkD_@eImCym@yCeq@_Bw^uBce@gBka@",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "WALK",
+     "startTime": "2026-10-02T10:13:00Z",
+     "endTime": "2026-10-02T10:15:00Z",
+     "realTime": false,
+     "distance": 113.0,
+     "from": {
+      "name": "Zurab Zhvania Square",
+      "lat": 41.730965000000005,
+      "lon": 44.76694500000001
+     },
+     "to": {
+      "name": "Zurab Zhvania Square",
+      "lat": 41.731390000000005,
+      "lon": 44.767803
+     },
+     "legGeometry": {
+      "points": "ox`rnA_mjktAoA}X??YmG??k@{M??oC]yBE??SmD??{BU_Hh@",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "BUS",
+     "startTime": "2026-10-02T10:21:00Z",
+     "endTime": "2026-10-02T10:37:00Z",
+     "realTime": false,
+     "headsign": "სადგურის მოედანი",
+     "routeShortName": "539",
+     "displayName": "539",
+     "routeColor": "0033b4",
+     "routeTextColor": "ffffff",
+     "agencyName": "Tbilisi Transport Company",
+     "from": {
+      "name": "Zurab Zhvania Square",
+      "lat": 41.731390000000005,
+      "lon": 44.767803
+     },
+     "to": {
+      "name": "Davit Aghmashenebeli Alley 12th Kilometer",
+      "lat": 41.784412,
+      "lon": 44.76988
+     },
+     "intermediateStops": [
+      {
+       "name": "Gabriel ISakadze Street",
+       "lat": 41.73424,
+       "lon": 44.769627
+      },
+      {
+       "name": "Iasamani Street",
+       "lat": 41.74862,
+       "lon": 44.77048
+      },
+      {
+       "name": "Ministry of Environmental Protection and Agriculture",
+       "lat": 41.753197,
+       "lon": 44.769653000000005
+      },
+      {
+       "name": "Police Department",
+       "lat": 41.75573000000001,
+       "lon": 44.769040000000004
+      },
+      {
+       "name": "Village Dighomi Lane",
+       "lat": 41.75911000000001,
+       "lon": 44.76856000000001
+      },
+      {
+       "name": "Dighomi Masivi V Block",
+       "lat": 41.766464,
+       "lon": 44.76923800000001
+      },
+      {
+       "name": "Tbilisi City Court",
+       "lat": 41.77211800000001,
+       "lon": 44.76914200000001
+      },
+      {
+       "name": "Giorgi Tereverko Street",
+       "lat": 41.77732,
+       "lon": 44.76899300000001
+      },
+      {
+       "name": "National Enforcement Bureau",
+       "lat": 41.781276999999996,
+       "lon": 44.769527000000004
+      }
+     ],
+     "legGeometry": {
+      "points": "_sarnAedlktAwCTwHY}FgEsDkAaCeByCiBgIeFaS_LaNwHca@aU}FaDmi@y[oKqF[Q{KsEkDgAc@SoDw@iSfBuCHsAIyBMaBY_Bg@{BgAgLmHuIeFuGsCyDiAsEkAaCe@kCa@uCW}J@{TlC{TnEgPpFqNvEoNzAoFLeEJM?}]ZmTp@kFP}g@tByGe@wI}@uIiAeIoAwNmB_Kk@oCIeDIsBh@qy@~QeNbCqK|AkFj@qGh@uLf@yGZaRv@wGPcNXoRBeH]iHq@kQiC{IeBgJyBeSmFoq@_PkEgA_FoA}KeC_K{BsDw@cE{@}KeBgNyBmCc@yAUcLgAeCUsHu@kXqAsEWoIWiBGcMEgV`@_L^{F^qHv@wTfC}m@bIaj@lHqv@|Ku^lF_CZ{JpA{VdDuIxAeYhEgMrB}HlA{KnBuDn@eLbBsNtB}LhBaKtAcDb@cOnBq[~Cwr@~FiXxBmXxAeBLiNn@s\\xA{IHeTTcAB}o@`AoKi@kTsB{Gw@oKmAuGw@kMyA}[sBsUd@eTrA}UP_LIua@w@w^aDkGUoMe@wHWq\\{@gPkAuJoB{YmGgOgBmLwAgGBoHF_JHmPNoRRiDB{JLyDAws@\\qWB}DDaa@ZoWJqb@JiC@er@Te@@{ONsSRiV^aa@d@cfAzAaEB_NHkC@we@Xm\\J}EBwUHaA?kU?aU?eE?}D?wH?{Z?sN?uG[ca@aBmU}@mMwAkHs@_Gm@sLwAuC]iRcBuFq@ee@oGu@KeEs@sEu@mB]wM}Ay^aCwa@kCub@qCqMw@aUk@}^g@",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "WALK",
+     "startTime": "2026-10-02T10:37:00Z",
+     "endTime": "2026-10-02T10:39:00Z",
+     "realTime": false,
+     "distance": 0.0,
+     "from": {
+      "name": "Davit Aghmashenebeli Alley 12th Kilometer",
+      "lat": 41.784412,
+      "lon": 44.76988
+     },
+     "to": {
+      "name": "Davit Aghmashenebeli Alley 12th Kilometer",
+      "lat": 41.784412,
+      "lon": 44.76988
+     },
+     "legGeometry": {
+      "points": "wdiunAodpktA??",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "BUS",
+     "startTime": "2026-10-02T10:41:00Z",
+     "endTime": "2026-10-02T10:52:00Z",
+     "realTime": false,
+     "headsign": "ვაზისუბნის II მ/რ",
+     "routeShortName": "333",
+     "displayName": "333",
+     "routeColor": "00b38b",
+     "routeTextColor": "000000",
+     "agencyName": "Tbilisi Transport Company",
+     "from": {
+      "name": "Davit Aghmashenebeli Alley 12th Kilometer",
+      "lat": 41.784412,
+      "lon": 44.76988
+     },
+     "to": {
+      "name": "Guram Nijaradze Street",
+      "lat": 41.81049699999999,
+      "lon": 44.77211400000001
+     },
+     "intermediateStops": [
+      {
+       "name": "Giorgi Papashvili Street",
+       "lat": 41.789925000000004,
+       "lon": 44.770320000000005
+      },
+      {
+       "name": "Mukhatgverdi Lane",
+       "lat": 41.79554000000001,
+       "lon": 44.770813000000004
+      },
+      {
+       "name": "Grigol Peradze Street",
+       "lat": 41.798683000000004,
+       "lon": 44.770973000000005
+      },
+      {
+       "name": "Kristine Sharashidze Street",
+       "lat": 41.80327,
+       "lon": 44.771446
+      },
+      {
+       "name": "Davit Aghmashenebeli Alley 13th Kilometer",
+       "lat": 41.805298,
+       "lon": 44.77164
+      },
+      {
+       "name": "Khakhuli Street",
+       "lat": 41.807649999999995,
+       "lon": 44.771893
+      }
+     ],
+     "legGeometry": {
+      "points": "wdiunAgcpktAeNQc]iAeOa@uDMskAiEaEQub@_BqaAwBwEM_CIqf@{AyJ[o]eAiNc@qLi@uBKqK_@e^qAcUy@uSu@uO[au@cCiTkA_q@wCqKWgGY_GWsCIkWw@uBGi[_AeDIka@mA}f@gAsEKws@}AoMqJe@]]UWQoCqAuG{CiB[sEMcDhAwB`DoE`Hs@fAoFMm_@{Ak{@{Cme@cCkMo@qF[yb@eCwb@{Bqu@{EyF_@mXsAqd@{BwJe@ak@qCaCKwQy@aT}@iQw@mm@kCme@sBgCMoc@eB}UaAc_BoG_Qa@",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "WALK",
+     "startTime": "2026-10-02T10:52:00Z",
+     "endTime": "2026-10-02T10:57:00Z",
+     "realTime": false,
+     "distance": 279.0,
+     "from": {
+      "name": "Guram Nijaradze Street",
+      "lat": 41.81049699999999,
+      "lon": 44.77211400000001
+     },
+     "to": {
+      "name": "END",
+      "lat": 41.8105,
+      "lon": 44.7752
+     },
+     "legGeometry": {
+      "points": "m|{vnAewtktA??oHkOaAqH??Usy@??_@{}@??Oee@",
+      "precision": 6
+     }
+    }
+   ]
+  },
+  {
+   "startTime": "2026-10-02T10:08:00Z",
+   "endTime": "2026-10-02T11:27:00Z",
+   "transfers": 1,
+   "legs": [
+    {
+     "mode": "WALK",
+     "startTime": "2026-10-02T10:08:00Z",
+     "endTime": "2026-10-02T10:13:00Z",
+     "realTime": false,
+     "distance": 332.0,
+     "from": {
+      "name": "START",
+      "lat": 41.7234622,
+      "lon": 44.720083
+     },
+     "to": {
+      "name": "Residential Complex \"\"Shatili\"\"",
+      "lat": 41.72560500000001,
+      "lon": 44.71971500000001
+     },
+     "legGeometry": {
+      "points": "ybrqnAi|nhtAd@dK??oGo@??YuF??aLvA??yTvC??wHz@??eV`D??iFh@??aUdC??qS`D??Bl@??w@H??u@H_A]??oAsW??}BR??t@fQ",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "BUS",
+     "startTime": "2026-10-02T10:13:00Z",
+     "endTime": "2026-10-02T10:34:00Z",
+     "realTime": false,
+     "headsign": "სადგურის მოედანი - მინდელის ქ.",
+     "routeShortName": "476",
+     "displayName": "476",
+     "routeColor": "0033b4",
+     "routeTextColor": "ffffff",
+     "agencyName": "Tbilisi Transport Company",
+     "from": {
+      "name": "Residential Complex \"\"Shatili\"\"",
+      "lat": 41.72560500000001,
+      "lon": 44.71971500000001
+     },
+     "to": {
+      "name": "Tevdore Mghvdeli Street",
+      "lat": 41.72064,
+      "lon": 44.796944
+     },
+     "intermediateStops": [
+      {
+       "name": "Public School #128",
+       "lat": 41.72590300000001,
+       "lon": 44.72261400000001
+      },
+      {
+       "name": "Besarion Zhghenti Street",
+       "lat": 41.72617300000001,
+       "lon": 44.725384000000005
+      },
+      {
+       "name": "Public School #126",
+       "lat": 41.726425000000006,
+       "lon": 44.72796
+      },
+      {
+       "name": "Ramaz Chkhikvadze Street",
+       "lat": 41.726788000000006,
+       "lon": 44.73172
+      },
+      {
+       "name": "Irakli Gamrekeli Street",
+       "lat": 41.72713000000001,
+       "lon": 44.73512300000001
+      },
+      {
+       "name": "Komarov School",
+       "lat": 41.72737000000001,
+       "lon": 44.737610000000004
+      },
+      {
+       "name": "Mamia Gurieli Street",
+       "lat": 41.727642,
+       "lon": 44.740326
+      },
+      {
+       "name": "Ferdinand Tavadze Street",
+       "lat": 41.72854600000001,
+       "lon": 44.74345
+      },
+      {
+       "name": "Delisi Street",
+       "lat": 41.729000000000006,
+       "lon": 44.747242
+      },
+      {
+       "name": "Mikheil Asatiani Street",
+       "lat": 41.72937000000001,
+       "lon": 44.750679999999996
+      },
+      {
+       "name": "Akvsenti Megrelidze Street",
+       "lat": 41.72957600000001,
+       "lon": 44.752705000000006
+      },
+      {
+       "name": "Public School #203",
+       "lat": 41.729794000000005,
+       "lon": 44.755226
+      },
+      {
+       "name": "Budapest Street",
+       "lat": 41.730083,
+       "lon": 44.758250000000004
+      },
+      {
+       "name": "Tashkenti Street",
+       "lat": 41.730610000000006,
+       "lon": 44.76348
+      },
+      {
+       "name": "Zurab Zhvania Square",
+       "lat": 41.730965000000005,
+       "lon": 44.76694500000001
+      },
+      {
+       "name": "Zurab Zhvania Square",
+       "lat": 41.731075000000004,
+       "lon": 44.76830700000001
+      },
+      {
+       "name": "Jiuli Shartava St #42",
+       "lat": 41.73068,
+       "lon": 44.769653000000005
+      },
+      {
+       "name": "Ana Kalandadze Street",
+       "lat": 41.72804000000001,
+       "lon": 44.772377000000006
+      },
+      {
+       "name": "Tbilisi City Hall",
+       "lat": 41.72569000000001,
+       "lon": 44.77476
+      },
+      {
+       "name": "M/S \"\"Tsereteli\"\"",
+       "lat": 41.727257,
+       "lon": 44.787482999999995
+      },
+      {
+       "name": "M/S \"\"Tsereteli\"\"",
+       "lat": 41.727203,
+       "lon": 44.788685
+      },
+      {
+       "name": "Boris Paichadze National Stadium",
+       "lat": 41.72287000000001,
+       "lon": 44.791454
+      },
+      {
+       "name": "Station Square",
+       "lat": 41.72215300000001,
+       "lon": 44.79675000000001
+      }
+     ],
+     "legGeometry": {
+      "points": "wjvqnA}dnhtAu@gQuKe}Bo@sMeAcTAa@yEkaAg@oKi@cLy@kPqCyj@MyCa@sIMkCW{Fu@iOaAiTgAcTMyB{D{|@a@mJu@gPeAiUoCen@MsDkHy~A}@iRiCwk@iA{V_@gIo@uLy@_QsAeZg@}KsBoc@w@aQm@sM[{GUkFOcDs@gOeE_~@cAuT}Du{@QuDMiCe@qKmFyjAScEeFohAE{@YqHWgGSeEMsCu@sKo@eF_@_Do@eF_AsFyAaHgBcJeDuN_Jo[yLo^qDmNgCkN_CoM_CoLc@iC]qCaCqa@cF}mA{Ai\\QeDK{BcAkTuA}Yo@oNuB}c@c@oJiGirAg@yKsAsYm@aMOaD[kHYyFmAmWcBi^OmDwAqZ}Aa]eAkUmFeiAy@_R]wGc@aJaA{Ts@sPgF_fAeBy^MqCaCch@gAuUe@mJKuB}@}Rm@aNk@oJOkCMkDUwF]eJQqDwBcf@w@qQuBge@oIqmBSmEQsDe@uKOkD_@eImCym@yCeq@_Bw^uBce@gBka@oA}XYmGk@{Mw@mQu@gPkAyWw@uQz@yG~AgDrGeHrEaF`IuIbTqUfQmRdUuVvLsMfDuDnFaGxUgW`IuIdL_MtA}AhSuTxDcEtB_ClKgLtDaE|IoD|@eBdi@yh@hP_Tr`@{`@hNeEzBcCpBwB`BiBZkBjAqGtRyRpBqBjHqFxAuAxLaLlMuLTuBNmAlBiGtKyJzAyB`@oBJkCOqBc@_Bk@gAaAmAkA_AuAm@yA_@wB]wT|EaE^kBP_Fp@_@ByABeBIw@m@w@cAs@aBuA{Di@wAmCgJa@mCO_CG_CD{B^qHpOaeBhDo_@jBwYZcEVmDPeEDqHUmDYeBm@wD_s@otCkJab@aAoEOsBj@kDl@uC`@wDQoE[qCu@gDqGmUgY}cA}AwFaBuF}`@mwAkAcE{DiNwByGi@eB_FmO{A{EbCuBzAkAfEkCjLmGvHcEfBaA`RiKxMmHtE_CrFmCnEuBlGgDdNgIdDgBfCsA`L_H~[oRzG}DbHgEtA_AlE_DnEcDvqAkt@lIuEpDsBnGoAhLoGn@oBf@sChBoDfAw@p@[jB_AdF_Dpw@eb@dE{B}AiGQo@eAeEgHcY_WybA}B}IiAqEm@_CsFsTaI_YkBgG{O{q@`IkEfH_FFErRiN`DsBxWsQ`GaElEaEnKeDnA?r@Nv@ZnGvFfArEhGnW",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "WALK",
+     "startTime": "2026-10-02T10:34:00Z",
+     "endTime": "2026-10-02T10:38:00Z",
+     "realTime": false,
+     "distance": 581.0,
+     "from": {
+      "name": "Tevdore Mghvdeli Street",
+      "lat": 41.72064,
+      "lon": 44.796944
+     },
+     "to": {
+      "name": "Public School #4",
+      "lat": 41.721478000000005,
+      "lon": 44.800774
+     },
+     "legGeometry": {
+      "points": "erlqnAo`emtAaHoW??[kA??[eA??}@sD??_AaC??vAoD??kD{L??gAyD??AM??eA}L??sFiT??_CiI??mDsL??@o@??y@mC??S@??Us@??yBtAbBzF??xBpH~ByA??K_@??M]??Ba@??eBwF??UM??Og@??KY??[cA??IY??iB{F??I[??cE}N??Qo@??u@Nu@Ue@u@KiANgAf@q@??K]??_@mA??w@Ns@Ug@u@KgANgAf@u@??mAgD??eAiD??cC|AwCE??iGnD??_BaG??kBgH??iBoJ??Q_B??E]??bGqAx\\sIxLwE??iAcG??{@aG??wHnB",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "BUS",
+     "startTime": "2026-10-02T10:40:00Z",
+     "endTime": "2026-10-02T11:22:00Z",
+     "realTime": false,
+     "headsign": "ვაზისუბნის II მ/რ",
+     "routeShortName": "333",
+     "displayName": "333",
+     "routeColor": "00b38b",
+     "routeTextColor": "000000",
+     "agencyName": "Tbilisi Transport Company",
+     "from": {
+      "name": "Public School #4",
+      "lat": 41.721478000000005,
+      "lon": 44.800774
+     },
+     "to": {
+      "name": "Guram Nijaradze Street",
+      "lat": 41.81049699999999,
+      "lon": 44.77211400000001
+     },
+     "intermediateStops": [
+      {
+       "name": "Railway Passage Bridge",
+       "lat": 41.72368,
+       "lon": 44.800125
+      },
+      {
+       "name": "Tsotne Dadiani St #71",
+       "lat": 41.727737000000005,
+       "lon": 44.79899000000001
+      },
+      {
+       "name": "Public School #112",
+       "lat": 41.729324000000005,
+       "lon": 44.79845400000001
+      },
+      {
+       "name": "M/S Nadzaladevi",
+       "lat": 41.73273000000001,
+       "lon": 44.79734800000001
+      },
+      {
+       "name": "Depo Street",
+       "lat": 41.73619000000001,
+       "lon": 44.796124000000006
+      },
+      {
+       "name": "Public School #10",
+       "lat": 41.737434,
+       "lon": 44.79559000000001
+      },
+      {
+       "name": "Zaza Urushadze Street",
+       "lat": 41.73975000000001,
+       "lon": 44.794827
+      },
+      {
+       "name": "Java Street",
+       "lat": 41.74242,
+       "lon": 44.793884
+      },
+      {
+       "name": "Public School #11",
+       "lat": 41.746002000000004,
+       "lon": 44.79244200000001
+      },
+      {
+       "name": "Kikvidze Park",
+       "lat": 41.748802000000005,
+       "lon": 44.791233000000005
+      },
+      {
+       "name": "Giorgi Chkondideli Street",
+       "lat": 41.750153000000005,
+       "lon": 44.786976
+      },
+      {
+       "name": "M/S \"\"Didube\"\"",
+       "lat": 41.749950000000005,
+       "lon": 44.781006
+      },
+      {
+       "name": "M/S \"\"Didube\"\"",
+       "lat": 41.74935000000001,
+       "lon": 44.77728
+      },
+      {
+       "name": "Shota Shalikashvili Bridge",
+       "lat": 41.755005000000004,
+       "lon": 44.775850000000005
+      },
+      {
+       "name": "13 May Park",
+       "lat": 41.75709,
+       "lon": 44.773810000000005
+      },
+      {
+       "name": "Dighomi Block VI",
+       "lat": 41.760090000000005,
+       "lon": 44.770836
+      },
+      {
+       "name": "Evgeni Mikeladze Street",
+       "lat": 41.76297400000001,
+       "lon": 44.76887500000001
+      },
+      {
+       "name": "Dighomi Masivi V Block",
+       "lat": 41.766464,
+       "lon": 44.76923800000001
+      },
+      {
+       "name": "Tbilisi City Court",
+       "lat": 41.77211800000001,
+       "lon": 44.76914200000001
+      },
+      {
+       "name": "Giorgi Tereverko Street",
+       "lat": 41.77732,
+       "lon": 44.76899300000001
+      },
+      {
+       "name": "National Enforcement Bureau",
+       "lat": 41.781276999999996,
+       "lon": 44.769527000000004
+      },
+      {
+       "name": "Davit Aghmashenebeli Alley 12th Kilometer",
+       "lat": 41.784412,
+       "lon": 44.76988
+      },
+      {
+       "name": "Giorgi Papashvili Street",
+       "lat": 41.789925000000004,
+       "lon": 44.770320000000005
+      },
+      {
+       "name": "Mukhatgverdi Lane",
+       "lat": 41.79554000000001,
+       "lon": 44.770813000000004
+      },
+      {
+       "name": "Grigol Peradze Street",
+       "lat": 41.798683000000004,
+       "lon": 44.770973000000005
+      },
+      {
+       "name": "Kristine Sharashidze Street",
+       "lat": 41.80327,
+       "lon": 44.771446
+      },
+      {
+       "name": "Davit Aghmashenebeli Alley 13th Kilometer",
+       "lat": 41.805298,
+       "lon": 44.77164
+      },
+      {
+       "name": "Khakhuli Street",
+       "lat": 41.807649999999995,
+       "lon": 44.771893
+      }
+     ],
+     "legGeometry": {
+      "points": "yenqnAgjlmtAqD~Aon@xN}_@vImOjDq^zDyBV_@@sP~@eAFaSx@uFh@cQ`DwHvAoKnBsVpEq`@zI_c@fIkFfA{Q~DwRxEgBZ{Bh@cRfE}HfBeMtCcVpFcHfBwIfBcT|EcJrBgIhBq\\tHqKbCya@lJa`@xIcIhB{u@bQ}XjGq@NuNbDqh@rLueAvW}KnCuLnD{PfFwf@fQ_Bh@sBp@qXhJi`@nM{Bx@gElAiD|@a_@vJiDz@aSzEgfAtWcFnAkG~AmX~G{e@pLmJ~BoKjCqc@lJmi@|McM~C{m@lO}QfFkJ~Bkb@dMeCx@ee@pOe`@jMeT~HaGvBcWpJeHzBonBno@qJbDgInCyp@bUyRvG_FbBsIxCbDjPbArILlKBfx@?n`ABnb@?hK@zE?d[@|N?nQ@dR?fO?dA@`X@dh@@tg@?lI@|j@?bEBbaAPpKV~CZfCb@jBfAfCfBxCHLlBjCpCtCxChBzCpAjCr@hBXlCh@fQjBbg@tEjQvBvH~@zTtBnCz@|BjApBrEx@hElBb_@tCzPx@bQ\\xGhEz|@RrEP`C_LlAaBVkm@`JcPfCaK`B{KzA{Ib@mALyR~ByPrBgALyARaC\\}Et@oAMwBe@uDsAaL}DsBs@eHgC{FuBuAe@oJeDmHqCmF_CgHqDcU{MsM}H_HyEmE}BaEw@qBEuAD{ATiA^iB`AoCnBoDrDcAjAoAdBsz@fy@aGzFoT~SeNhNoLnL}ZpZu@r@yMrMe[f[uPtPwJlJoLjLei@jh@wDrD_XzWmZhZiZ|Yag@|f@qg@ng@gT|S_DzCwHrHyT~TsOjOqRlR}XnYu@t@yGxDoD|AyHhDwDtAsHl@cGf@qLf@yKRiEFcHH_EEuMKaX[aRt@gIp@kGUoMe@wHWq\\{@gPkAuJoB{YmGgOgBmLwAgGBoHF_JHmPNoRRiDB{JLyDAws@\\qWB}DDaa@ZoWJqb@JiC@er@Te@@{ONsSRiV^aa@d@cfAzAaEB_NHkC@we@Xm\\J}EBwUHaA?kU?aU?eE?}D?wH?{Z?sN?uG[ca@aBmU}@mMwAkHs@_Gm@sLwAuC]iRcBuFq@ee@oGu@KeEs@sEu@mB]wM}Ay^aCwa@kCub@qCqMw@aUk@}^g@eNQc]iAeOa@uDMskAiEaEQub@_BqaAwBwEM_CIqf@{AyJ[o]eAiNc@qLi@uBKqK_@e^qAcUy@uSu@uO[au@cCiTkA_q@wCqKWgGY_GWsCIkWw@uBGi[_AeDIka@mA}f@gAsEKws@}AoMqJe@]]UWQoCqAuG{CiB[sEMcDhAwB`DoE`Hs@fAoFMm_@{Ak{@{Cme@cCkMo@qF[yb@eCwb@{Bqu@{EyF_@mXsAqd@{BwJe@ak@qCaCKwQy@aT}@iQw@mm@kCme@sBgCMoc@eB}UaAc_BoG_Qa@",
+      "precision": 6
+     }
+    },
+    {
+     "mode": "WALK",
+     "startTime": "2026-10-02T11:22:00Z",
+     "endTime": "2026-10-02T11:27:00Z",
+     "realTime": false,
+     "distance": 279.0,
+     "from": {
+      "name": "Guram Nijaradze Street",
+      "lat": 41.81049699999999,
+      "lon": 44.77211400000001
+     },
+     "to": {
+      "name": "END",
+      "lat": 41.8105,
+      "lon": 44.7752
+     },
+     "legGeometry": {
+      "points": "m|{vnAewtktA??oHkOaAqH??Usy@??_@{}@??Oee@",
+      "precision": 6
+     }
+    }
+   ]
+  }
+ ],
+ "direct": []
+}

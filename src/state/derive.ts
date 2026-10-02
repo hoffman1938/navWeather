@@ -222,7 +222,11 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
 
   const options =
     !navigating && input.options.length > 1
-      ? stableJson(previous.options, input.options.map((o, i) => summarizeOption(wholeRoad(o), i, input)))
+      ? stableJson(
+          previous.options,
+          // A public-transport trip starts at its own timetabled time; a road whenever you leave.
+          input.options.map((o, i) => summarizeOption(wholeRoad(o), i, input, o.timed.route.transit?.departMs ?? input.departureMs)),
+        )
       : [];
   const otherRoads = navigating ? stableJson(previous.otherRoads, summarizeOtherRoads(input, plan, progress)) : [];
 

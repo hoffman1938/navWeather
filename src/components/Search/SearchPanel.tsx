@@ -228,8 +228,9 @@ export function SearchPanel() {
 }
 
 /**
- * Where to look up public-transport timetables, which this app has no data for:
- * Google Maps' directions page, opened only if the user taps the link.
+ * Where to look up public-transport timetables when the app found none (its
+ * open timetables don't cover every place): Google Maps' directions page,
+ * opened only if the user taps the link.
  * A start that is "Your location" is left out, so Google uses theirs.
  */
 export function transitTimetablesUrl(origin: PlaceField, destination: PlaceField): string {

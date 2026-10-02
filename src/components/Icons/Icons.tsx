@@ -180,38 +180,65 @@ export const LayersIcon = ({ size, className }: P) => (
   </svg>
 );
 
-/** Travel-mode glyphs. */
+/**
+ * Travel-mode glyphs: solid shapes, like a map app's mode tabs (they read
+ * at 20 px where outlines turn to noise). Paths after Google's Material
+ * Icons (Apache-2.0).
+ */
+const solid = (size = 20) => ({
+  width: size,
+  height: size,
+  viewBox: '0 0 24 24',
+  fill: 'currentColor',
+  'aria-hidden': true,
+  focusable: false as const,
+});
+
 export const CarIcon = ({ size, className }: P) => (
-  <svg {...base(size)} className={className}>
-    <path d="M5 16v-4.2L6.6 7.6A2 2 0 0 1 8.5 6.3h7a2 2 0 0 1 1.9 1.3L19 11.8V16" />
-    <path d="M3.5 12h17M4.5 16h15v2.5h-3.2V16M7.7 16v2.5H4.5" />
-    <circle cx="7.8" cy="13.6" r="0.6" fill="currentColor" />
-    <circle cx="16.2" cy="13.6" r="0.6" fill="currentColor" />
+  <svg {...solid(size)} className={className}>
+    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z" />
   </svg>
 );
 export const WalkIcon = ({ size, className }: P) => (
-  <svg {...base(size)} className={className}>
-    <circle cx="13" cy="4.5" r="1.8" />
-    <path d="M10.2 21l2.1-6.2-2.6-2.6 1.1-4.7 3 2.9 3 .9M9.7 12.2L7.5 14.6M12.3 14.8l2.9 2.3.7 3.9" />
+  <svg {...solid(size)} className={className}>
+    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7" />
   </svg>
 );
 export const BikeIcon = ({ size, className }: P) => (
-  <svg {...base(size)} className={className}>
-    <circle cx="6" cy="16" r="3.6" />
-    <circle cx="18" cy="16" r="3.6" />
-    <path d="M6 16l3.6-6.6h5L18 16M9.6 9.4L12 16M8.2 7.6h2.6M14.4 9.4l-.9-2h2.2" />
+  <svg {...solid(size)} className={className}>
+    <path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z" />
   </svg>
 );
+/** Public transport (the mode tab) and a train / metro leg. */
 export const TransitIcon = ({ size, className }: P) => (
-  <svg {...base(size)} className={className}>
-    <rect x="5" y="3.5" width="14" height="13" rx="2.5" />
-    <path d="M5 11h14M8.5 20l1-3.5M15.5 20l-1-3.5M9 7.2h6" />
-    <circle cx="8.6" cy="13.8" r="0.7" fill="currentColor" />
-    <circle cx="15.4" cy="13.8" r="0.7" fill="currentColor" />
+  <svg {...solid(size)} className={className}>
+    <path d="M12 2c-4 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-3.58-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-7H6V6h5v4zm2 0V6h5v4h-5zm3.5 7c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
   </svg>
 );
 export const FlightIcon = ({ size, className }: P) => (
-  <svg {...base(size)} className={className}>
-    <path d="M3 12.6l7.2-2.1L14 4.2l2 .6-1.7 5.8 5.4-.6 1.5 1.5-5.4 1.9-1.3 5-1.8-.4-.6-4.3-3.4 1.2-2.3 2.3-1-1 1.9-2.6z" />
+  <svg {...solid(size)} className={className}>
+    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+  </svg>
+);
+
+/** Public-transport legs: what you ride. */
+export const BusIcon = ({ size, className }: P) => (
+  <svg {...solid(size)} className={className}>
+    <path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z" />
+  </svg>
+);
+export const TramIcon = ({ size, className }: P) => (
+  <svg {...solid(size)} className={className}>
+    <path d="M19 16.94V8.5c0-2.79-2.61-3.4-6.01-3.49l.76-1.51H17V2H7v1.5h4.75l-.76 1.52C7.86 5.11 5 5.73 5 8.5v8.44c0 1.45 1.19 2.66 2.59 2.97L6 21.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 20h-.08c1.69 0 2.58-1.37 2.58-3.06zm-7 1.56c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm5-4.5H7V9h10v5z" />
+  </svg>
+);
+export const SubwayIcon = ({ size, className }: P) => (
+  <svg {...solid(size)} className={className}>
+    <path d="M12 2c-4.42 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19L6 20.5v.5h12v-.5L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-3.58-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-6H6V6h5v5zm5.5 6c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6h-5V6h5v5z" />
+  </svg>
+);
+export const FerryIcon = ({ size, className }: P) => (
+  <svg {...solid(size)} className={className}>
+    <path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.65 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.06-.78s-.34-.42-.6-.5L20 10.62V6c0-1.1-.9-2-2-2h-3V1H9v3H6c-1.1 0-2 .9-2 2v4.62l-1.29.42c-.26.08-.48.26-.6.5s-.15.52-.06.78L3.95 19zM6 6h12v3.97L12 8 6 9.97V6z" />
   </svg>
 );

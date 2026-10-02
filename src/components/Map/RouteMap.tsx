@@ -244,11 +244,27 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     const map = mapRef.current;
     if (!map || !styleVersion) return;
     if (!timed) {
-      for (const id of ['route', 'route-weather', 'endpoints', 'focus', 'pois', 'cameras', 'hazards', 'incidents', 'alternatives']) setData(map, id, EMPTY_FC);
+      for (const id of ['route', 'route-weather', 'endpoints', 'focus', 'pois', 'cameras', 'hazards', 'incidents', 'alternatives', 'transit', 'transit-stops']) {
+        setData(map, id, EMPTY_FC);
+      }
       return;
     }
     const g = timed.route.geometry;
-    setData(map, 'route', lineFeature(g));
+    // Public transport is drawn leg by leg (walks dotted, rides in their line's colour) instead of one route line.
+    const trip = timed.route.transit;
+    setData(map, 'route', trip ? EMPTY_FC : lineFeature(g));
+    setData(map, 'transit', {
+      type: 'FeatureCollection',
+      features: (trip?.legs ?? [])
+        .filter((l) => l.toIndex > l.fromIndex)
+        .map((l) => lineFeature(g.slice(l.fromIndex, l.toIndex + 1), { walk: l.vehicle === 'walk', ...(l.color ? { color: l.color } : {}) })),
+    });
+    setData(map, 'transit-stops', {
+      type: 'FeatureCollection',
+      features: (trip?.legs ?? [])
+        .filter((l) => l.vehicle !== 'walk')
+        .flatMap((l) => [pointFeature(g[l.fromIndex], l.color ? { color: l.color } : {}), pointFeature(g[l.toIndex], l.color ? { color: l.color } : {})]),
+    });
     setData(map, 'endpoints', {
       type: 'FeatureCollection',
       features: [pointFeature(g[0], { role: 'origin' }), pointFeature(g[g.length - 1], { role: 'destination' })],
@@ -286,7 +302,8 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     if (!map || !styleVersion) return;
     altLabels.current.forEach((mk) => mk.remove());
     altLabels.current = [];
-    const planning = mode === 'planning' && routeOptions.length > 1;
+    // Public-transport trips are other departures, mostly on the same streets: chosen in the sheet, not on the map.
+    const planning = mode === 'planning' && routeOptions.length > 1 && !routeOptions[0]?.timed.route.transit;
     const alts = planning ? routeOptions.map((o, i) => ({ o, i })).filter(({ i }) => i !== selectedOption) : [];
     // Driving: a re-route on offer, and the other roads the car can still take (quiet, not tappable — switching is in the sheet).
     const driving = mode !== 'planning'
@@ -517,6 +534,10 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     let progressFor: TimedRoute | null = null;
     let bearing = map.getBearing();
     let zoom = map.getZoom();
+    // The smoothing below eases from the camera's last zoom/bearing. Whenever something else moved the camera
+    // (the start-of-drive move, a pan, the overview), pick up from where it actually is — not from where it was
+    // when this effect ran, or the camera would drift back out to the overview and creep in.
+    let steering = false;
 
     const update = () => {
       const s = useAppStore.getState();
@@ -551,13 +572,21 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       }
 
       // Navigation camera: heading-up, zoom out on open road, in near maneuvers.
-      if (!s.followVehicle || transitioning.current) return;
+      if (!s.followVehicle || transitioning.current) {
+        steering = false;
+        return;
+      }
       if (saver && now - lastCamera < 500) return;
       lastCamera = now;
+      if (!steering) {
+        zoom = map.getZoom();
+        bearing = map.getBearing();
+        steering = true;
+      }
       const g = s.guidance;
       const targetZoom = navigationZoom(g?.next ? g.distanceToNextM : null, v.speedMps ?? 14);
       const simFast = s.mode === 'simulating' && s.sim.speed > 10;
-      zoom += (targetZoom - (simFast ? 1.5 : 0) - zoom) * (reduced ? 1 : 0.08);
+      zoom += (targetZoom - (simFast ? 1 : 0) - zoom) * (reduced ? 1 : 0.08);
       if (v.headingDeg !== undefined && Number.isFinite(v.headingDeg)) {
         const d = ((v.headingDeg - bearing + 540) % 360) - 180;
         bearing = (bearing + d * (reduced ? 1 : 0.15) + 360) % 360;
@@ -588,12 +617,15 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
     if (v) {
       transitioning.current = true;
       map.once('moveend', () => (transitioning.current = false));
+      // Straight to street level, like a phone's navigation app: the road you're on and the next turn.
+      const g = s.guidance;
+      const simFast = mode === 'simulating' && s.sim.speed > 10;
       map.easeTo({
         center: v.coordinate,
-        zoom: mode === 'simulating' ? 12 : 16.5,
+        zoom: navigationZoom(g?.next ? g.distanceToNextM : null, v.speedMps ?? 0) - (simFast ? 1 : 0),
         bearing: v.headingDeg ?? 0,
         pitch: reduced ? 0 : 45,
-        duration: reduced ? 0 : 900,
+        duration: reduced ? 0 : 1200,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -609,7 +641,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       map.once('moveend', () => (transitioning.current = false));
       map.easeTo({
         center: v.coordinate,
-        zoom: Math.max(map.getZoom(), 15.5),
+        zoom: Math.max(map.getZoom(), 16.5),
         bearing: v.headingDeg ?? map.getBearing(),
         pitch: reduced ? 0 : 45,
         duration: reduced ? 0 : 500,

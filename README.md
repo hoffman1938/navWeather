@@ -17,7 +17,7 @@ ETA   13:00  Batumi      ☁ 23°
 ```
 
 It runs on free services with no API keys (OSRM, Open-Meteo, Nominatim/Photon,
-Overpass, OpenFreeMap) plus a tiny Cloudflare Worker for live location sharing
+Overpass, OpenFreeMap, Transitous) plus a tiny Cloudflare Worker for live location sharing
 and driver reports.
 
 ## Quick start
@@ -50,9 +50,15 @@ servers, with the same weather at *your* pace (rain matters more on a bike) and
 turn-by-turn; the driving extras (speed limits, cameras, curves, driving breaks,
 fuel advice) stay for the car. **Flight is a labelled estimate** — the straight
 line and a typical time, no airports, schedules or prices — and is a plan only.
-**Public transport is not available**: it needs timetable data and there is no
-free worldwide source, so the app says so (and links to Google Maps timetables,
-opened only if you tap it) instead of inventing anything.
+**Public transport** comes from [Transitous](https://transitous.org) — a free,
+community-run journey planner over the timetables operators publish openly (no
+key). Each trip found is an option with its departure and arrival, the lines to
+take on their own colours, every step (walk, board, stops, get off) and the
+weather at the times you'd be there; another departure time asks the timetable
+again. Coverage is what operators publish: Tbilisi's buses and metro are there,
+Georgian intercity trains and marshrutkas are not — then the app says "no public
+transport found" (and links to Google Maps timetables, opened only if you tap it)
+instead of inventing anything. It is a plan only, like a flight.
 
 **Plan** — up to three genuinely different **roads** to the destination (near-copies
 of the best route are dropped; when the router offers none, the app asks it for
@@ -123,6 +129,7 @@ Every part runs on free services or free tiers, with no API keys and no card:
 | App + live sharing + driver reports | Cloudflare Workers **Free plan** (static assets, 2 SQLite Durable Objects, rate limits) | 100 000 Worker requests/day (static files don't count); plenty for personal use |
 | Map tiles | OpenFreeMap | free, no key |
 | Routing | OSRM public demo server | fair use, no uptime guarantee |
+| Public transport | Transitous | open-source, **non-commercial** projects; link to its sources (shown with every trip); ask them before heavy use |
 | Weather, air quality, elevation | Open-Meteo | free for **non-commercial** use (≈10 000 calls/day) |
 | Search | Nominatim (1 request/s) and Photon | fair use |
 | Places, speed limits, cameras | Overpass (OpenStreetMap) | fair use, often slow |

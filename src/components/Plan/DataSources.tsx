@@ -4,7 +4,7 @@ import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
 import { deviceTimeZone, formatLocalTime } from '../../utils/timezone';
 
-type Status = 'forecast' | 'estimated' | 'stale' | 'unavailable' | 'simulated' | 'community';
+type Status = 'forecast' | 'estimated' | 'scheduled' | 'stale' | 'unavailable' | 'simulated' | 'community';
 
 /**
  * What each piece of information is based on — forecast, estimate, stale,
@@ -21,6 +21,7 @@ export function DataSources() {
   const speedLoaded = useAppStore((s) => s.speedLimits !== null);
   const reportsStatus = useAppStore((s) => s.reportsStatus);
   const reportsOn = useSettings((s) => s.driverReports);
+  const transit = useAppStore((s) => !!s.plan?.timed.route.transit);
   const p = getProviders();
   const reports = p.incidents.name === 'reports';
   const old = weatherUpdatedAt !== null && Date.now() - weatherUpdatedAt > 60 * 60_000;
@@ -33,7 +34,7 @@ export function DataSources() {
         ? `Open-Meteo · ${weatherStatus === 'stale' ? formatAgo(weatherUpdatedAt, Date.now(), m) : D.updated(formatLocalTime(weatherUpdatedAt, deviceTimeZone()))}`
         : '',
     ],
-    [D.eta, 'estimated', D.etaDetail],
+    transit ? [m.transit.data, 'scheduled', m.transit.dataDetail] : [D.eta, 'estimated', D.etaDetail],
     [D.traffic, p.traffic.name === 'none' ? 'unavailable' : 'forecast', p.traffic.name === 'none' ? D.noProvider : p.traffic.name],
     reports
       ? [D.incidents, reportsOn && reportsStatus !== 'unavailable' ? 'community' : 'unavailable', !reportsOn ? D.reportsOff : reportsStatus === 'unavailable' ? D.reportsDown : D.reports]
