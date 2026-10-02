@@ -48,7 +48,8 @@ function EtaBar() {
   const mode = useAppStore((s) => s.mode);
   const remainingMin = useAppStore((s) => (s.progress ? Math.round(s.progress.remainingTimeS / 60) : null));
   const remainingM = useAppStore((s) => (s.progress ? Math.round(s.progress.remainingDistanceM / 100) * 100 : null));
-  const etaMin = useAppStore((s) => (s.progress ? Math.round(s.progress.etaMs / 60000) : null));
+  // Includes planned stops (Long Trip Mode); otherwise the same as the progress ETA.
+  const etaMin = useAppStore((s) => (s.progress ? Math.round((s.derived.arrivalMs ?? s.progress.etaMs) / 60000) : null));
   const destTz = useAppStore((s) => s.derived.points.at(-1)?.timezone ?? 'UTC');
   const simClockMin = useAppStore((s) => (s.mode === 'simulating' ? Math.floor(s.sim.nowMs / 60000) : null));
   const originTz = useAppStore((s) => s.derived.points[0]?.timezone ?? 'UTC');

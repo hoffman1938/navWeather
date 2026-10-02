@@ -28,6 +28,7 @@ import { useSimulationLoop } from './hooks/useSimulationLoop';
 import { useWakeLock } from './hooks/useWakeLock';
 import { parseLiveUrl, parsePlaceUrl } from './share/links';
 import { resumeLiveShare, useLiveShare } from './share/liveShare';
+import { initTrip } from './state/trip';
 import { useViewer } from './share/viewer';
 import { locationWatcher, useExplore } from './state/explore';
 import { useLayoutStore } from './state/layout';
@@ -63,6 +64,7 @@ function CrashScreen() {
 }
 
 function MainApp() {
+  useEffect(() => initTrip(), []);
   useAppTimers();
   useLocationSync();
   useOnLoad();

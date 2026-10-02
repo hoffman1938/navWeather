@@ -18,6 +18,8 @@ export const apiPaths = {
   reports: `${API_BASE}/reports`,
   whereami: `${API_BASE}/whereami`,
   health: `${API_BASE}/health`,
+  tripsPlan: `${API_BASE}/trips/plan`,
+  tripsPlaces: `${API_BASE}/trips/places`,
 } as const;
 
 /**

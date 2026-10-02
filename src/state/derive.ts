@@ -25,6 +25,7 @@ import type { PlannedRoute } from '../services/routePlanner';
 import type { LngLat } from '../types/geo';
 import type { NavigationMode, RouteProgress } from '../types/navigation';
 import type { RouteSample, TimedRoute } from '../types/route';
+import type { TripStop } from '../trip/types';
 import type {
   LocationForecast,
   RouteWeatherPoint,
@@ -125,7 +126,21 @@ export interface DeriveInput {
   breakReminders?: boolean;
   speedCameras?: RouteCamera[];
   extraEvents: RouteEvent[];
+  /**
+   * Long Trip Mode's planned stops (rests, meals, fuel, nights): their
+   * durations are added to every ETA after them, so forecasts are matched to
+   * the times you'll really be there. Absent outside Long Trip Mode.
+   */
+  tripStops?: TripStop[];
   previous: Derived;
+}
+
+/** Seconds of planned stops strictly between two along-route positions. */
+export function dwellBetweenStops(stops: TripStop[] | undefined, fromM: number, toM: number): number {
+  if (!stops?.length) return 0;
+  let s = 0;
+  for (const st of stops) if (st.alongM > fromM + 1 && st.alongM < toM - 1) s += st.dwellMinutes * 60;
+  return s;
 }
 
 let maneuverMemo: { timed: TimedRoute; list: Maneuver[] } | null = null;
@@ -155,7 +170,11 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
   const clock = navigating
     ? ({ mode: 'navigating', nowMs: input.nowMs, modelTimeS: progress.modelTimeS, departureMs: input.departureMs } as const)
     : ({ mode: 'planning', departureMs: input.departureMs } as const);
-  const arrivals = computeArrivals(samples, clock);
+  // Planned stops ahead of the car (or of the start) push every later ETA back.
+  const fromM = navigating ? progress.distanceAlongM : 0;
+  const stops = input.tripStops;
+  const dwellBeforeS = stops?.length ? (toM: number) => dwellBetweenStops(stops, fromM, toM) : undefined;
+  const arrivals = computeArrivals(samples, clock).map((a, i) => (dwellBeforeS ? a + dwellBeforeS(samples[i].distanceM) * 1000 : a));
   const rawPoints = buildRouteWeatherPoints({
     samples,
     arrivals,
@@ -186,7 +205,10 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     timed: plan.timed,
     maneuvers,
     progressM: navigating ? progress.distanceAlongM : 0,
-    clock: navigating ? { mode: 'navigating', nowMs: input.nowMs, modelTimeS: progress.modelTimeS } : { mode: 'planning', departureMs: input.departureMs },
+    clock: navigating
+      ? { mode: 'navigating', nowMs: input.nowMs, modelTimeS: progress.modelTimeS, dwellBeforeS }
+      : { mode: 'planning', departureMs: input.departureMs, dwellBeforeS },
+    tripStops: stops,
     weatherPoints: points,
     currentPoint,
     weatherPrefs: input.weatherPrefs,
@@ -230,7 +252,8 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
       : [];
   const otherRoads = navigating ? stableJson(previous.otherRoads, summarizeOtherRoads(input, plan, progress)) : [];
 
-  const arrivalMs = navigating ? progress.etaMs : input.departureMs + plan.timed.totalTimeS * 1000;
+  const arrivalMs =
+    (navigating ? progress.etaMs : input.departureMs + plan.timed.totalTimeS * 1000) + (dwellBeforeS ? dwellBeforeS(plan.timed.totalDistM + 2) * 1000 : 0);
 
   return {
     points,

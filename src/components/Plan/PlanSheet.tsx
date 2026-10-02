@@ -18,6 +18,7 @@ import { DepartureSelector } from './DepartureSelector';
 import { RouteOptions } from './RouteOptions';
 import { TRANSIT_SOURCES_URL, TransitOptions, TransitSteps } from './TransitTrip';
 import { TravelModeBar } from './TravelModeBar';
+import { JourneyWeather, LongTripBanner, LongTripDashboard, OvernightStay, TripDays, TripRecommendations } from '../Trip/LongTrip';
 import { NAVIGABLE_MODES } from '../../types/travel';
 import { ResumeDrive, takeResumableDrive } from './ResumeDrive';
 import './Plan.css';
@@ -67,6 +68,7 @@ export function PlanSheet() {
       header={<RouteHeader />}
       body={
         <>
+          <LongTripDashboard />
           {transit ? <TransitOptions /> : <RouteOptions />}
           <WeatherHeadline />
           <DepartureTip />
@@ -76,6 +78,10 @@ export function PlanSheet() {
       extra={
         <div className="plan-extra">
           <TransitSteps />
+          <OvernightStay />
+          <TripDays />
+          <TripRecommendations />
+          <JourneyWeather />
           <DepartureChart />
           <HeadsUp />
           <ElevationProfile />
@@ -146,6 +152,7 @@ function RouteHeader() {
             </p>
           ) : null}
           <DepartureSelector />
+          <LongTripBanner />
         </div>
         {navigable ? (
           <div className="rhead__actions">

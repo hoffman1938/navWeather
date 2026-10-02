@@ -4,10 +4,11 @@ import { REPORT_ID_RE } from '../src/reports/protocol';
 import { json, randomToken, readJson, sha256Hex } from './http';
 import { LiveShare } from './liveShare';
 import { Reports } from './reports';
+import { tripPlaces, tripPlan, type TripEnv } from './trips';
 
 export { LiveShare, Reports };
 
-export interface Env {
+export interface Env extends TripEnv {
   ASSETS: Fetcher;
   LIVE_SHARE: DurableObjectNamespace<LiveShare>;
   /** Workers rate-limiting binding (wrangler.toml [[ratelimits]]); optional so the relay still runs without it. */
@@ -40,6 +41,9 @@ export interface Env {
  *   POST   /api/reports/:id/vote           { vote: 'still' | 'gone' }
  *
  *   GET    /api/whereami           approximate location of the connection (city level)
+ *
+ *   POST   /api/trips/plan         long-trip plan for a route (stateless; worker/trips.ts)
+ *   POST   /api/trips/places       places around one planned stop (Overpass, edge-cached)
  */
 export default {
   async fetch(request, env): Promise<Response> {
@@ -55,6 +59,9 @@ export default {
     if (path === '/api/health') return request.method === 'GET' ? json({ ok: true, api: API_VERSION }) : json({ error: 'method-not-allowed' }, 405);
 
     if (path === '/api/reports' || path.startsWith('/api/reports/')) return reports(request, path, url, env);
+
+    if (path === '/api/trips/plan') return tripPlan(request, env);
+    if (path === '/api/trips/places') return tripPlaces(request, env);
 
     // When the device can't say where it is (location off, no GPS on a desktop), a trip can
     // still start from the right city: Cloudflare already knows the connection's rough area.

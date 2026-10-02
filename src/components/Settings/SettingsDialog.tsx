@@ -253,6 +253,8 @@ export function SettingsDialog() {
         </label>
       </Section>
 
+      <TripSettings />
+
       <SavedPlacesSettings />
 
       <p className="set-note set-privacy">{S.privacy}</p>
@@ -338,6 +340,91 @@ function SavedPlacesSettings() {
           </button>
         </div>
       ) : null}
+    </Section>
+  );
+}
+
+/** Long trips: pace, vehicle, tank and consumption, and what to recommend (docs/features/LONG_TRIP_MODE.md). */
+function TripSettings() {
+  const m = useMessages();
+  const T = m.trip.settings;
+  const s = useSettings();
+  const up = s.update;
+  const num = (v: string): number | null => {
+    const n = v === '' ? null : Number(v);
+    return n === null || !Number.isFinite(n) || n <= 0 ? null : n;
+  };
+  return (
+    <Section title={T.section}>
+      <Segmented
+        label={T.pace}
+        value={s.tripPace}
+        options={[
+          ['relaxed', T.relaxed],
+          ['balanced', T.balanced],
+          ['fast', T.fast],
+        ]}
+        onChange={(tripPace) => up({ tripPace })}
+        hint={T.paceHint}
+      />
+      <Select
+        label={T.vehicleKind}
+        value={s.vehicleKind}
+        options={[
+          ['car', T.car],
+          ['van', T.van],
+          ['truck', T.truck],
+          ['motorcycle', T.motorcycle],
+        ]}
+        onChange={(vehicleKind) => up({ vehicleKind })}
+      />
+      {s.vehicleKind === 'truck' ? <p className="set-note">{T.truckNote}</p> : null}
+      <label className="set-row">
+        <span className="set-row__label">
+          {T.tank}
+          <small>{T.tankHint}</small>
+        </span>
+        <input type="number" inputMode="decimal" min={0} max={1000} value={s.tankSize ?? ''} onChange={(e) => up({ tankSize: num(e.target.value) })} />
+      </label>
+      <label className="set-row">
+        <span className="set-row__label">{T.consumption}</span>
+        <input type="number" inputMode="decimal" min={0} max={100} step="0.1" value={s.consumptionPer100Km ?? ''} onChange={(e) => up({ consumptionPer100Km: num(e.target.value) })} />
+      </label>
+      <Segmented
+        label={T.stars}
+        value={String(s.hotelMinStars) as '0' | '3' | '4'}
+        options={[
+          ['0', T.starsAny],
+          ['3', T.stars3],
+          ['4', T.stars4],
+        ]}
+        onChange={(v) => up({ hotelMinStars: Number(v) as 0 | 3 | 4 })}
+      />
+      <Segmented
+        label={T.detour}
+        value={String(s.hotelMaxDetourKm) as '5' | '10' | '20'}
+        options={[
+          ['5', s.units.distance === 'imperial' ? '3 mi' : '5 km'],
+          ['10', s.units.distance === 'imperial' ? '6 mi' : '10 km'],
+          ['20', s.units.distance === 'imperial' ? '12 mi' : '20 km'],
+        ]}
+        onChange={(v) => up({ hotelMaxDetourKm: Number(v) as 5 | 10 | 20 })}
+      />
+      <Select
+        label={T.food}
+        value={s.tripFood}
+        options={[
+          ['any', T.foodAny],
+          ['restaurant', T.restaurant],
+          ['fast_food', T.fastFood],
+          ['cafe', T.cafe],
+        ]}
+        onChange={(tripFood) => up({ tripFood })}
+      />
+      <label className="set-row">
+        <span className="set-row__label">{T.fuelBrand}</span>
+        <input type="text" maxLength={40} value={s.fuelBrand ?? ''} onChange={(e) => up({ fuelBrand: e.target.value.trim() ? e.target.value : null })} />
+      </label>
     </Section>
   );
 }

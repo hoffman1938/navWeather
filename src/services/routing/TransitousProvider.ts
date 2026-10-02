@@ -1,6 +1,7 @@
 import type { LngLat } from '../../types/geo';
 import type { Route, RouteSegment, RouteStep, TransitLeg, TransitTrip, TransitVehicle } from '../../types/route';
 import { bboxOf, haversineM } from '../../utils/distance';
+import { decodePolyline } from '../../utils/polyline';
 import { fetchJson, ProviderError } from '../http';
 import type { RouteRequest, RoutingCapabilities, RoutingProvider } from './RoutingProvider';
 
@@ -52,6 +53,8 @@ export interface MotisPlan {
 
 /** Itineraries to ask for: departures to choose from. */
 const ITINERARIES = 5;
+
+export { decodePolyline };
 
 export class TransitousProvider implements RoutingProvider {
   readonly name = 'transitous';
@@ -219,35 +222,4 @@ export function itineraryToRoute(it: MotisItinerary, req: Pick<RouteRequest, 'or
 function cleanStopName(name: string): string {
   if (name === 'START' || name === 'END') return '';
   return name.replace(/""/g, '"').trim();
-}
-
-/** Decode an encoded polyline (Google's algorithm) with `precision` decimal places. */
-export function decodePolyline(encoded: string, precision = 6): LngLat[] {
-  const factor = 10 ** precision;
-  const out: LngLat[] = [];
-  let index = 0;
-  let lat = 0;
-  let lon = 0;
-  // Plain arithmetic, not 32-bit bit operations: at precision 7 a longitude overflows them.
-  const next = (): number | null => {
-    let result = 0;
-    let scale = 1;
-    let byte: number;
-    do {
-      if (index >= encoded.length) return null;
-      byte = encoded.charCodeAt(index++) - 63;
-      result += (byte & 0x1f) * scale;
-      scale *= 32;
-    } while (byte >= 0x20);
-    return result % 2 ? -(result + 1) / 2 : result / 2;
-  };
-  while (index < encoded.length) {
-    const dLat = next();
-    const dLon = next();
-    if (dLat === null || dLon === null) break;
-    lat += dLat;
-    lon += dLon;
-    out.push([lon / factor, lat / factor]);
-  }
-  return out;
 }
