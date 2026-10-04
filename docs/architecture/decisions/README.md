@@ -23,7 +23,8 @@ supersede it with a new one.
 | [011](ADR-011-public-transport.md) | Public transport via Transitous, switchable off | Accepted (terms pending) |
 | [012](ADR-012-offline.md) | Offline: honest shell-and-cache on web; regions and on-device routing native-only | Accepted |
 | [013](ADR-013-trip-planner.md) | Long-trip planner: stateless Worker endpoints over a shared TS domain module | Accepted; web planning moved to the client by 014 (Free CPU limit) |
-| [014](ADR-014-zero-cost.md) | Zero cost and free for users: free tiers only, non-commercial, core independent of our quota | Accepted (2026-10-03) |
+| [014](ADR-014-zero-cost.md) | Zero cost and free for users: free tiers only, non-commercial, core independent of our quota | Accepted (2026-10-03); superseded in part by 015 (hosting may be paid) |
+| [015](ADR-015-free-software-own-hosting.md) | Free software and open data on our own (paid) hosting; no paid services, no sponsors; Google-Maps-class scale | Accepted (2026-10-04) — plan: [FREE_STACK_PLAN](../../FREE_STACK_PLAN.md) |
 
 All external facts in these ADRs were verified against official sources on
 **2026-10-02**; see [LICENSING_MATRIX](../../legal/LICENSING_MATRIX.md) for links.

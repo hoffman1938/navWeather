@@ -30,9 +30,13 @@ weather. It is not "a map site" or "a weather site" — keep that direction.
   docs updated? tests present? debt recorded?
 
 ## Rules that must not be broken
-- **Zero cost, free for users (ADR-014, owner, 2026-10-03):** never add a paid plan, key, hosting, domain,
-  store account or paid feature; no ads or subscriptions. Free tiers only; the core must keep working when our
-  Worker quota is exhausted. Work follows `docs/PRODUCTION_READINESS_PLAN.md`.
+- **Only hosting is paid; free for users (ADR-015, owner, 2026-10-04 — supersedes the zero-cost part of ADR-014):**
+  the owner pays for hosting (compute, storage, bandwidth, CDN, domain) and nothing else. Never add a paid API
+  plan, key, per-request fee, paid data, store account or paid feature; no ads or subscriptions; no sponsors,
+  grants or credits. Every third-party component is free software or open data with its licence recorded. In
+  production no live public third-party API sits in the critical path (OpenFreeMap tiles as a fallback is the
+  exception). Target scale: Google-Maps-class. Work follows `docs/FREE_STACK_PLAN.md` (tasks `FS-x.y`); stage 1 of
+  `docs/PRODUCTION_READINESS_PLAN.md` (driver safety) goes first.
 - Only real data: no source → "not available"; simulations labelled; driver
   reports are "reported", never fact. Weather wording: forecast vs derived
   estimate vs official warning (docs/architecture/WEATHER_ENGINE.md §6).
@@ -71,7 +75,10 @@ and push it. Commit messages: what and why; reference requirement IDs.
 - Mobile/CarPlay/Android Auto: `docs/mobile/` · UX/SEO/analytics/i18n: `docs/product/`
 - Cost & scale, CI/CD, testing, DR: `docs/operations/`
 - Feature specs (source of truth per feature): `docs/features/` (Long Trip Mode)
-- **Path to production: `docs/PRODUCTION_READINESS_PLAN.md`** (stages, tasks PR-x.y, release gates G1–G12)
+- **Free stack and development plan: `docs/FREE_STACK_PLAN.md`** (catalogue of free self-hosted replacements, Google Maps
+  gaps and their free sources, stages 0–9, tasks FS-x.y, gates G2'/G3'/G13–G15) — ADR-015
+- Path to production (2026-10-03): `docs/PRODUCTION_READINESS_PLAN.md` (stages, tasks PR-x.y, release gates G1–G12;
+  stage 1 still applies, stage 2 replaced by the free stack plan)
 - Latest audit: `docs/AUDIT/MASTER_AUDIT.md` (2026-10-03: status of every requirement, confirmed defects `B-xx`),
   with `docs/AUDIT/FEATURE_GAP_ANALYSIS.md` and `docs/AUDIT/IMPLEMENTATION_ROADMAP.md`;
   previous: `docs/AUDIT/2026-10-02-platform-audit.md`

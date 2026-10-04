@@ -24,19 +24,25 @@ DEPRECATED · FUTURE.
 
 ---
 
-## 0. Binding constraints (owner decision, 2026-10-03)
+## 0. Binding constraints (owner decisions, 2026-10-03 and 2026-10-04)
 
-Decision: [ADR-014](architecture/decisions/ADR-014-zero-cost.md). Plan:
-[PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md). These constraints override any older requirement that
-assumed a paid step; such requirements are marked DEPRECATED or BLOCKED below with the reason and date (never
-deleted).
+Decisions: [ADR-015](architecture/decisions/ADR-015-free-software-own-hosting.md) (2026-10-04, newer) and
+[ADR-014](architecture/decisions/ADR-014-zero-cost.md) (2026-10-03, superseded in part). Plans:
+[FREE_STACK_PLAN](FREE_STACK_PLAN.md) (catalogue of free alternatives, Google Maps gaps, tasks `FS-x.y`) and
+[PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md) (stage 1 and stages 3–7 still apply; stage 2 replaced).
+These constraints override any older requirement that assumed a paid step; such requirements are marked DEPRECATED
+or BLOCKED below with the reason and date (never deleted).
 
 | ID | Constraint | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-COST-005 | **Zero operating cost:** no paid plan, API key plan, hosting, domain, store account or billing service; Cloudflare Workers Free on `*.workers.dev`; free public services and open data; a service that needs a payment method only as an optional accelerator, never in the critical path | P0 | IN PROGRESS (paid steps removed from plans; code already runs on free tiers) |
-| REQ-COST-006 | **Free for users, non-commercial:** no subscriptions, ads, paid features or in-app purchases; stated in the app | P0 | IN PROGRESS (true today; in-app statement planned, PR-0.1/PR-4.1) |
-| REQ-COST-007 | **Core independent of our Worker quota:** search, routing, weather at ETA, alerts, navigation and Long Trip planning work when `/api/*` is exhausted (429) | P0 | DEFECT (Long Trip planning and places/borders depend on the Worker — B-23, B-22) |
-| REQ-COST-008 | Capacity ceilings of the free stack documented; per-feature budgets, back-off and a degradation ladder; users told when a free limit is reached | P1 | PLANNED (plan §5–§6) |
+| REQ-COST-005 | **Zero operating cost:** no paid plan, API key plan, hosting, domain, store account or billing service; Cloudflare Workers Free on `*.workers.dev`; free public services and open data; a service that needs a payment method only as an optional accelerator, never in the critical path | P0 | DEPRECATED — Reason: owner decision ADR-015 (hosting may be paid; scale target Google-Maps-class) · Date: 2026-10-04 → REQ-COST-009…012 |
+| REQ-COST-006 | **Free for users, non-commercial:** no subscriptions, ads, paid features or in-app purchases; stated in the app | P0 | IN PROGRESS (true today; in-app statement planned, PR-0.1/PR-4.1) — kept by ADR-015 |
+| REQ-COST-007 | **Core independent of our Worker quota:** search, routing, weather at ETA, alerts, navigation and Long Trip planning work when `/api/*` is exhausted (429) | P0 | DEPRECATED — Reason: ADR-015 (no free-tier quota in the target) · Date: 2026-10-04 → REQ-COST-012 |
+| REQ-COST-008 | Capacity ceilings of the free stack documented; per-feature budgets, back-off and a degradation ladder; users told when a free limit is reached | P1 | DEPRECATED — Reason: ADR-015 · Date: 2026-10-04 → REQ-SCALE-004 (capacity model of our own hosting, FS-2.11) |
+| REQ-COST-009 | **Only hosting is paid:** the owner pays for compute, storage, bandwidth, CDN in front of our own servers and a domain — nothing else; no paid API plans, keys, per-request/per-user fees or paid data (ADR-015) | P0 | PLANNED (FREE_STACK_PLAN; today the app uses free public services) |
+| REQ-COST-010 | **No sponsors:** no sponsorship programmes, grants or credits in the plan or the critical path (ADR-015) | P0 | VERIFIED (none used) |
+| REQ-COST-011 | **Free software and open data only** for every third-party component; licence recorded in LICENSING_MATRIX before use; attribution shown; AGPL obligations met (ADR-015) | P0 | IN PROGRESS (FREE_STACK_PLAN §10; FS-3.10) |
+| REQ-COST-012 | **No live public third-party API in the production critical path**, except services whose terms explicitly allow unlimited use (today: OpenFreeMap as tile fallback); public demo servers only in development; checked by an E2E test of the production build (gate G3') | P0 | PLANNED (FS-3.1…FS-3.8) |
 
 ## 1. Product vision
 
@@ -315,11 +321,13 @@ large targets, nothing to read for long ([UX_AND_GROWTH](product/UX_AND_GROWTH.m
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-SCALE-001 | Upstream weather calls bounded by geography × refresh rate, not by user count (shared cache) | P1 | CHANGED by ADR-014 — upstream weather calls are bounded per device (REQ-WX-011); a shared cache only with a free domain |
-| REQ-SCALE-002 | No single Durable Object on the hot path of every user at >1,000 req/s | P2 | PLANNED (shard Reports) |
-| REQ-SCALE-003 | Self-hosted routing/geocoding/POI before public beta | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 → static OSM data (REQ-DATA-006) and free fallback chains (REQ-ROUTE-006); own services optional (plan §7 Этап 8) |
+| REQ-SCALE-001 | Upstream weather calls bounded by geography × refresh rate, not by user count (shared cache) | P1 | CHANGED by ADR-014 — upstream weather calls are bounded per device (REQ-WX-011); a shared cache only with a free domain. CHANGED again by ADR-015 (2026-10-04): self-hosted Open-Meteo syncs model data per region and run, so upstream volume does not depend on users at all (FS-2.7) |
+| REQ-SCALE-002 | No single Durable Object on the hot path of every user at >1,000 req/s | P2 | PLANNED (shard Reports; FS-4.3) |
+| REQ-SCALE-003 | Self-hosted routing/geocoding/POI before public beta | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 → static OSM data (REQ-DATA-006) and free fallback chains (REQ-ROUTE-006); own services optional (plan §7 Этап 8). Revived by ADR-015 (2026-10-04) as REQ-SCALE-005 |
+| REQ-SCALE-004 | **Google-Maps-class target:** every server role is stateless and horizontally scalable, multi-region, with cache layers (tiles, weather by cell + model run, places by tile, geocoding); a measured capacity model gives hosting cost per 1,000 DAU (ADR-015) | P0 | PLANNED (FS-2.11, FS-8.x) |
+| REQ-SCALE-005 | Self-hosted free engines before public beta: Valhalla (routing, all modes), Photon (geocoding), PostGIS Places API (OSM + Overture + Foursquare OS Places + Open Charge Map), Open-Meteo (weather, air quality, elevation), MOTIS (public transport), own tiles (Planetiler → PMTiles), own real-time backend (ADR-015) | P1 | PLANNED (FREE_STACK_PLAN stages 2–4) |
 
-Model: [COST_AND_SCALE](operations/COST_AND_SCALE.md).
+Models: [COST_AND_SCALE](operations/COST_AND_SCALE.md); free stack and plan: [FREE_STACK_PLAN](FREE_STACK_PLAN.md).
 
 ## 20. Mobile preparation requirements
 

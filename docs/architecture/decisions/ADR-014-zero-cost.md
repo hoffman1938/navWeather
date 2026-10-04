@@ -1,6 +1,10 @@
 # ADR-014 — Zero cost and free for users: free tiers only, non-commercial, core independent of our quota
 
-**Status:** Accepted · **Date:** 2026-10-03 · **Decision by:** owner
+**Status:** Accepted · **Superseded in part by [ADR-015](ADR-015-free-software-own-hosting.md) (2026-10-04):**
+hosting may now be paid by the owner, the scale target is Google-Maps-class, and the "free tiers only / Workers
+Free only / zero operating cost" rules are replaced by "free software and open data on our own hosting, no paid
+services, no sponsors". Rule 2 (free for users, non-commercial) and rule 8 (native store apps blocked by fees) stay.
+· **Date:** 2026-10-03 · **Decision by:** owner
 **Amends:** ADR-001, ADR-004, ADR-005, ADR-006, ADR-010, ADR-013 (only where they assumed a paid step)
 
 ## Context

@@ -153,6 +153,11 @@ services have limits, so the app uses free fallbacks (another router, another
 tile source, another weather service) and says so when a free limit is reached.
 The path to production: [docs/PRODUCTION_READINESS_PLAN.md](docs/PRODUCTION_READINESS_PLAN.md).
 
+**Update 2026-10-04 ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md)):** the target is
+Google-Maps-class scale. The owner pays for hosting only; every other part stays free — the same free, open-source
+engines the public services above run on (Valhalla, Photon, Open-Meteo, MOTIS, OpenStreetMap tiles) move onto our own
+servers, so no third-party limit or fee applies. Plan: [docs/FREE_STACK_PLAN.md](docs/FREE_STACK_PLAN.md).
+
 ## Honest limits
 
 - **No live traffic, no official incident feed.** There is no free source;
@@ -204,7 +209,8 @@ unavailable).
 Start with **[Project requirements](docs/PROJECT_REQUIREMENTS.md)** (single
 source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
 
-- **[Production readiness plan](docs/PRODUCTION_READINESS_PLAN.md)** — the exact, zero-cost path to production (stages, tasks, gates)
+- **[Free stack and development plan](docs/FREE_STACK_PLAN.md)** (in Russian) — free self-hosted replacements for every service, the Google Maps features we lack and their free sources, and the plan to move the navigation onto them ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md), 2026-10-04: only hosting is paid; no paid services, no sponsors)
+- **[Production readiness plan](docs/PRODUCTION_READINESS_PLAN.md)** — the zero-cost path to production from 2026-10-03 (stage 1 still first; stage 2 replaced by the free stack plan)
 - [Master audit 2026-10-03](docs/AUDIT/MASTER_AUDIT.md) — status of every requirement, confirmed defects, cost, roadmap ([gap analysis](docs/AUDIT/FEATURE_GAP_ANALYSIS.md), [implementation roadmap](docs/AUDIT/IMPLEMENTATION_ROADMAP.md))
 - [Platform audit 2026-10-02](docs/AUDIT/2026-10-02-platform-audit.md) — findings, fixes, sources
 - [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md) · [Roadmap & MVP](docs/ROADMAP.md)

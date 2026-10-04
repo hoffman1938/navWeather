@@ -1,5 +1,11 @@
 # Licensing and terms matrix
 
+> **Update 2026-10-04 ([ADR-015](../architecture/decisions/ADR-015-free-software-own-hosting.md)):** production moves to
+> self-hosted free software on owner-paid hosting. The licences of the new engines and data sources (Valhalla,
+> Photon, Open-Meteo self-hosted, MOTIS, Planetiler, Overture Places, Foursquare OS Places, Open Charge Map, Copernicus,
+> Mangrove, Panoramax, LibreWXR, Kokoro and others) are listed in [FREE_STACK_PLAN §10](../FREE_STACK_PLAN.md#10-лицензии-и-обязательства);
+> rows are added here as each component is adopted (task FS-3.10).
+
 > Engineering summary of public terms, **not legal advice**. Since 2026-10-03 the app is free and
 > non-commercial with zero operating cost ([ADR-014](../architecture/decisions/ADR-014-zero-cost.md)); "commercial use"
 > columns are kept for completeness. All rows verified
@@ -58,7 +64,7 @@ commercial release — **PLANNED**.
 | Valhalla | MIT | recommended self-hosted router (ADR-004) |
 | GraphHopper | Apache-2.0 | alternative; hosted API free plan "for non-commercial use only", paid from €69/month |
 | OSRM | BSD-2-Clause | current integration |
-| MOTIS | (Transitous' engine) — licence **REQUIRES VERIFICATION** before self-hosting |
+| MOTIS ([repo](https://github.com/motis-project/motis)) | MIT (verified 2026-10-04) | Transitous' engine: GTFS/NeTEx, GTFS-RT/SIRI, GBFS, OSM streets; self-hosting planned (FS-2.8) |
 
 ## Attribution as shipped
 - Map (top-right control): OpenFreeMap © OpenMapTiles Data from OpenStreetMap.
