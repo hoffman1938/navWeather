@@ -11,9 +11,14 @@
 | Env | How | Config | Data |
 | --- | --- | --- | --- |
 | local | `npm run dev` (Vite :5173 + wrangler dev :8787 in one command, local DO/D1 state in `.wrangler/`); `npm run seed:local` (our data), `npm run engines:up` (Valhalla in Docker — Colima or Docker Desktop); `npm run preview:worker` for the production build | `.env` (optional, public `VITE_*` only), `.dev.vars` (Worker secrets, git-ignored) | local |
-| PR preview | `wrangler versions upload` → preview URL (deploy workflow, manual) | same as production unless `--env preview` is added | production DO namespaces — **add `[env.preview]` with its own bindings before previews touch real users' shares** |
-| staging | `wrangler deploy --env staging` (to add) | own D1/KV ids when they exist | synthetic |
-| production | `wrangler deploy` (manual or `deploy.yml`) | `wrangler.toml` + `wrangler secret` | real |
+| preview | `npm run deploy:preview` = `wrangler deploy --env preview` (or the Deploy workflow) → Worker `navweather-preview` on `*.workers.dev` | `[env.preview]` in `wrangler.toml` | its own Durable Objects (separate Worker), D1 `navweather-geo-preview`, R2 `navweather-weather-preview`, rate-limit namespaces 2001–2009 — never production data (DP-2.2) |
+| production | `npm run deploy:production` = `wrangler deploy --env production` (or the Deploy workflow) → Worker `navweather` | `[env.production]` + `wrangler secret --env production` | real; D1 `navweather-geo-production`, R2 `navweather-weather-production`, namespaces 3001–3009 |
+
+The top level of `wrangler.toml` is the local `dev` environment (Worker `navweather-dev`); a plain `wrangler deploy`
+would create that separate Worker, never touch production. Bindings are repeated per environment (wrangler does not
+inherit them); `npm run check:envs` (in CI) fails when the three drift apart or share a resource. Logs (DP-3.3):
+observability on, **invocation logs off** (they would record request URLs: share ids, coordinates in `/weather` and
+`/geocode` queries), query strings redacted from traces; the Worker writes no logs of its own.
 
 Variables: `VITE_*` are compiled into the public bundle (documented in
 `.env.example`, `docs/ENVIRONMENT.md`) — **never secrets**. Server secrets
@@ -28,10 +33,16 @@ npm ci → typecheck (app + Worker) → unit/scenario tests (vitest)
        → production build → wrangler dev (local) → share + reports smoke tests on /api/v1 and /api
 ```
 `.github/workflows/deploy.yml` — manual (`workflow_dispatch`), choose
-`preview` (versions upload, no traffic) or `production` (deploy). Requires
-repository secrets `CLOUDFLARE_API_TOKEN` (scoped: Workers Scripts edit,
-Durable Objects, account read) and `CLOUDFLARE_ACCOUNT_ID`; runs the same
-checks first. Switch production to "on push to main" once previews are routine.
+`preview` or `production`: environment check, typecheck, tests, our data (places tiles and search index for
+Georgia), build, `wrangler deploy --env <target>`, the search index into that environment's D1, and — for preview,
+when the repository variable `PREVIEW_URL` is set — every Worker smoke test against it (`BASE_URL`, DP-3.5; never
+against production: they create shares and reports). Requires repository secrets `CLOUDFLARE_API_TOKEN` (Workers
+Scripts, Durable Objects, D1, R2 edit; account read) and `CLOUDFLARE_ACCOUNT_ID`. Switch production to "on push to
+main" once previews are routine.
+
+`.github/workflows/weather.yml` — every hour: new ECMWF/GFS runs in the Open-Meteo archive → our forecast tiles
+into production's R2 (`npm run data:weather -- --env production`; manual runs for preview). Ends at once without
+credentials or new runs.
 
 `.github/dependabot.yml` — weekly npm and Actions updates.
 

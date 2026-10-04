@@ -145,7 +145,7 @@ describe('from model steps to hours', () => {
 
   it('derives the weather code: snow, fog, clouds', () => {
     expect(at('weather_code', 0)).toBe(0); // clear
-    expect(at('weather_code', 2)).toBe(61); // 1 mm/h of rain
+    expect(at('weather_code', 2)).toBe(55); // 1 mm/h: dense drizzle
     expect(at('weather_code', 6)).toBe(45); // dry, 500 m visibility
     expect(at('weather_code', 9)).toBe(73); // 0.7 cm/h of snow
   });
@@ -169,6 +169,12 @@ describe('from model steps to hours', () => {
     expect(g.hourly.temperature_2m[6]).toBe(16);
     expect(g.hourly.wind_speed_10m.every((v) => v === null)).toBe(true);
     expect(g.elevation).toBeUndefined();
+    // The source's "no height" (-999, open sea) is no height either — and never moves the temperature.
+    const sea = record(-999, { t2m: [10, 10, 10, 10] });
+    const h = pointForecast(index, sea, plan, { hourly: ['temperature_2m'], windUnit: 'kmh', elevation: 0 });
+    expect(h.elevation).toBe(0);
+    expect(h.hourly.temperature_2m[0]).toBe(10);
+    expect(pointForecast(index, sea, plan, { hourly: ['temperature_2m'], windUnit: 'kmh' }).elevation).toBeUndefined();
   });
 });
 
@@ -176,8 +182,12 @@ describe('the derived weather code (WEATHER_ENGINE §6: a derived estimate)', ()
   const none = { precip: 0, swe: 0, ptype: 0, cape: 0, cloud: 0, vis: 24000, t2m: 10 };
   it.each([
     [{ precip: 3, cape: 3500 }, 95],
-    [{ precip: 3, cape: 1600 }, 95],
-    [{ precip: 1, cape: 1600 }, 61],
+    [{ precip: 3, cape: 1600 }, 63], // unstable but not enough: heavy rain, not a thunderstorm
+    [{ precip: 0.05, cape: 3500 }, 0], // dry: no storm without rain
+    [{ precip: 0.3 }, 51],
+    [{ precip: 0.7 }, 53],
+    [{ precip: 1.2 }, 55],
+    [{ precip: 2 }, 61],
     [{ precip: 3, ptype: 3, t2m: -1 }, 67],
     [{ precip: 1, ptype: 3, t2m: -1 }, 66],
     [{ precip: 0.3, ptype: 12, t2m: -1 }, 56],
@@ -187,9 +197,11 @@ describe('the derived weather code (WEATHER_ENGINE §6: a derived estimate)', ()
     [{ precip: 8 }, 65],
     [{ precip: 3 }, 63],
     [{ vis: 400, t2m: -2 }, 48],
-    [{ cloud: 90 }, 3],
-    [{ cloud: 60 }, 2],
+    [{ cloud: 81 }, 3],
+    [{ cloud: 80 }, 2],
+    [{ cloud: 50 }, 2],
     [{ cloud: 20 }, 1],
+    [{ cloud: 19 }, 0],
     [{ cloud: null, precip: null }, null],
   ])('%j → %s', (h, code) => expect(weatherCode({ ...none, ...h })).toBe(code));
 });

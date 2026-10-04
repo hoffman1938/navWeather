@@ -4,7 +4,7 @@
 // Each run uses its own coordinates, so it can be repeated against the same relay.
 import assert from 'node:assert/strict';
 
-const BASE = process.env.REPORTS_BASE ?? 'http://127.0.0.1:8787';
+const BASE = process.env.REPORTS_BASE ?? process.env.BASE_URL ?? 'http://127.0.0.1:8787';
 // The versioned API by default; the Worker also answers the original unversioned paths.
 const API = process.env.API ?? '/api/v1';
 const api = (path) => path.replace(/^\/api\//, `${API}/`);

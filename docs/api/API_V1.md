@@ -33,7 +33,7 @@ Status column: **IMPLEMENTED** (live in `worker/index.ts`) or **PLANNED**
 ### `GET /whereami`
 Approximate area of the connection (Cloudflare `request.cf`), used when the
 device can't give a position. `200 { lat, lon, city, country }` or
-`404 { error: "unknown" }`. Nothing stored. No CORS headers.
+`404 { error: "unknown" }`. Nothing stored. No CORS headers. 429 (`WHEREAMI_LIMITER`, 20/min per IP).
 
 ### Live location sharing
 
@@ -44,6 +44,8 @@ device can't give a position. `200 { lat, lon, city, country }` or
 | `GET /share/:id/ws` | capability id | WebSocket upgrade | stream of `{type:"snapshot"}` / `{type:"ended"}`; 426 without upgrade; 429 too many viewers |
 | `PUT /share/:id` | `Authorization: Bearer <key>` | `ShareUpdate` ≤48 KB (position, optional trip/route ≤500 points) | `200 { ok, needsRoute, expiresAt }` (`stale: true` for out-of-order); 403, 404, 413, 429 (`too-fast`, <1 s apart) |
 | `DELETE /share/:id` | Bearer key | — | `200 { ok: true }` — everything deleted, viewers told |
+
+Every `/share/:id` request (updates, polling, WebSocket opens) also counts against `SHARE_LIMITER` — 240/min per IP → `429 { error: "too-many-requests" }`.
 
 ### Driver reports
 

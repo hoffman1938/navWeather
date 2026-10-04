@@ -34,10 +34,17 @@ Worker route instead (see `worker/`).
 | `VITE_AIR_QUALITY_PROVIDER` | `open-meteo` | `open-meteo`, `none` |
 | `VITE_SPEECH_PROVIDER` | `browser` | `browser` |
 
+## Modes
+
+`npm run dev` reads `.env.development`, `npm run build:preview` reads `.env.preview`, `npm run build` reads
+`.env.production` (Vite modes; all committed, public values only). `.env` and `.env.<mode>.local` (git-ignored)
+override them on one machine.
+
 ## Endpoints
 
 | Variable | Default |
 | --- | --- |
+| `VITE_API_ORIGIN` | empty — our API on the page's own origin (the Worker serves both). An absolute origin (`https://…`) for a client served elsewhere, e.g. a native shell; every path below and the live-share WebSocket then use it (add it to `connect-src` in `public/_headers`) |
 | `VITE_ROUTE_URL` | `/api/v1/route` — our routing API (same origin) |
 | `VITE_OSRM_BASE_URL` | `https://router.project-osrm.org` |
 | `VITE_OSRM_MIN_INTERVAL_MS` | `1000` — least time between requests to one OSRM server (the public servers allow 1 request/s); `0` for a self-hosted router |
@@ -110,12 +117,14 @@ on :8787, as Cloudflare would (headers, SPA fallback, service worker).
 | Name | Kind | Default | Purpose |
 | --- | --- | --- | --- |
 | `TRIP_LIMITER` | rate-limit binding (`wrangler.toml`) | 20 requests / 60 s per IP | `/api/v1/trips/*` |
-| `GEO` | D1 database `navweather-geo` | — | our geocoder index; locally `npm run seed:local` loads it (no account); on Cloudflare the first deploy creates it, then `wrangler d1 execute navweather-geo --remote --file data/build/ge/geocode.sql` |
+| `GEO` | D1 database `navweather-geo` (local), `navweather-geo-preview`, `navweather-geo-production` | — | our geocoder index; locally `npm run seed:local` loads it (no account); on Cloudflare the first deploy creates it, then `npm run seed:preview` / `seed:production` (or the Deploy workflow) |
 | `GEOCODE_LIMITER` | rate-limit binding | 120 requests / 60 s per IP | `/api/v1/geocode` |
 | `VALHALLA_URL` | var (`.dev.vars` locally, written by `npm run engines:up`) | unset → 503 | where our Valhalla answers; in the cloud the container (DP-5.2) |
 | `ROUTE_LIMITER` | rate-limit binding | 60 requests / 60 s per IP | `/api/v1/route`, `/route/matrix` |
-| `WEATHER` | R2 bucket `navweather-weather` | — | our weather tiles (`/api/v1/weather/*`); locally `npm run data:weather` fills the local bucket (no account; ~270 MB downloaded from the Open-Meteo open-data archive, ~1.6 GB of tiles, ~15–40 min; `-- --bbox w,s,e,n` for a quick area); on Cloudflare the first deploy creates the bucket and the scheduled pipeline fills it (DP-4.6, stage 5) |
-| `WEATHER_LIMITER` | rate-limit binding | 120 requests / 60 s per IP | `/api/v1/weather/forecast` |
+| `WEATHER` | R2 bucket `navweather-weather` | — | our weather tiles (`/api/v1/weather/*`); locally `npm run data:weather` fills the local bucket (no account; ~270 MB downloaded from the Open-Meteo open-data archive, ~0.8 GB of tiles, ~15–40 min; `-- --bbox w,s,e,n` for a quick area); on Cloudflare the first deploy creates the environment's bucket (`navweather-weather-preview` / `-production`) and the Weather workflow fills it (`npm run data:weather -- --env …`) |
+| `WEATHER_LIMITER` | rate-limit binding | 120 requests / 60 s per IP | `/api/v1/weather/forecast`, `/weather/meta` |
+| `WHEREAMI_LIMITER` | rate-limit binding | 20 requests / 60 s per IP | `/api/v1/whereami` |
+| `SHARE_LIMITER` | rate-limit binding | 240 requests / 60 s per IP | `/api/v1/share/:id` (updates, viewers' polling, WebSocket opens; the object also refuses updates < 1 s apart) |
 | `ASSETS` (read by the Worker) | static assets | — | our places tiles for Long Trip stops (`/data/places/v1`) |
 | `OVERPASS_URLS` | `[vars]` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` | Overpass endpoints for trip stop places and borders (server-side) |
 | `TRIP_USER_AGENT` | `[vars]` | `navWeather/0.1 (trip planner; Cloudflare Worker)` | identifies the app to Overpass — **add a contact before production** |

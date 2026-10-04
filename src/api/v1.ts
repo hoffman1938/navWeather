@@ -10,18 +10,44 @@
 export const API_VERSION = 1;
 export const API_BASE = '/api/v1';
 
-/** Paths the web client calls (same origin). */
+/**
+ * Where the API is: '' = the page's own origin (the web app on the Worker); an absolute origin for clients served
+ * from elsewhere (a native shell, a dev server on another host). Set once from the client's config
+ * (`VITE_API_ORIGIN`, DEVELOPMENT_PLAN DP-2.3).
+ */
+let origin = '';
+export function setApiOrigin(value: string): void {
+  origin = value.replace(/\/+$/, '');
+}
+export const apiOrigin = (): string => origin;
+
+/** URLs the clients call. */
 export const apiPaths = {
-  share: `${API_BASE}/share`,
-  shareItem: (id: string) => `${API_BASE}/share/${encodeURIComponent(id)}`,
+  get share() {
+    return `${origin}${API_BASE}/share`;
+  },
+  shareItem: (id: string) => `${origin}${API_BASE}/share/${encodeURIComponent(id)}`,
+  /** Path only: the WebSocket URL needs a ws(s) origin (see `share/viewer.ts`). */
   shareSocket: (id: string) => `${API_BASE}/share/${encodeURIComponent(id)}/ws`,
-  reports: `${API_BASE}/reports`,
-  whereami: `${API_BASE}/whereami`,
-  health: `${API_BASE}/health`,
-  tripsPlan: `${API_BASE}/trips/plan`,
-  tripsPlaces: `${API_BASE}/trips/places`,
-  tripsBorders: `${API_BASE}/trips/borders`,
-} as const;
+  get reports() {
+    return `${origin}${API_BASE}/reports`;
+  },
+  get whereami() {
+    return `${origin}${API_BASE}/whereami`;
+  },
+  get health() {
+    return `${origin}${API_BASE}/health`;
+  },
+  get tripsPlan() {
+    return `${origin}${API_BASE}/trips/plan`;
+  },
+  get tripsPlaces() {
+    return `${origin}${API_BASE}/trips/places`;
+  },
+  get tripsBorders() {
+    return `${origin}${API_BASE}/trips/borders`;
+  },
+};
 
 /**
  * The Worker's internal route for a request path. `/api/v1/…` and the

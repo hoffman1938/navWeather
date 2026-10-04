@@ -221,14 +221,18 @@ stored.
 ## Deploy (Cloudflare Workers)
 
 ```bash
-npm run build
 npx wrangler login
-npx wrangler deploy      # app + live-sharing and reports relay (Worker + Durable Objects)
+npm run deploy:preview      # Worker navweather-preview: its own Durable Objects, D1, R2 (test data)
+npm run seed:preview        # our search index into its D1
+npm run data:weather -- --env preview   # our forecast into its R2 (or let .github/workflows/weather.yml do it)
+npm run deploy:production   # Worker navweather (real users); seed:production, --env production likewise
 ```
 
-`public/_headers` sets the CSP. Hosting is one Cloudflare **Worker** project (not Pages) — see
-[ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md). Separate `preview` and `production`
-environments and the one-command local stack arrive with DEVELOPMENT_PLAN stage 2.
+Or from GitHub: the **Deploy** workflow (secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) builds the data,
+deploys and, for preview, runs the Worker smoke tests; the **Weather** workflow refreshes the forecast every hour
+when new model runs appear. `public/_headers` sets the CSP. Hosting is one Cloudflare **Worker** project per
+environment (not Pages) — see [ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md);
+`npm run check:envs` keeps the environments of `wrangler.toml` in step.
 
 ## Licence
 

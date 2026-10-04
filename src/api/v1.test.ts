@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiPaths, normalizeApiPath } from './v1';
+import { apiOrigin, apiPaths, normalizeApiPath, setApiOrigin } from './v1';
 
 describe('API v1 routing', () => {
   it('serves /api/v1/… and the unversioned /api/… (clients from before versioning) as the same route', () => {
@@ -22,5 +22,18 @@ describe('API v1 routing', () => {
     expect(apiPaths.reports).toBe('/api/v1/reports');
     expect(apiPaths.shareItem('a/b')).toBe('/api/v1/share/a%2Fb');
     expect(apiPaths.shareSocket('x')).toBe('/api/v1/share/x/ws');
+  });
+
+  it('a client served elsewhere (a native shell) calls the API at its absolute origin (DP-2.3)', () => {
+    setApiOrigin('https://navweather.example/');
+    try {
+      expect(apiOrigin()).toBe('https://navweather.example');
+      expect(apiPaths.tripsPlan).toBe('https://navweather.example/api/v1/trips/plan');
+      expect(apiPaths.shareItem('x')).toBe('https://navweather.example/api/v1/share/x');
+      expect(apiPaths.shareSocket('x')).toBe('/api/v1/share/x/ws'); // the viewer puts it on a wss:// origin
+    } finally {
+      setApiOrigin('');
+    }
+    expect(apiPaths.tripsPlan).toBe('/api/v1/trips/plan');
   });
 });

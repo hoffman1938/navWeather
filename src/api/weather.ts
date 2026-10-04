@@ -270,14 +270,15 @@ export function apparentTemperature(t: number, rh: number, windMs: number): numb
 
 /**
  * WMO weather code derived from the model's fields (a derived estimate, WEATHER_ENGINE §6): thunderstorm from
- * instability with rain, freezing rain and snow from the model's precipitation type and snowfall, rain by intensity,
- * fog from visibility, otherwise clouds. Hourly amounts in mm (precipitation, snow as water).
+ * strong instability with rain, freezing rain and snow from the model's precipitation type and snowfall, drizzle and
+ * rain by intensity, fog from visibility, otherwise clouds. Thresholds follow Open-Meteo's (checked against its
+ * ECMWF answers, 2026-10-05) so the app words the weather as before; below 0.1 mm/h it is dry (the icon never
+ * contradicts "0 mm"). Hourly amounts in mm (precipitation, snow as water).
  */
 export function weatherCode(h: { precip: number | null; swe: number | null; ptype: number | null; cape: number | null; cloud: number | null; vis: number | null; t2m: number | null }): number | null {
   const p = h.precip;
   if (p !== null && p >= 0.1) {
-    const cape = h.cape ?? 0;
-    if ((cape >= 3000 && p >= 0.1) || (cape >= 1500 && p >= 2.5)) return 95;
+    if ((h.cape ?? 0) >= 3000) return 95;
     if (h.ptype === 3) return p >= 2.5 ? 67 : 66;
     if (h.ptype === 12) return p >= 0.5 ? 57 : 56;
     const snowShare = h.swe !== null ? h.swe / p : h.ptype === 5 || h.ptype === 6 ? 1 : 0;
@@ -286,11 +287,11 @@ export function weatherCode(h: { precip: number | null; swe: number | null; ptyp
       return cm >= 0.8 ? 75 : cm >= 0.2 ? 73 : 71;
     }
     if (h.ptype === 8) return 77;
-    return p >= 7.6 ? 65 : p >= 2.5 ? 63 : 61;
+    return p >= 7.6 ? 65 : p >= 2.5 ? 63 : p >= 1.3 ? 61 : p >= 1 ? 55 : p >= 0.5 ? 53 : 51;
   }
   if (h.vis !== null && h.vis < 1000) return h.t2m !== null && h.t2m < 0 ? 48 : 45;
   if (h.cloud === null) return null;
-  return h.cloud >= 85 ? 3 : h.cloud >= 50 ? 2 : h.cloud >= 15 ? 1 : 0;
+  return h.cloud > 80 ? 3 : h.cloud >= 50 ? 2 : h.cloud >= 20 ? 1 : 0;
 }
 
 /** Temperature change per metre of height (standard atmosphere), for a point higher or lower than its grid cell. */
@@ -304,7 +305,8 @@ export function pointForecast(
   q: Pick<ForecastQuery, 'hourly' | 'windUnit'> & { elevation?: number },
 ): { elevation?: number; hourly: Record<string, (number | null)[]> } {
   const s = (key: VarKey, perHour = false) => series(index, rec, plan, key, perHour);
-  const gridElev = rec[0] === MISSING ? null : rec[0];
+  // The source marks cells without a height (open sea) with -999.
+  const gridElev = rec[0] === MISSING || rec[0] <= -999 ? null : rec[0];
   const dT = q.elevation !== undefined && gridElev !== null ? (gridElev - q.elevation) * LAPSE_K_PER_M : 0;
   const t2m = s('t2m').map((t) => (t === null ? null : t + dT));
   const rh = s('rh');
@@ -330,7 +332,8 @@ export function pointForecast(
     showers: () => precip.map((x) => (x === null ? null : 0)),
     snowfall: () => swe.map((x) => round(x === null ? null : x * 0.7, 2)),
     weather_code: () =>
-      plan.hours.map((_, i) => weatherCode({ precip: precip[i], swe: swe[i], ptype: ptype[i], cape: cape[i], cloud: cloud[i], vis: vis[i], t2m: t2m[i] })),
+      // From the amounts as shown (rounded), so the icon and the number always agree.
+      plan.hours.map((_, i) => weatherCode({ precip: round(precip[i], 1), swe: round(swe[i], 1), ptype: ptype[i], cape: cape[i], cloud: cloud[i], vis: vis[i], t2m: t2m[i] })),
     cloud_cover: () => cloud.map((x) => round(x, 0)),
     wind_speed_10m: () => windMs.map((x) => round(x === null ? null : x * k, 1)),
     wind_gusts_10m: () => gust.map((x, i) => (x === null ? null : round(Math.max(x, windMs[i] ?? 0) * k, 1))),

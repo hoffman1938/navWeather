@@ -9,7 +9,7 @@
 | Bucket / prefix | Content | Written by | Read by |
 | --- | --- | --- | --- |
 | `navweather-weather` `weather/latest.json` | index of the current build (`WeatherIndex`, `src/api/weather.ts`): run, model runs, steps (unix s), per-variable interval/presence, scales, tiles present | `pipelines/weather/build.mjs` (last, so a build appears whole) | Worker, cached 60 s per isolate |
-| `weather/runs/<run>/t/<ty>/<tx>.bin` | one 5° × 5° tile of the 0.25° grid (land and coasts, 1 030 tiles): 400 points × [height, 11 variables × ~85 steps] int16 (−32768 = no value) — ~1.6 KB per point at a fixed offset (range reads) | the pipeline (twice a day with new model runs; the two newest builds are kept) | `/api/v1/weather/forecast` (+ edge cache per point) |
+| `weather/runs/<run>/t/<ty>/<tx>.bin` | one 5° × 5° tile of the 0.25° grid (land and coasts, 1 030 tiles): 400 points × [height, 11 variables × ~85 steps] int16 (−32768 = no value); each point's ~1.9 KB record sits at a fixed offset (range reads); ~0.75 MB per tile, ~0.8 GB per build | the pipeline (`.github/workflows/weather.yml` looks every hour and builds when a new model run appears; the two newest builds are kept) | `/api/v1/weather/forecast` (+ edge cache per point) |
 
 No personal data: model fields per grid cell. Locally the same bucket lives in `.wrangler/state` (`npm run data:weather`).
 

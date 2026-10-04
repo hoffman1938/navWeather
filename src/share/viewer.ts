@@ -1,4 +1,4 @@
-import { apiPaths } from '../api/v1';
+import { apiOrigin, apiPaths } from '../api/v1';
 import { create } from 'zustand';
 import { matchForecastToTime } from '../algorithms/weatherMatching';
 import { getProviders } from '../services/providers';
@@ -124,9 +124,10 @@ async function firstLoad(id: string, sid: number) {
 function connect(id: string, sid: number) {
   if (sid !== session) return;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const base = apiOrigin() ? apiOrigin().replace(/^http/, 'ws') : `${proto}//${location.host}`;
   let ws: WebSocket;
   try {
-    ws = new WebSocket(`${proto}//${location.host}${apiPaths.shareSocket(id)}`);
+    ws = new WebSocket(`${base}${apiPaths.shareSocket(id)}`);
   } catch {
     startPolling(id, sid);
     return;

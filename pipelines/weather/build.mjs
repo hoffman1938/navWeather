@@ -8,6 +8,9 @@
  *   npm run data:weather -- --bbox 39,40,47,44            # only tiles touching this box (w,s,e,n): a quick local run
  *   npm run data:weather -- --out data/build/weather      # write the objects as files instead of R2
  *   npm run data:weather -- --force                       # rebuild even when these runs are already there
+ *   npm run data:weather -- --env production              # into that environment's bucket on Cloudflare (needs
+ *                                                         # `wrangler login` or CLOUDFLARE_API_TOKEN; the schedule
+ *                                                         # in .github/workflows/weather.yml does this)
  *
  * Sources (read with HTTP range requests from the Open-Meteo open-data archive on AWS, CC BY 4.0):
  *   ECMWF IFS 0.25° (CC BY 4.0) — temperature, humidity, clouds, precipitation, snowfall, wind, gusts, CAPE,
@@ -18,7 +21,7 @@
  * the globe, ~250 MB downloaded per run. Two builds stay in R2 (the newest and the one before, for requests in
  * flight); older ones are deleted.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { GRID, LATEST_KEY, MISSING, recordValues, runPrefix, TILE, tileKey, VARS } from '../../src/api/weather.ts';
 import { countryAt, decodeCountries } from '../../src/trip/countries.ts';
@@ -32,6 +35,8 @@ const opt = (name) => {
 const OUT = opt('out');
 const BBOX = opt('bbox')?.split(',').map(Number);
 const FORCE = args.includes('--force');
+const ENV = opt('env');
+if (ENV && ENV !== 'preview' && ENV !== 'production') throw new Error('--env is preview or production');
 
 const IFS = 'ecmwf_ifs025';
 const GFS = 'ncep_gfs025';
@@ -51,6 +56,10 @@ const SOURCES = {
 };
 const SOURCE_TEXT =
   'ECMWF IFS 0.25° open data (CC BY 4.0) and NOAA GFS 0.25° (public domain), from the Open-Meteo open-data archive on AWS (CC BY 4.0)';
+
+/** Tiles read in one go per variable: 8 × 20 columns × 20 rows × ≤210 steps × 4 bytes ≈ 2.7 MB of decoder memory. */
+const MAX_SPAN_TILES = 8;
+const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
 const t0 = Date.now();
 const iso = (s) => new Date(s * 1000).toISOString().slice(0, 16) + 'Z';
@@ -108,14 +117,26 @@ async function openStore() {
           return null;
         }
       },
+      has: async (key) => existsSync(join(OUT, key)),
       runs: async () => [],
       deleteRun: async () => {},
       close: async () => {},
     };
   }
-  const { getPlatformProxy } = await import('wrangler');
-  // The same local state `wrangler dev` uses (.wrangler/state), so the dev Worker sees what we write.
-  const proxy = await getPlatformProxy({ persist: true });
+  const { getPlatformProxy, unstable_readConfig } = await import('wrangler');
+  let proxy;
+  if (ENV) {
+    // The environment's real bucket, through a one-binding config of our own (the Worker's config stays local).
+    const cfg = unstable_readConfig({ config: 'wrangler.toml', env: ENV }, { hideWarnings: true });
+    const bucket = cfg.r2_buckets.find((b) => b.binding === 'WEATHER')?.bucket_name;
+    const configPath = 'data/build/weather-remote.wrangler.json';
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, JSON.stringify({ name: 'navweather-weather-pipeline', compatibility_date: '2026-09-01', r2_buckets: [{ binding: 'WEATHER', bucket_name: bucket, remote: true }] }));
+    proxy = await getPlatformProxy({ configPath, persist: false });
+  } else {
+    // The same local state `wrangler dev` uses (.wrangler/state), so the dev Worker sees what we write.
+    proxy = await getPlatformProxy({ persist: true });
+  }
   const bucket = proxy.env.WEATHER;
   if (!bucket) throw new Error('wrangler.toml has no R2 binding WEATHER');
   const keys = async (prefix) => {
@@ -129,9 +150,10 @@ async function openStore() {
     return out;
   };
   return {
-    kind: 'local R2 (bucket of `npm run dev`)',
+    kind: ENV ? `R2 of ${ENV} on Cloudflare` : 'local R2 (bucket of `npm run dev`)',
     put: (key, bytes) => bucket.put(key, bytes),
     getText: async (key) => (await bucket.get(key))?.text() ?? null,
+    has: async (key) => (await bucket.head(key)) !== null,
     runs: async () => (await bucket.list({ prefix: 'weather/runs/', delimiter: '/' })).delimitedPrefixes.map((p) => p.split('/')[2]),
     deleteRun: async (r) => {
       const all = await keys(runPrefix(r));
@@ -217,14 +239,21 @@ for (let ty = 0; ty < tileRows; ty++) {
   if (!land[ty].length) continue;
   const r0 = ty * TILE;
   const r1 = Math.min(GRID.rows, r0 + TILE);
-  // Neighbouring tiles are read together (fewer, larger range requests).
+  // Neighbouring tiles are read together (fewer, larger range requests) — but not too many: the reader decodes in
+  // a fixed 64 MB WebAssembly heap shared by every variable read at the same time.
   const spans = [];
   for (const tx of land[ty]) {
     const last = spans[spans.length - 1];
-    if (last && last[1] === tx - 1) last[1] = tx;
+    if (last && last[1] === tx - 1 && tx - last[0] < MAX_SPAN_TILES) last[1] = tx;
     else spans.push([tx, tx]);
   }
   for (const [tx0, tx1] of spans) {
+    // A run stopped half-way resumes: tiles of this build already stored are not read again.
+    const done = await Promise.all(range(tx0, tx1).map((tx) => store.has(tileKey(run, ty, tx))));
+    if (!FORCE && done.every(Boolean)) {
+      written += done.length;
+      continue;
+    }
     const c0 = tx0 * TILE;
     const c1 = (tx1 + 1) * TILE;
     const width = c1 - c0;
@@ -237,7 +266,7 @@ for (let ty = 0; ty < tileRows; ty++) {
           const col = tx * TILE + pc;
           const base = (pr * TILE + pc) * RV;
           const e = elevation[row * GRID.cols + col];
-          if (Number.isFinite(e)) rec[base] = Math.round(e);
+          if (Number.isFinite(e) && e > -999) rec[base] = Math.round(e); // -999: no height (open sea)
           sources.forEach((s, n) => {
             const values = data[n];
             const off = (pr * width + (col - c0)) * s.T;

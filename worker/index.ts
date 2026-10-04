@@ -22,6 +22,15 @@ export interface Env extends TripEnv, GeocodeEnv, RouteEnv, WeatherEnv {
   REPORT_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
   /** Abuse guard for listing reports (per client IP; generous — a long route asks for several boxes). */
   REPORT_LIST_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+  /** Abuse guard for the approximate-location lookup (per client IP). */
+  WHEREAMI_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+  /** Abuse guard for live-share traffic: updates, viewers' polling and WebSocket opens (per client IP). */
+  SHARE_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+}
+
+/** True when this client may go on (no limiter bound — e.g. an old config — means no limit). */
+async function allowed(limiter: { limit(opts: { key: string }): Promise<{ success: boolean }> } | undefined, request: Request): Promise<boolean> {
+  return !limiter || (await limiter.limit({ key: request.headers.get('CF-Connecting-IP') ?? 'local' })).success;
 }
 
 /**
@@ -84,6 +93,7 @@ export default {
     // Nothing is stored; no CORS headers, so other sites can't read it.
     if (path === '/api/whereami') {
       if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405);
+      if (!(await allowed(env.WHEREAMI_LIMITER, request))) return json({ error: 'too-many-requests' }, 429);
       const cf = request.cf as { latitude?: string; longitude?: string; city?: string; country?: string; asn?: number; clientTcpRtt?: number } | undefined;
       const lat = Number(cf?.latitude);
       const lon = Number(cf?.longitude);
@@ -115,6 +125,7 @@ export default {
 
     const m = /^\/api\/share\/([^/]+)(\/ws)?$/.exec(path);
     if (!m || !SHARE_ID_RE.test(m[1])) return json({ error: 'not-found' }, 404);
+    if (!(await allowed(env.SHARE_LIMITER, request))) return json({ error: 'too-many-requests' }, 429);
     if (!m[2] && request.method === 'PUT' && Number(request.headers.get('content-length') ?? '0') > MAX_BODY_BYTES) {
       return json({ error: 'too-large' }, 413);
     }

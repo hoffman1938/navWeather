@@ -1,3 +1,5 @@
+import { setApiOrigin } from './api/v1';
+
 /**
  * Single source of configuration. Every tunable reads from Vite env vars
  * (see .env.example) with a sensible default, so the app runs with no .env.
@@ -27,6 +29,11 @@ function list(key: string, fallback: string[]): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+/** Our API: '' = this page's origin (the Worker serves both); an absolute origin otherwise (DP-2.3). */
+const apiOriginValue = str('VITE_API_ORIGIN', '').replace(/\/+$/, '');
+setApiOrigin(apiOriginValue);
+const api = (path: string) => `${apiOriginValue}/api/v1${path}`;
 
 export const config = {
   providers: {
@@ -58,7 +65,7 @@ export const config = {
   },
   endpoints: {
     /** Our routing API (the Worker's `/api/v1/route`, same origin). */
-    route: str('VITE_ROUTE_URL', '/api/v1/route'),
+    route: str('VITE_ROUTE_URL', api('/route')),
     osrm: str('VITE_OSRM_BASE_URL', 'https://router.project-osrm.org'),
     /** OpenStreetMap community routing instances for walking and cycling (the demo server above only does cars). */
     osrmFoot: str('VITE_OSRM_FOOT_URL', 'https://routing.openstreetmap.de/routed-foot'),
@@ -66,17 +73,17 @@ export const config = {
     /** Public transport: Transitous (MOTIS) over operators' open timetables. Empty turns public transport off. */
     transit: env.VITE_TRANSIT_URL === '' ? '' : str('VITE_TRANSIT_URL', 'https://api.transitous.org'),
     /** Our forecast (the Worker's `/api/v1/weather`, same origin). */
-    weather: str('VITE_WEATHER_URL', '/api/v1/weather'),
+    weather: str('VITE_WEATHER_URL', api('/weather')),
     openMeteo: str('VITE_OPEN_METEO_BASE_URL', 'https://api.open-meteo.com'),
     openMeteoAir: str('VITE_OPEN_METEO_AIR_URL', 'https://air-quality-api.open-meteo.com'),
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),
     photon: str('VITE_PHOTON_BASE_URL', 'https://photon.komoot.io'),
     /** Driver reports relay (same origin as the app: the Worker in worker/). */
-    reports: str('VITE_REPORTS_URL', '/api/v1/reports'),
+    reports: str('VITE_REPORTS_URL', api('/reports')),
     /** Rough area of the connection, when the device can't give a position (same Worker). */
-    whereami: str('VITE_WHEREAMI_URL', '/api/v1/whereami'),
+    whereami: str('VITE_WHEREAMI_URL', api('/whereami')),
     /** Our geocoder (the Worker's `/api/v1/geocode`, same origin). */
-    geocode: str('VITE_GEOCODE_URL', '/api/v1/geocode'),
+    geocode: str('VITE_GEOCODE_URL', api('/geocode')),
     /** Our places tiles (static assets built by `npm run data:osm`). */
     placesTiles: str('VITE_PLACES_TILES_URL', '/data/places/v1'),
     overpass: list('VITE_OVERPASS_URLS', [

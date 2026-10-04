@@ -3,7 +3,7 @@
 //   npm run test:geocode   [GEO_BASE=https://… to test a deployment; API=/api for legacy paths]
 import assert from 'node:assert/strict';
 
-const BASE = process.env.GEO_BASE ?? 'http://127.0.0.1:8787';
+const BASE = process.env.GEO_BASE ?? process.env.BASE_URL ?? 'http://127.0.0.1:8787';
 const API = process.env.API ?? '/api/v1';
 const get = (qs, init) => fetch(`${BASE}${API}/geocode?${qs}`, init);
 let passed = 0;

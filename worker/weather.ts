@@ -136,6 +136,8 @@ export async function weatherForecast(request: Request, url: URL, env: WeatherEn
 
 export async function weatherMeta(request: Request, env: WeatherEnv): Promise<Response> {
   if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405);
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
+  if (env.WEATHER_LIMITER && !(await env.WEATHER_LIMITER.limit({ key: ip })).success) return json({ error: 'too-many-requests' }, 429);
   const c = await latest(env);
   if (!c) return json({ error: 'unavailable' }, 503);
   const { index } = c;

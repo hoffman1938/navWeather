@@ -42,10 +42,12 @@ From model steps (3-hourly to 6 days, then 6-hourly) to hours (`src/api/weather.
   6 h → 1 mm each hour), a maximum holds for each hour of its interval; the hour before the run starts has none;
 - derived: wind speed and direction from its components; rain = precipitation − snowfall water; snowfall cm =
   water mm × 0.7; apparent temperature (Steadman, without sunshine); gusts never below the wind;
-- **weather code — a derived estimate**: thunderstorm when CAPE ≥ 3000 J/kg with precipitation, or ≥ 1500 with
-  ≥ 2.5 mm/h; freezing rain/drizzle and ice pellets from the model's precipitation type; snow when snowfall is at
-  least half the precipitation (light < 0.2 cm/h, heavy ≥ 0.8); rain by intensity (2.5 and 7.6 mm/h); fog when
-  visibility < 1 km (freezing below 0 °C); otherwise clouds (15/50/85 %);
+- **weather code — a derived estimate**, thresholds as Open-Meteo's (compared on 1 152 hours in 16 cities,
+  2026-10-05: the same condition almost everywhere, wording differs at the edges): dry below 0.1 mm/h (the icon never
+  contradicts "0 mm"); thunderstorm when CAPE ≥ 3000 J/kg with precipitation; freezing rain/drizzle and ice pellets
+  from the model's precipitation type; snow when snowfall is at least half the precipitation (light < 0.2 cm/h,
+  heavy ≥ 0.8); drizzle below 1.3 mm/h (light < 0.5, dense ≥ 1), rain by intensity (2.5 and 7.6 mm/h); fog when visibility < 1 km (freezing
+  below 0 °C); otherwise clouds (20/50/80 %). Not derivable without convective precipitation: showers (80–82);
 - temperature for the point's height: route samples send their height; the forecast moves the temperature by
   6.5 °C/km from the grid cell's height (and says which height it is for).
 

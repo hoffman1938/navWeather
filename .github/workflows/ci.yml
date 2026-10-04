@@ -23,6 +23,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Worker environments in step (dev, preview, production)
+        run: npm run check:envs
       - name: Typecheck (app + Worker)
         run: npm run typecheck
       - name: Unit and scenario tests

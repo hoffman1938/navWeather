@@ -3,7 +3,7 @@
 //   npm run test:trips       (terminal 2)   [TRIP_BASE=https://… to test a deployment; API=/api for legacy paths]
 import assert from 'node:assert/strict';
 
-const BASE = process.env.TRIP_BASE ?? 'http://127.0.0.1:8787';
+const BASE = process.env.TRIP_BASE ?? process.env.BASE_URL ?? 'http://127.0.0.1:8787';
 const API = process.env.API ?? '/api/v1';
 const post = (path, body, headers = {}) =>
   fetch(`${BASE}${API}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) });

@@ -1,11 +1,14 @@
 # navWeather on Cloudflare Workers (not Pages): the static app (dist/) plus the API (live sharing, driver reports,
-# approximate location, Long Trip planner). Runs on Workers Free today; Workers Paid from the first engine in
-# Containers (docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md).
+# approximate location, Long Trip planner, our geocoder, routing and forecast). ADR-016; DEVELOPMENT_PLAN DP-2.2.
 #
-#   npm run build && npx wrangler deploy     # deploy
-#   npm run dev:api                          # local relay for `npm run dev`
-#   npm run build && npx wrangler dev        # full stack locally (port 8787)
-name = "navweather"
+# Three environments, each its own Worker with its own Durable Objects, D1, R2 and rate limits — preview never
+# touches real users' data:
+#   (top level) dev   `npm run dev` / `wrangler dev` — local only (local Durable Objects, D1, R2; no account)
+#   preview           `npm run deploy:preview`    → Worker navweather-preview  (test data)
+#   production        `npm run deploy:production` → Worker navweather          (real users)
+# Bindings below are repeated per environment on purpose: wrangler does not inherit them (scripts/check-wrangler-envs.mjs
+# keeps the three in step, in CI).
+name = "navweather-dev"
 main = "worker/index.ts"
 compatibility_date = "2026-09-01"
 
@@ -17,6 +20,29 @@ not_found_handling = "single-page-application"
 # (with public/_headers applied).
 run_worker_first = ["/api/*"]
 
+# Durable Object classes and their storage migrations (inherited by every environment).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LiveShare"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Reports"]
+
+# Logs without location data (DP-3.3): no invocation logs (they would carry request URLs — share ids, coordinates
+# in /weather and /geocode queries), query strings redacted from traces; the Worker itself logs nothing.
+[observability]
+enabled = true
+redact_query_string = true
+
+[observability.logs]
+enabled = true
+invocation_logs = false
+head_sampling_rate = 1
+
+# ---------------------------------------------------------------------------------------------------------------
+# dev (local)
+
 [[durable_objects.bindings]]
 name = "LIVE_SHARE"
 class_name = "LiveShare"
@@ -26,77 +52,219 @@ class_name = "LiveShare"
 name = "REPORTS"
 class_name = "Reports"
 
-# Abuse guard for creating shares (per client IP).
+# Abuse guards, per client IP (DP-3.4: every endpoint that does work has one).
+# Creating shares.
 [[ratelimits]]
 name = "CREATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 6, period = 60 }
 
-# Abuse guard for reporting and "still there?" votes (per client IP).
+# Reporting and "still there?" votes.
 [[ratelimits]]
 name = "REPORT_LIMITER"
 namespace_id = "1002"
 simple = { limit = 10, period = 60 }
 
-# Abuse guard for reading reports (per client IP). A route asks for up to
-# 24 boxes, every 5 minutes while driving — this leaves plenty of headroom.
+# Reading reports: a route asks for up to 24 boxes, every 5 minutes while driving — plenty of headroom.
 [[ratelimits]]
 name = "REPORT_LIST_LIMITER"
 namespace_id = "1003"
 simple = { limit = 120, period = 60 }
 
-# Abuse guard for the long-trip planner (per client IP). Each plan may make up
-# to 12 Overpass queries (edge-cached by area), so keep this modest.
+# The long-trip planner: each plan may make up to 12 Overpass queries (edge-cached by area), so keep this modest.
 [[ratelimits]]
 name = "TRIP_LIMITER"
 namespace_id = "1004"
 simple = { limit = 20, period = 60 }
 
-# Abuse guard for search and suggestions (per client IP): typing makes a request every ~300 ms.
+# Search and suggestions: typing makes a request every ~300 ms.
 [[ratelimits]]
 name = "GEOCODE_LIMITER"
 namespace_id = "1005"
 simple = { limit = 120, period = 60 }
 
-# Abuse guard for routing (per client IP): a plan asks for a road and a few via probes; re-routes add more.
+# Routing: a plan asks for a road and a few via probes; re-routes add more.
 [[ratelimits]]
 name = "ROUTE_LIMITER"
 namespace_id = "1006"
 simple = { limit = 60, period = 60 }
 
-# Our geocoder index (DEVELOPMENT_PLAN DP-4.4): the region's places, streets and addresses with FTS5.
-# Locally: `npm run seed:local` loads it (no account needed). On Cloudflare the first `wrangler deploy` creates
-# the database; load it with `wrangler d1 execute navweather-geo --remote --file data/build/ge/geocode.sql`.
-[[d1_databases]]
-binding = "GEO"
-database_name = "navweather-geo"
-
-# Abuse guard for weather (per client IP): a route asks for its points in batches, refreshed every ~20 minutes.
+# Weather: a route asks for its points in batches, refreshed every ~20 minutes; the run check every 10.
 [[ratelimits]]
 name = "WEATHER_LIMITER"
 namespace_id = "1007"
 simple = { limit = 120, period = 60 }
 
-# Our forecast, worldwide (DEVELOPMENT_PLAN DP-4.6): weather tiles built from open model data by
-# `npm run data:weather` (pipelines/weather/build.mjs) — locally into this bucket's local state; on Cloudflare the
-# first `wrangler deploy` creates the bucket and the scheduled pipeline fills it.
+# Approximate location: asked once when the device has no position.
+[[ratelimits]]
+name = "WHEREAMI_LIMITER"
+namespace_id = "1008"
+simple = { limit = 20, period = 60 }
+
+# Live-share traffic of one IP: the sharer's updates (≤1/s, also checked by the object) and viewers' polling.
+[[ratelimits]]
+name = "SHARE_LIMITER"
+namespace_id = "1009"
+simple = { limit = 240, period = 60 }
+
+# Our geocoder index (DEVELOPMENT_PLAN DP-4.4): the region's places, streets and addresses with FTS5.
+# Locally `npm run seed:local` loads it (no account needed).
+[[d1_databases]]
+binding = "GEO"
+database_name = "navweather-geo"
+
+# Our forecast, worldwide (DP-4.6): weather tiles built from open model data by `npm run data:weather`
+# (pipelines/weather/build.mjs) into this bucket's local state.
 [[r2_buckets]]
 binding = "WEATHER"
 bucket_name = "navweather-weather"
 
-# Long-trip planner: Overpass endpoints and the User-Agent sent to them (name a
-# contact before production — Overpass asks apps to identify themselves).
+# Long-trip planner: Overpass endpoints and the User-Agent sent to them (name a contact before production —
+# Overpass asks apps to identify themselves; DP-0.6).
 [vars]
 OVERPASS_URLS = "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter"
 TRIP_USER_AGENT = "navWeather/0.1 (trip planner; Cloudflare Worker)"
 
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["LiveShare"]
+# ---------------------------------------------------------------------------------------------------------------
+# preview: its own Worker and data. The first deploy creates the D1 database and the R2 bucket; load the geocoder
+# with `npm run seed:preview` (wrangler d1 execute navweather-geo-preview --remote --env preview …).
 
-[[migrations]]
-tag = "v2"
-new_sqlite_classes = ["Reports"]
+[env.preview]
+name = "navweather-preview"
 
-[observability]
-enabled = false
+[[env.preview.durable_objects.bindings]]
+name = "LIVE_SHARE"
+class_name = "LiveShare"
+
+[[env.preview.durable_objects.bindings]]
+name = "REPORTS"
+class_name = "Reports"
+
+[[env.preview.ratelimits]]
+name = "CREATE_LIMITER"
+namespace_id = "2001"
+simple = { limit = 6, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "REPORT_LIMITER"
+namespace_id = "2002"
+simple = { limit = 10, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "REPORT_LIST_LIMITER"
+namespace_id = "2003"
+simple = { limit = 120, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "TRIP_LIMITER"
+namespace_id = "2004"
+simple = { limit = 20, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "GEOCODE_LIMITER"
+namespace_id = "2005"
+simple = { limit = 120, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "ROUTE_LIMITER"
+namespace_id = "2006"
+simple = { limit = 60, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "WEATHER_LIMITER"
+namespace_id = "2007"
+simple = { limit = 120, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "WHEREAMI_LIMITER"
+namespace_id = "2008"
+simple = { limit = 20, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "SHARE_LIMITER"
+namespace_id = "2009"
+simple = { limit = 240, period = 60 }
+
+[[env.preview.d1_databases]]
+binding = "GEO"
+database_name = "navweather-geo-preview"
+
+[[env.preview.r2_buckets]]
+binding = "WEATHER"
+bucket_name = "navweather-weather-preview"
+
+[env.preview.vars]
+OVERPASS_URLS = "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter"
+TRIP_USER_AGENT = "navWeather/0.1 preview (trip planner; Cloudflare Worker)"
+
+# ---------------------------------------------------------------------------------------------------------------
+# production: real users. The first deploy creates the D1 database and the R2 bucket; `npm run seed:production`
+# loads the geocoder; the scheduled weather pipeline fills the bucket (DP-4.6, stage 5).
+
+[env.production]
+name = "navweather"
+
+[[env.production.durable_objects.bindings]]
+name = "LIVE_SHARE"
+class_name = "LiveShare"
+
+[[env.production.durable_objects.bindings]]
+name = "REPORTS"
+class_name = "Reports"
+
+[[env.production.ratelimits]]
+name = "CREATE_LIMITER"
+namespace_id = "3001"
+simple = { limit = 6, period = 60 }
+
+[[env.production.ratelimits]]
+name = "REPORT_LIMITER"
+namespace_id = "3002"
+simple = { limit = 10, period = 60 }
+
+[[env.production.ratelimits]]
+name = "REPORT_LIST_LIMITER"
+namespace_id = "3003"
+simple = { limit = 120, period = 60 }
+
+[[env.production.ratelimits]]
+name = "TRIP_LIMITER"
+namespace_id = "3004"
+simple = { limit = 20, period = 60 }
+
+[[env.production.ratelimits]]
+name = "GEOCODE_LIMITER"
+namespace_id = "3005"
+simple = { limit = 120, period = 60 }
+
+[[env.production.ratelimits]]
+name = "ROUTE_LIMITER"
+namespace_id = "3006"
+simple = { limit = 60, period = 60 }
+
+[[env.production.ratelimits]]
+name = "WEATHER_LIMITER"
+namespace_id = "3007"
+simple = { limit = 120, period = 60 }
+
+[[env.production.ratelimits]]
+name = "WHEREAMI_LIMITER"
+namespace_id = "3008"
+simple = { limit = 20, period = 60 }
+
+[[env.production.ratelimits]]
+name = "SHARE_LIMITER"
+namespace_id = "3009"
+simple = { limit = 240, period = 60 }
+
+[[env.production.d1_databases]]
+binding = "GEO"
+database_name = "navweather-geo-production"
+
+[[env.production.r2_buckets]]
+binding = "WEATHER"
+bucket_name = "navweather-weather-production"
+
+[env.production.vars]
+OVERPASS_URLS = "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter"
+TRIP_USER_AGENT = "navWeather/0.1 (trip planner; Cloudflare Worker)"
