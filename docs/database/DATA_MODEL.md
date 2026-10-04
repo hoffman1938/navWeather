@@ -10,6 +10,13 @@ Decision: [ADR-007](../architecture/decisions/ADR-007-data-storage.md).
 [`database/migrations/0001_accounts.sql`](../../database/migrations/0001_accounts.sql)
 and is **not applied** (no D1 binding in `wrangler.toml`).
 
+## 0. Open data we build
+
+| Data | Where | Built by |
+| --- | --- | --- |
+| Country borders (Natural Earth, public domain) | `src/trip/data/countries-v1.json` (in the app and the Worker bundle) | `npm run data:borders` |
+| Places, cameras, crossings, speed limits per layer and tile (OSM, ODbL) | static assets `/data/places/v1/…` (not in git) | `npm run seed:local` (download + `data:osm`) |
+
 ## 1. What lives where today
 
 | Data | Where | Retention |

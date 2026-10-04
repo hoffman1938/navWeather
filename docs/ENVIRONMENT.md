@@ -20,9 +20,10 @@ Worker route instead (see `worker/`).
 | `VITE_WEATHER_PROVIDER` | `open-meteo` | `open-meteo` |
 | `VITE_GEOCODING_PROVIDER` | `nominatim` | `nominatim`, `photon` |
 | `VITE_AUTOCOMPLETE_PROVIDER` | `photon` | `photon` |
-| `VITE_PLACES_PROVIDER` | `overpass` | `overpass`, `none` |
-| `VITE_POI_PROVIDER` | `overpass` | `overpass`, `none` |
-| `VITE_SPEED_LIMIT_PROVIDER` | `overpass` | `overpass`, `none` |
+| `VITE_PLACES_PROVIDER` | `tiles` | `tiles` (our places tiles, `npm run data:osm`), `overpass`, `none` |
+| `VITE_POI_PROVIDER` | `tiles` | `tiles`, `overpass`, `none` |
+| `VITE_SPEED_LIMIT_PROVIDER` | `tiles` | `tiles`, `overpass`, `none` |
+| `VITE_PLACES_FALLBACK` | `overpass` | outside the region our tiles cover: `overpass` (until that region is built) or `none` |
 | `VITE_ELEVATION_PROVIDER` | `open-meteo` | `open-meteo`, `none` |
 | `VITE_MAP_PROVIDER` | `openfreemap` | `openfreemap` |
 | `VITE_TRAFFIC_PROVIDER` | `none` | `none` (interface ready) |
@@ -44,6 +45,7 @@ Worker route instead (see `worker/`).
 | `VITE_PHOTON_BASE_URL` | `https://photon.komoot.io` |
 | `VITE_REPORTS_URL` | `/api/v1/reports` (same origin — no CSP change needed; the unversioned `/api/reports` still works) |
 | `VITE_WHEREAMI_URL` | `/api/v1/whereami` (approximate area of the connection, when the device can't give a position; same origin) |
+| `VITE_PLACES_TILES_URL` | `/data/places/v1` — our places tiles (static assets, same origin) |
 | `VITE_OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` |
 | `VITE_MAP_STYLE_LIGHT` / `VITE_MAP_STYLE_DARK` | OpenFreeMap Positron / Dark |
 

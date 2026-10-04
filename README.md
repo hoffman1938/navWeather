@@ -34,6 +34,15 @@ npm run preview:worker   # the production build served by the Worker, as on Clou
 `npm run dev:web` starts only the app (sharing, reports and Long Trip plans then say the server is missing);
 `npm run dev:api` starts only the Worker.
 
+Our own data (instead of public services with limits): once, and again to refresh —
+
+```bash
+npm run seed:local   # downloads Georgia's OpenStreetMap extract (~100 MB, Geofabrik, MD5-checked) and builds
+                     # the places tiles (places, speed limits, cameras, level crossings) into public/data/places
+```
+
+Without it the app still works and asks the public Overpass servers instead.
+
 Use Node 22+ (required by the Cloudflare tooling; the tests need 20+).
 Location only works on `https://` or `localhost` — opening the dev server from
 a phone via `http://192.168…` will be refused by the browser.

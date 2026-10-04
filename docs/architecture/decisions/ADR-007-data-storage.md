@@ -14,7 +14,7 @@ tiles and optional accounts — all on Cloudflare.
 | --- | --- | --- |
 | Preferences, saved places, recents (anonymous) | device only | privacy; no server needed |
 | Places index and FTS5 geocoder index | **D1**, one database per region/country (≤10 GB each) | relational queries and full-text search; 50,000 databases per account |
-| Places tiles, map PMTiles, weather cells, terrain, imagery, data snapshots | **R2** | object storage, free egress, range requests |
+| Places tiles, map PMTiles, weather cells, terrain, imagery, data snapshots | **static assets** while a region fits (free, unlimited requests — Georgia's places tiles since 2026-10-04: ~2,700 files, 9 MB), then **R2** | object storage, free egress, range requests |
 | Accounts, auth identities, passkeys, sessions, synced settings, saved places and lists, security events | **D1** (when accounts ship) | relational, strongly consistent per database |
 | Live share state, WebSocket fan-out | **Durable Object** per share | single-writer coordination, hibernating WebSockets |
 | Driver reports, traffic aggregates | **Durable Objects**, sharded by region (geohash) | one coordinated writer per area, SQLite inside |

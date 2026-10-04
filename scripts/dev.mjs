@@ -10,7 +10,7 @@
  * Only the app: `npm run dev:web`. Only the Worker: `npm run dev:api`.
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { prepareWorkerAssets } from './worker-assets.mjs';
 
 const API = 'http://127.0.0.1:8787/api/v1/health';
 const children = [];
@@ -72,8 +72,7 @@ const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 if (await apiRunning()) {
   console.log('\x1b[36m[api]\x1b[0m a Worker already answers on :8787 — using it');
 } else {
-  // The Worker serves dist/ as its assets; it only has to exist in development.
-  mkdirSync('dist', { recursive: true });
+  prepareWorkerAssets(); // dist/ with our places tiles, as the Worker sees them when deployed
   run('api', 36, npx, ['wrangler', 'dev', '--port', '8787', '--ip', '127.0.0.1']);
   // Vite can start meanwhile; say clearly when the API is (not) there.
   void waitForApi(60_000).then((ok) =>

@@ -215,7 +215,7 @@ with no account.
 | REQ-DATA-002 | D1 for accounts, sessions, settings, saved places and lists (when accounts ship) | P2 | PLANNED (DP-7.6) |
 | REQ-DATA-003 | Never store positions, routes or trip history on the server unless a user opts in to a named feature | P0 | IMPLEMENTED |
 | REQ-DATA-004 | Real-time state (live share, reports) in Durable Objects with expiry | P1 | IMPLEMENTED |
-| REQ-DATA-006 | Open data for each region (OSM + Overture Places + Foursquare OS Places + Open Charge Map; borders from Natural Earth) pre-built by our pipelines into R2, D1 and static assets; no live Overpass | P1 | IN PROGRESS (borders done 2026-10-04, DP-4.5; places DP-4.1…DP-4.4) |
+| REQ-DATA-006 | Open data for each region (OSM + Overture Places + Foursquare OS Places + Open Charge Map; borders from Natural Earth) pre-built by our pipelines into R2, D1 and static assets; no live Overpass | P1 | IN PROGRESS (2026-10-04: borders (Natural Earth) and Georgia's OSM places, cameras, crossings, speed limits as static tiles — no Overpass inside Georgia; Overture/FSQ/OCM and other regions to come) |
 
 ## 12. API architecture
 
@@ -439,7 +439,7 @@ iOS, CarPlay, Android Auto and Google Play are BLOCKED by store fees (ADR-015).
 | DEBT-003 | Single global `Reports` Durable Object | ~1,000 req/s ceiling | shard by region (REQ-CF-008, DP-7.2) |
 | DEBT-005 | No linter | style drift | ESLint (REQ-CI-003, DP-11.6) |
 | DEBT-007 | Observability disabled | blind in production | REQ-OBS-002, DP-3.3 |
-| DEBT-008 | Overpass called live per route (and per trip stop / borders) | violates its usage guidance at scale | our Places API and client borders (DP-4.5, DP-6.5) |
+| DEBT-008 | Overpass called live per route (and per trip stop / borders) — **inside Georgia no longer** (our tiles, 2026-10-04); outside it as a fallback until those regions are built | violates its usage guidance at scale | more regions (DP-13.9), then `VITE_PLACES_FALLBACK=none` (DP-6.1) |
 | DEBT-009 | Main JS chunk 604 KB (196 KB gz) | LCP on slow phones | more lazy chunks (REQ-PERF-004, DP-11.5) |
 | DEBT-010 | Weather thresholds duplicated in 7 files with different values (B-08) | inconsistent alerts vs trip risks | REQ-WX-009, DP-11.1 |
 | DEBT-011 | ~~`forecasts` map in the app store is never pruned (B-11)~~ — fixed 2026-10-04: kept only for the trip's roads | — | DP-1.9 ✅ |

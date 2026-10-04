@@ -71,6 +71,18 @@ Types: `src/trip/types.ts`. Positions sent are the planned route (needed to
 plan it); the car's position is sent only as `progress.alongM` (a distance
 along that route) when replanning.
 
+## Static data (implemented)
+
+Served as static assets on the app's origin (free on Cloudflare; `public/` on localhost), immutable per build:
+
+| Path | Content |
+| --- | --- |
+| `/data/places/v1/index.json` | `{ v: 1, region, source, license: "ODbL-1.0", dataDate, coverage: { z, tiles: ["x/y"] }, layers: { <layer>: { z, tiles: ["x/y"] } } }` — which tiles exist |
+| `/data/places/v1/<layer>/<z>/<x>/<y>.json` | `{ v: 1, e: [[id, lon, lat, tags]] }`; layer `maxspeed`: `[[id, maxspeed, [[lon, lat]…], highway]]`. Layers: `settlement` (z9), `fuel`, `ev_charging`, `restaurant`, `cafe`, `hotel`, `parking`, `atm`, `pharmacy`, `supermarket`, `rest_area`, `car_wash`, `car_repair`, `attraction`, `toilets`, `hospital`, `speed_camera`, `level_crossing`, `maxspeed` (z11) |
+
+Built by `npm run data:osm` from an OpenStreetMap extract (ODbL — a derivative database: attribution in the app, the
+same licence for anyone reusing the files). Ids: `n<osm node id>`, `w<osm way id>`.
+
 ## Planned
 
 All planned endpoints are served by the same Worker on Cloudflare (ADR-016); engines behind them run in Containers,

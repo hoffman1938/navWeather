@@ -106,7 +106,7 @@ that names implementations, chosen by `VITE_*` variables.
 | `RoutingProvider` | OSRM demo server | declares capabilities; `avoid` is empty because the demo server rejects `exclude`; asks for `alternatives=3` (plain `true` returns at most one), retrying with `true` if an older server answers 400 |
 | `WeatherProvider` (+ `WeatherService`) | Open-Meteo | batching, cache, stale fallback, model-run checks |
 | `GeocodingProvider` / `AutocompleteProvider` | Nominatim (1 req/s) / Photon | Nominatim forbids autocomplete |
-| `PlacesProvider`, `PoiProvider`, `SpeedLimitProvider` | Overpass | one shared sequential queue with endpoint fallback |
+| `PlacesProvider`, `PoiProvider`, `SpeedLimitProvider` | our places tiles (`services/places/tiles.ts`, `TileProviders.ts`): static JSON per layer and z9/z11 tile, built from OSM by `pipelines/osm/` | inside the region the tiles cover no third-party request; outside it Overpass (one shared sequential queue) until that region is built (`VITE_PLACES_FALLBACK`) |
 | `ElevationProvider` | Open-Meteo | pass detection |
 | `TrafficProvider` | none | hook for live traffic (sets segment durations) |
 | `IncidentProvider` | driver reports (`/api/reports`) | normalized incidents (`verified` flag) → route events; reports are never verified; `report()`/`vote()` when the source accepts them |

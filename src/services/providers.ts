@@ -9,6 +9,8 @@ import { OverpassPlacesProvider } from './places/OverpassPlacesProvider';
 import type { PlacesProvider } from './places/PlacesProvider';
 import { OverpassPoiProvider } from './places/OverpassPoiProvider';
 import type { PoiProvider } from './places/PoiProvider';
+import { PlacesTiles } from './places/tiles';
+import { TilePlacesProvider, TilePoiProvider, TileSpeedLimitProvider } from './places/TileProviders';
 import { OverpassSpeedLimitProvider } from './speed/OverpassSpeedLimitProvider';
 import type { SpeedLimitProvider } from './speed/SpeedLimitProvider';
 import {
@@ -107,12 +109,18 @@ export function createProviders(cfg: AppConfig = config): Providers {
         )
       : unknown('weather', p.weather);
 
+  // Our tiles first (DP-6.5); Overpass only outside the region they cover, while VITE_PLACES_FALLBACK allows it.
+  const tiles = new PlacesTiles(e.placesTiles);
+  const fallback = p.placesFallback === 'overpass' ? true : p.placesFallback === 'none' ? false : unknown('places fallback', p.placesFallback);
+  const lang = cfg.geocoding.language;
   const places: PlacesProvider | null =
-    p.places === 'overpass'
-      ? new OverpassPlacesProvider(e.overpass, cfg.geocoding.language)
-      : p.places === 'none'
-        ? null
-        : unknown('places', p.places);
+    p.places === 'tiles'
+      ? new TilePlacesProvider(tiles, lang, fallback ? new OverpassPlacesProvider(e.overpass, lang) : null)
+      : p.places === 'overpass'
+        ? new OverpassPlacesProvider(e.overpass, lang)
+        : p.places === 'none'
+          ? null
+          : unknown('places', p.places);
 
   const elevation: ElevationProvider | null =
     p.elevation === 'open-meteo'
@@ -127,13 +135,21 @@ export function createProviders(cfg: AppConfig = config): Providers {
       : unknown('map', p.map);
 
   const poi: PoiProvider | null =
-    p.poi === 'overpass' ? new OverpassPoiProvider(e.overpass, cfg.geocoding.language) : p.poi === 'none' ? null : unknown('poi', p.poi);
+    p.poi === 'tiles'
+      ? new TilePoiProvider(tiles, lang, fallback ? new OverpassPoiProvider(e.overpass, lang) : null)
+      : p.poi === 'overpass'
+        ? new OverpassPoiProvider(e.overpass, lang)
+        : p.poi === 'none'
+          ? null
+          : unknown('poi', p.poi);
   const speedLimits: SpeedLimitProvider | null =
-    p.speedLimits === 'overpass'
-      ? new OverpassSpeedLimitProvider(e.overpass)
-      : p.speedLimits === 'none'
-        ? null
-        : unknown('speed limit', p.speedLimits);
+    p.speedLimits === 'tiles'
+      ? new TileSpeedLimitProvider(tiles, fallback ? new OverpassSpeedLimitProvider(e.overpass) : null)
+      : p.speedLimits === 'overpass'
+        ? new OverpassSpeedLimitProvider(e.overpass)
+        : p.speedLimits === 'none'
+          ? null
+          : unknown('speed limit', p.speedLimits);
   // No free live-traffic source exists; the interface is ready for one.
   const traffic: TrafficProvider = p.traffic === 'none' ? new NoTrafficProvider() : unknown('traffic', p.traffic);
   // Driver reports go through the app's own relay (worker/reports.ts); official feeds can plug in here.

@@ -34,11 +34,14 @@ export const config = {
     weather: str('VITE_WEATHER_PROVIDER', 'open-meteo'),
     geocoding: str('VITE_GEOCODING_PROVIDER', 'nominatim'),
     autocomplete: str('VITE_AUTOCOMPLETE_PROVIDER', 'photon'),
-    places: str('VITE_PLACES_PROVIDER', 'overpass'),
+    /** Settlements, places and road data: our tiles (DP-6.5); `overpass` (public servers) only to compare. */
+    places: str('VITE_PLACES_PROVIDER', 'tiles'),
+    /** Outside the region our tiles cover: `overpass` (until that region is built) or `none`. */
+    placesFallback: str('VITE_PLACES_FALLBACK', 'overpass'),
     elevation: str('VITE_ELEVATION_PROVIDER', 'open-meteo'),
     map: str('VITE_MAP_PROVIDER', 'openfreemap'),
-    poi: str('VITE_POI_PROVIDER', 'overpass'),
-    speedLimits: str('VITE_SPEED_LIMIT_PROVIDER', 'overpass'),
+    poi: str('VITE_POI_PROVIDER', 'tiles'),
+    speedLimits: str('VITE_SPEED_LIMIT_PROVIDER', 'tiles'),
     traffic: str('VITE_TRAFFIC_PROVIDER', 'none'),
     incidents: str('VITE_INCIDENT_PROVIDER', 'reports'),
     airQuality: str('VITE_AIR_QUALITY_PROVIDER', 'open-meteo'),
@@ -59,6 +62,8 @@ export const config = {
     reports: str('VITE_REPORTS_URL', '/api/v1/reports'),
     /** Rough area of the connection, when the device can't give a position (same Worker). */
     whereami: str('VITE_WHEREAMI_URL', '/api/v1/whereami'),
+    /** Our places tiles (static assets built by `npm run data:osm`). */
+    placesTiles: str('VITE_PLACES_TILES_URL', '/data/places/v1'),
     overpass: list('VITE_OVERPASS_URLS', [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter',

@@ -14,7 +14,7 @@
 | Data | Collected? | Where it goes | Retention | Basis (to confirm) |
 | --- | --- | --- | --- | --- |
 | Precise position (GPS) | on device, when the user locates, navigates or shares | stays on device, except: live share (Worker DO, latest only), a report's position, and coordinates inside provider requests | share: until stop/expiry; report: ≤12 h (×3 if confirmed) | user request (contract) / consent prompt by the OS |
-| Route start/end/geometry | on device | sent to the router (OSRM/FOSSGIS/Transitous) and, as sample points, to Open-Meteo; places along it to Overpass | not stored by us; providers' own policies apply | user request |
+| Route start/end/geometry | on device | sent to the router (OSRM/FOSSGIS/Transitous) and, as sample points, to Open-Meteo; places along it come from our static tiles (only tile numbers reach our server) — Overpass only outside the region they cover | not stored by us; providers' own policies apply | user request |
 | Searched text | on device | Photon (autocomplete), Nominatim (submit) | not stored by us | user request |
 | Long-trip plan request (Long Trip Mode) | when a long trip is planned or replanned | our Worker: the planned route (resampled), departure, vehicle type and declared range, preferences, settlements and hazard codes along it; when replanning, the car's distance along that route; processed and discarded (not stored, not logged) | none | user request |
 | Trip stop places | when a stop is opened | our Worker → Overpass (OSMF/others): the stop position and road ±30 km; cached by area, never by user | Overpass operators' policies; our edge cache 1 day, keyed by area only | user request |

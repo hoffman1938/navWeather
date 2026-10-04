@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite",
-    "dev:api": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && wrangler dev --port 8787 --ip 127.0.0.1",
+    "dev:api": "node scripts/worker-assets.mjs && wrangler dev --port 8787 --ip 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "preview:worker": "npm run build && wrangler dev --port 8787 --ip 127.0.0.1",
@@ -20,7 +20,10 @@
     "test:reports": "node scripts/reports-smoke.mjs",
     "deploy": "npm run build && wrangler deploy",
     "test:trips": "node scripts/trip-smoke.mjs",
-    "data:borders": "node pipelines/borders/build.mjs"
+    "data:borders": "node pipelines/borders/build.mjs",
+    "data:download": "node pipelines/osm/download.mjs",
+    "data:osm": "node pipelines/osm/build.mjs",
+    "seed:local": "npm run data:download && npm run data:osm"
   },
   "dependencies": {
     "maplibre-gl": "^6.11.2",

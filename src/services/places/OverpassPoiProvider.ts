@@ -104,7 +104,7 @@ function brandOf(t: Record<string, string>, language: string): string | undefine
   return raw ? localizeScript(raw, language) : undefined;
 }
 
-function parsePois(elements: OverpassElement[], category: PoiCategory, language: string): Poi[] {
+export function parsePois(elements: OverpassElement[], category: PoiCategory, language: string): Poi[] {
   const seen = new Set<string>();
   const out: Poi[] = [];
   for (const e of elements) {

@@ -13,3 +13,5 @@ coverage
 # Open data downloaded and built by the pipelines (pipelines/); never committed
 data/raw/
 data/build/
+# Places tiles built from OSM by `npm run data:osm` (ODbL, rebuilt from the extract)
+public/data/places/

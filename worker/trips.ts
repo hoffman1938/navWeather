@@ -1,6 +1,8 @@
 import { createTripPlan, findStopPlaces, TripPlanError } from '../src/trip/planning/planner';
 import { MAX_STOP_PLACES_BODY_BYTES, MAX_TRIP_BODY_BYTES, sanitizeStopPlacesRequest, sanitizeTripRequest } from '../src/trip/protocol';
 import { OverpassTripPlaces, type RawPlace } from '../src/trip/stops/places';
+import { TileTripPlaces } from '../src/trip/stops/tilePlaces';
+import { PlacesTiles } from '../src/services/places/tiles';
 import { crossingsFrom, sanitizeBordersRequest, type BordersResponse } from '../src/trip/borders';
 import { countryAt, decodeCountries, type CountriesFile, type CountryIndex } from '../src/trip/countries';
 import countriesFile from '../src/trip/data/countries-v1.json';
@@ -20,6 +22,8 @@ import { json, readJson } from './http';
  */
 
 export interface TripEnv {
+  /** The app's static assets — our places tiles live under /data/places/v1 (built by `npm run data:osm`). */
+  ASSETS?: Fetcher;
   /** Abuse guard for planning (per client IP). */
   TRIP_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
   /** Comma-separated Overpass endpoints (defaults: overpass-api.de, kumi.systems). */
@@ -46,6 +50,18 @@ function edgeCache(): { get(key: string): Promise<RawPlace[] | null>; put(key: s
       await cache.put(url(key), new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${PLACES_TTL_S}` } }));
     },
   };
+}
+
+let tiles: PlacesTiles | null = null;
+
+/** Our places tiles read through the static-assets binding (one instance per isolate, tiles kept in memory). */
+function placesTiles(assets: Fetcher): PlacesTiles {
+  tiles ??= new PlacesTiles('/data/places/v1', 200, async <T>(path: string): Promise<T | null> => {
+    const res = await assets.fetch(new Request(`https://assets.internal${path}`));
+    // A missing file is the SPA's index.html (not_found_handling): only JSON counts.
+    return res.ok && (res.headers.get('content-type') ?? '').includes('json') ? ((await res.json()) as T) : null;
+  });
+  return tiles;
 }
 
 export async function tripPlan(request: Request, env: TripEnv): Promise<Response> {
@@ -79,10 +95,12 @@ export async function tripPlaces(request: Request, env: TripEnv): Promise<Respon
   const timer = setTimeout(() => ctrl.abort(), PLACES_BUDGET_MS);
   try {
     const endpoints = (env.OVERPASS_URLS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    const source = new OverpassTripPlaces(endpoints.length ? endpoints : DEFAULT_OVERPASS, env.TRIP_USER_AGENT ?? 'navWeather/0.1 (trip planner; Cloudflare Worker)', {
+    const overpass = new OverpassTripPlaces(endpoints.length ? endpoints : DEFAULT_OVERPASS, env.TRIP_USER_AGENT ?? 'navWeather/0.1 (trip planner; Cloudflare Worker)', {
       timeoutMs: 12_000,
       cache: edgeCache(),
     });
+    // Our tiles from the static assets (free, no cache needed); Overpass only outside the region they cover.
+    const source = env.ASSETS ? new TileTripPlaces(placesTiles(env.ASSETS), overpass) : overpass;
     return json({ places: await findStopPlaces(req, source, ctrl.signal) });
   } finally {
     clearTimeout(timer);
