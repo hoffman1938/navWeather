@@ -248,7 +248,7 @@ forecasts loaded ─▶ POST /api/v1/trips/plan (route resampled + driving times
                     ◀─ TripPlan (stops, nights, days, timeline, weather risks, advice)
   ─▶ setTripStopsProvider → derive(): every ETA after a stop += its duration (forecasts at the real times)
   ─▶ routeIntelligence: planned stops as TRIP_STOP events (replace generic break/fuel reminders)
-  ─▶ first night's hotels: POST /api/v1/trips/places (Overpass, edge-cached) · borders: POST /trips/borders
+  ─▶ first night's hotels: POST /api/v1/trips/places (Overpass, edge-cached) · borders: on the device (Natural Earth, trip/countries.ts)
 driving: ≥20 min off plan (10 min cooldown) ─▶ replan with progress (along, driven today, since break)
 ```
 

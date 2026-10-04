@@ -17,7 +17,8 @@
 | Route start/end/geometry | on device | sent to the router (OSRM/FOSSGIS/Transitous) and, as sample points, to Open-Meteo; places along it to Overpass | not stored by us; providers' own policies apply | user request |
 | Searched text | on device | Photon (autocomplete), Nominatim (submit) | not stored by us | user request |
 | Long-trip plan request (Long Trip Mode) | when a long trip is planned or replanned | our Worker: the planned route (resampled), departure, vehicle type and declared range, preferences, settlements and hazard codes along it; when replanning, the car's distance along that route; processed and discarded (not stored, not logged) | none | user request |
-| Trip stop places / borders | when a stop is opened / after a plan | our Worker → Overpass (OSMF/others): the stop position and road ±30 km / ≤20 points along the route; cached by area, never by user | Overpass operators' policies; our edge cache 1–7 days, keyed by area only | user request |
+| Trip stop places | when a stop is opened | our Worker → Overpass (OSMF/others): the stop position and road ±30 km; cached by area, never by user | Overpass operators' policies; our edge cache 1 day, keyed by area only | user request |
+| Border crossings | after a Long Trip plan | nowhere: worked out on the device from Natural Earth data (since 2026-10-04) | — | — |
 | Approximate location from IP | only when the device gives none | computed by our Worker from Cloudflare metadata | not stored | legitimate interest — **LEGAL REVIEW** |
 | IP address | every request (transport) | Cloudflare; reports DO keeps only a daily-salted hash | hash rotates daily, rows expire with reports | legitimate interest (abuse prevention) |
 | Voice | only during push-to-talk | browser vendor's speech service (Chrome) | vendor policy | consent (user presses the mic; disclosed in Settings) |

@@ -179,11 +179,13 @@ built in**; Settings says so. Adding them needs verified rules per country.
   trigger a replan, which recomputes all of it.
 
 ## 9. Borders
-`POST /api/v1/trips/borders`: ≤ 20 points along the route (≥ 25 km apart) →
-the OSM country of each (one Overpass `is_in` query, edge-cached for a week)
-→ crossings where the country changes (points at sea skipped). Shown in the
-dashboard and as timeline entries ("Georgia → Turkey · around 380 km").
-Approximate position; no border wait times (no source).
+On the device (DP-4.5): Natural Earth admin-0 boundaries (public domain,
+`pipelines/borders/build.mjs` → `src/trip/data/countries-v1.json`, loaded on
+first use, ≈0.2 MB gzip) — a point every 5 km along the route, each change
+placed by bisection; points at sea skipped. No request leaves the device, and
+it works offline. `POST /api/v1/trips/borders` (≤ 20 points) answers from the
+same data for other clients. Shown in the dashboard and as timeline entries
+("Georgia → Turkey · around 380 km"). No border wait times (no source).
 
 ## 10. Notifications (anti-spam)
 - Planned stops become route events (`TRIP_STOP`): overnight and fuel/charge

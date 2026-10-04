@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": [
+      "ES2023"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -10,7 +12,15 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["@cloudflare/workers-types"]
+    "types": [
+      "@cloudflare/workers-types"
+    ],
+    "resolveJsonModule": true
   },
-  "include": ["./*.ts", "../src/api/v1.ts", "../src/share/protocol.ts", "../src/types/geo.ts"]
+  "include": [
+    "./*.ts",
+    "../src/api/v1.ts",
+    "../src/share/protocol.ts",
+    "../src/types/geo.ts"
+  ]
 }

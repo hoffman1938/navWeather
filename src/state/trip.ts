@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getProviders } from '../services/providers';
 import { forecastLookupFn } from '../services/routePlanner';
 import { isAbortError } from '../services/http';
-import { buildTripRequest, fetchBorders, fetchStopPlaces, fetchTripPlan, profileFromTimed } from '../services/trip/requests';
+import { buildTripRequest, fetchStopPlaces, fetchTripPlan, findBorders, profileFromTimed } from '../services/trip/requests';
 import type { BorderCrossing } from '../trip/borders';
 import { atLeast, classifyTrip, countTimeZoneChanges } from '../trip/classification/classify';
 import { REPLAN, TRIP_THRESHOLDS } from '../trip/config';
@@ -296,7 +296,7 @@ function loadBorders(routeId: string) {
   const app = useAppStore.getState();
   if (!app.plan || app.plan.timed.route.id !== routeId) return;
   useTripStore.setState({ borders: { status: 'loading', crossings: [] } });
-  fetchBorders(app.plan.timed, currentMessages().locale)
+  findBorders(app.plan.timed, currentMessages().locale)
     .then((r) => {
       const t = useTripStore.getState();
       if (t.routeId !== routeId) return;

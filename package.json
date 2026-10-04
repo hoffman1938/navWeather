@@ -19,7 +19,8 @@
     "test:share": "node scripts/share-smoke.mjs",
     "test:reports": "node scripts/reports-smoke.mjs",
     "deploy": "npm run build && wrangler deploy",
-    "test:trips": "node scripts/trip-smoke.mjs"
+    "test:trips": "node scripts/trip-smoke.mjs",
+    "data:borders": "node pipelines/borders/build.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.11.2",

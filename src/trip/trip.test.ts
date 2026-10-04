@@ -11,7 +11,7 @@ import { openStatus } from './stops/openingHours';
 import { overpassQueryFor, parseOverpass } from './stops/places';
 import { fakePlaces, profileOf, rawPlace, routeRequest, tbilisi, town, TZ, weatherEvery } from './test/fixtures';
 import { hazardCode } from './weather/hazards';
-import { borderSamplePoints, bordersQuery, crossingsFrom, parseBorders, sanitizeBordersRequest } from './borders';
+import { crossingsFrom, sanitizeBordersRequest } from './borders';
 
 const NOW = tbilisi(5, 7);
 const localHour = (ms: number) => {
@@ -482,33 +482,8 @@ describe('request validation', () => {
 });
 
 describe('border crossings', () => {
-  it('samples ≥25 km apart (≤20 points), ends included', () => {
-    const { points, alongM } = borderSamplePoints(1_600_000, (d) => [d / 100_000, 41]);
-    expect(points.length).toBeLessThanOrEqual(20);
-    expect(alongM[0]).toBe(0);
-    expect(alongM.at(-1)).toBe(1_600_000);
-    expect(borderSamplePoints(30_000, () => [0, 0]).alongM).toEqual([0, 25_000, 30_000]);
-  });
-
-  it('one query with a marker per point; points at sea stay aligned and are skipped', () => {
-    const q = bordersQuery([[44.8271, 41.7151], [35, 43]]);
-    expect(q).toContain('make p ref="0";out;is_in(41.71510,44.82710)');
-    expect(q).toContain('make p ref="1";out;is_in(43.00000,35.00000)');
-    const countries = parseBorders(
-      {
-        elements: [
-          { type: 'p', tags: { ref: '0' } },
-          { type: 'area', tags: { 'ISO3166-1': 'GE', name: 'საქართველო', 'name:en': 'Georgia', 'name:ru': 'Грузия' } },
-          { type: 'p', tags: { ref: '1' } }, // at sea: no country
-          { type: 'p', tags: { ref: '2' } },
-          { type: 'area', tags: { 'ISO3166-1': 'TR', name: 'Türkiye', 'name:en': 'Turkey' } },
-        ],
-      },
-      3,
-      'ru',
-    );
-    // No Russian name for Turkey in this answer: the English one is more readable than the local script.
-    expect(countries).toEqual([{ code: 'GE', name: 'Грузия' }, null, { code: 'TR', name: 'Turkey' }]);
+  it('country changes between points; points at sea are skipped', () => {
+    const countries = [{ code: 'GE', name: 'Грузия' }, null, { code: 'TR', name: 'Turkey' }];
     expect(crossingsFrom(countries, [0, 100_000, 300_000])).toEqual([{ alongM: 150_000, from: { code: 'GE', name: 'Грузия' }, to: { code: 'TR', name: 'Turkey' } }]);
     expect(crossingsFrom([null, null], [0, 1])).toEqual([]);
   });

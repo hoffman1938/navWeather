@@ -28,6 +28,7 @@ let h: Harness;
 let stop: () => void;
 let requests: TripPlanRequest[];
 let planFails: boolean;
+let bordersCalls: number;
 
 /** The Tbilisi → Batumi fixture road, `factor` times slower (×3 ≈ 14.7 h: a long trip). */
 function slowCarRouter(factor: number): RoutingProvider {
@@ -81,6 +82,7 @@ beforeEach(() => {
   h = installFakeProviders(BASE);
   requests = [];
   planFails = false;
+  bordersCalls = 0;
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body ?? '{}'));
     if (url === '/api/v1/trips/plan') {
@@ -91,10 +93,8 @@ beforeEach(() => {
       return Response.json(await createTripPlan(req, { places: null, nowMs: Date.now() }));
     }
     if (url === '/api/v1/trips/borders') {
-      // Georgia for the first half of the points, then Turkey.
-      const n = body.points.length;
-      const countries = body.points.map((_: unknown, i: number) => (i < n / 2 ? { code: 'GE', name: 'Georgia' } : { code: 'TR', name: 'Turkey' }));
-      return Response.json({ countries, crossings: [{ alongM: body.alongM[Math.floor(n / 2)], from: countries[0], to: countries[n - 1] }] });
+      bordersCalls++; // the app finds borders on the device now (DP-4.5)
+      return Response.json({ error: 'unexpected' }, { status: 500 });
     }
     if (url === '/api/v1/trips/places') {
       const req = sanitizeStopPlacesRequest(body, Date.now());
@@ -173,12 +173,14 @@ describe('Long Trip Mode in the app', () => {
     const events = useAppStore.getState().derived.intelligence.events;
     expect(events.some((e) => e.type === 'TRIP_STOP')).toBe(true);
     expect(events.some((e) => e.type === 'REST_BREAK')).toBe(false);
-    // The first night's hotels were fetched for the dashboard, and the borders along the route.
+    // The first night's hotels were fetched for the dashboard; the borders were found on the device
+    // (Natural Earth, no request): Tbilisi → Batumi stays in Georgia.
     const night = t.plan!.recommendedStops.find((s) => s.kinds.includes('overnight'))!;
     await vi.waitFor(() => expect(useTripStore.getState().stopPlaces[night.id]?.status).toBe('ready'));
     await vi.waitFor(() => expect(useTripStore.getState().borders.status).toBe('ready'));
-    expect(useTripStore.getState().borders.crossings).toHaveLength(1);
-    expect(useTripStore.getState().classification!.requiresBorderCrossing).toBe(true);
+    expect(useTripStore.getState().borders.crossings).toEqual([]);
+    expect(useTripStore.getState().classification!.requiresBorderCrossing).toBe(false);
+    expect(bordersCalls).toBe(0);
   });
 
   it('a multi-day trip: forecasts for the whole trip, stops included, from the first load; codes past 4 days (B-06, B-21)', async () => {
@@ -226,7 +228,7 @@ describe('Long Trip Mode in the app', () => {
     expect(await screen.findByText(/availability, prices and ratings are not checked/)).toBeInTheDocument();
     expect(screen.getAllByText('Overnight stay').length).toBeGreaterThan(0);
     expect(screen.getByText('Day 1', { exact: false })).toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.getAllByText(/Georgia → Turkey/).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(useTripStore.getState().borders.status).toBe('ready'));
     expect(screen.queryByText('When to leave')).toBeNull(); // no 12-hour comparison for a multi-day trip
   });
 

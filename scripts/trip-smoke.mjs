@@ -65,4 +65,13 @@ assert.equal((await post('/trips/places', { version: 1, stop: { lat: 41, lon: 44
 assert.equal((await post('/trips/borders', { version: 1, points: [[44.8, 41.7]], alongM: [0] })).status, 400);
 ok('places and borders reject malformed requests');
 
+// Borders from Natural Earth bundled with the Worker (no Overpass): Tbilisi → Yerevan crosses into Armenia.
+const b = await post('/trips/borders', { version: 1, points: [[44.79, 41.72], [44.7, 41.4], [44.6, 40.9], [44.51, 40.18]], alongM: [0, 36_000, 92_000, 173_000], locale: 'en' });
+assert.equal(b.status, 200);
+const borders = await b.json();
+assert.deepEqual(borders.countries.map((c) => c?.code), ['GE', 'GE', 'AM', 'AM']);
+assert.equal(borders.crossings.length, 1);
+assert.deepEqual([borders.crossings[0].from.code, borders.crossings[0].to.code], ['GE', 'AM']);
+ok('borders: Georgia → Armenia from bundled open data');
+
 console.log(`${passed} checks passed`);

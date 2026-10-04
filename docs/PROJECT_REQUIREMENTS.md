@@ -89,7 +89,7 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-TRIP-009 | Weather risks at stop-aware times; "stop earlier" advice with reason, never applied silently; forecasts that end before the trip are reported as such (`dataStatus.weather: 'partial'`), never as "no risk" | P1 | DEFECT (B-08/B-09 open; DP-11.1) — B-07, B-21 fixed 2026-10-04 | `weather/risks.ts`, `weather/hazards.ts`, `services/trip/requests.ts`; `trip.test.ts`, `trip.test.tsx` |
 | REQ-TRIP-010 | Replan from the car when ≥ 20 min off plan (10 min cooldown), carry today's driving over re-routes; announce arrival changes ≥ 15 min | P1 | VERIFIED (B-03, B-01 fixed 2026-10-04) | `state/trip.ts`, `replanning/progress.ts`; `trip.test.ts`, `trip.test.tsx` |
 | REQ-TRIP-011 | Planned stops as route events replacing generic break/fuel reminders; no notification spam | P1 | VERIFIED | `routeIntelligence.ts` |
-| REQ-TRIP-012 | Border crossings along the route, shown in dashboard and timeline; borders from Natural Earth on the client | P2 | VERIFIED (via Overpass today); client-side borders PLANNED (DP-4.5) | `trip/borders.ts`, `/api/v1/trips/borders` |
+| REQ-TRIP-012 | Border crossings along the route, shown in dashboard and timeline; borders from Natural Earth on the client | P2 | VERIFIED (2026-10-04: on the device from Natural Earth, every 5 km with bisection; the API endpoint answers from the same data — no Overpass) | `trip/countries.ts`, `trip/data/countries-v1.json`, `pipelines/borders/build.mjs`, `services/trip/requests.ts` (`findBorders`), `worker/trips.ts`; `countries.test.ts`, `trip.test.tsx`, `scripts/trip-smoke.mjs` |
 | REQ-TRIP-013 | Vehicle-specific planning: car/van/motorcycle/truck/EV (stops and places); truck road restrictions | P2 | PARTIALLY (restrictions PLANNED with Valhalla, DP-9.2) | `stops/places.ts`, `recommend.ts` |
 | REQ-TRIP-014 | Preferences: pace, hotel stars and distance, food, fuel brand (device-only) | P1 | IMPLEMENTED | `SettingsDialog.tsx` (Long trips) |
 | REQ-TRIP-015 | Planner stateless on Cloudflare; no stored trips, no position logs | P0 | IMPLEMENTED (CPU limit B-23 disappears on Workers Paid, DP-5.1) | `worker/trips.ts`, ADR-013 |
@@ -142,7 +142,7 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-CF-007 | Workers Paid plan from the first engine in Containers | P1 | PLANNED (DP-5.1) | ADR-016, [COST](operations/COST_AND_SCALE.md) |
 | REQ-CF-008 | Shard the single `Reports` object by region before it nears ~1,000 req/s | P2 | PLANNED (DP-7.2) | [COST](operations/COST_AND_SCALE.md) |
 | REQ-CF-009 | Report listing as one corridor request instead of up to 24 box requests | P1 | PLANNED (DP-7.2) | `services/traffic/ReportsIncidentProvider.ts`, [API_V1](api/API_V1.md) |
-| REQ-CF-010 | Trip planner endpoints (`/api/v1/trips/plan|places|borders`) stateless and rate-limited (`TRIP_LIMITER`) | P1 | DEFECT (B-22: places/borders cache uses the Cache API, which does nothing on `*.workers.dev`) → fixed by DP-4.5, DP-6.5 | `worker/trips.ts`, `wrangler.toml` |
+| REQ-CF-010 | Trip planner endpoints (`/api/v1/trips/plan|places|borders`) stateless and rate-limited (`TRIP_LIMITER`) | P1 | DEFECT (B-22: the places cache uses the Cache API, which does nothing on `*.workers.dev`) → DP-6.5; borders fixed 2026-10-04 (DP-4.5: bundled Natural Earth, no cache needed) | `worker/trips.ts`, `wrangler.toml` |
 | REQ-CF-011 | No feature relies on the Cache API while the app runs on `*.workers.dev`; once the custom domain is attached (DP-12.1) the Cache API fronts tiles, places and weather | P1 | PLANNED (fixes B-22) | `worker/trips.ts` |
 | REQ-CF-012 | Per-feature request budgets, spend alerts, back-off on 429 and rate limits on every endpoint incl. `/whereami` — protect the hosting bill | P1 | PLANNED (DP-3.4, DP-5.1) | `worker/*`, `share/liveShare.ts`, `ReportsIncidentProvider.ts` |
 | REQ-CF-013 | **All hosting on Cloudflare Workers (not Pages)** — one Worker project with static assets and `/api/v1/*`; custom domain attached to it when bought | P0 | IMPLEMENTED (Worker with assets) / PLANNED (domain, DP-12.1) | `wrangler.toml`, ADR-016 |
@@ -215,7 +215,7 @@ with no account.
 | REQ-DATA-002 | D1 for accounts, sessions, settings, saved places and lists (when accounts ship) | P2 | PLANNED (DP-7.6) |
 | REQ-DATA-003 | Never store positions, routes or trip history on the server unless a user opts in to a named feature | P0 | IMPLEMENTED |
 | REQ-DATA-004 | Real-time state (live share, reports) in Durable Objects with expiry | P1 | IMPLEMENTED |
-| REQ-DATA-006 | Open data for each region (OSM + Overture Places + Foursquare OS Places + Open Charge Map; borders from Natural Earth) pre-built by our pipelines into R2, D1 and static assets; no live Overpass | P1 | PLANNED (DP-4.1…DP-4.5) |
+| REQ-DATA-006 | Open data for each region (OSM + Overture Places + Foursquare OS Places + Open Charge Map; borders from Natural Earth) pre-built by our pipelines into R2, D1 and static assets; no live Overpass | P1 | IN PROGRESS (borders done 2026-10-04, DP-4.5; places DP-4.1…DP-4.4) |
 
 ## 12. API architecture
 

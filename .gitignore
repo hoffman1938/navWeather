@@ -9,3 +9,7 @@ coverage
 # Cloudflare local dev state and secrets
 .wrangler/
 .dev.vars*
+
+# Open data downloaded and built by the pipelines (pipelines/); never committed
+data/raw/
+data/build/

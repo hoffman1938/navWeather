@@ -1,7 +1,9 @@
 import { createTripPlan, findStopPlaces, TripPlanError } from '../src/trip/planning/planner';
 import { MAX_STOP_PLACES_BODY_BYTES, MAX_TRIP_BODY_BYTES, sanitizeStopPlacesRequest, sanitizeTripRequest } from '../src/trip/protocol';
 import { OverpassTripPlaces, type RawPlace } from '../src/trip/stops/places';
-import { bordersQuery, crossingsFrom, parseBorders, sanitizeBordersRequest, type BordersResponse } from '../src/trip/borders';
+import { crossingsFrom, sanitizeBordersRequest, type BordersResponse } from '../src/trip/borders';
+import { countryAt, decodeCountries, type CountriesFile, type CountryIndex } from '../src/trip/countries';
+import countriesFile from '../src/trip/data/countries-v1.json';
 import { json, readJson } from './http';
 
 /**
@@ -13,8 +15,8 @@ import { json, readJson } from './http';
  *                              from settlements), so a plan never waits for Overpass.
  *   POST /api/v1/trips/places  one stop → ranked OpenStreetMap places around it, from Overpass (identifying
  *                              User-Agent), cached at the edge by area for a day. Called when a stop is opened.
- *   POST /api/v1/trips/borders points along the route → the country of each and where it changes (one
- *                              Overpass `is_in` query, cached at the edge for a week).
+ *   POST /api/v1/trips/borders points along the route → the country of each and where it changes (Natural Earth
+ *                              boundaries bundled with the Worker — no third party, no cache needed).
  */
 
 export interface TripEnv {
@@ -87,8 +89,9 @@ export async function tripPlaces(request: Request, env: TripEnv): Promise<Respon
   }
 }
 
-const BORDERS_TTL_S = 7 * 24 * 3600;
+let countries: CountryIndex | null = null;
 
+/** Countries of points along a route and where they change — from Natural Earth boundaries bundled with the Worker (DP-4.5). */
 export async function tripBorders(request: Request, env: TripEnv): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
   if (!(request.headers.get('content-type') ?? '').startsWith('application/json')) return json({ error: 'unsupported-media-type' }, 415);
@@ -97,38 +100,8 @@ export async function tripBorders(request: Request, env: TripEnv): Promise<Respo
   const body = await readJson(request, 8_000);
   const req = body === undefined ? null : sanitizeBordersRequest(body);
   if (!req) return json({ error: 'bad-request' }, 400);
-
-  // Countries don't move: cache by the rounded points for a week.
-  const key = `https://trip-borders.navweather.internal/v1/${req.locale}/${req.points.map(([lo, la]) => `${lo.toFixed(2)},${la.toFixed(2)}`).join(';')}`;
-  const cache = typeof caches !== 'undefined' && 'default' in caches ? (caches as unknown as { default: Cache }).default : null;
-  const hit = await cache?.match(key).catch(() => undefined);
-  if (hit) return json(await hit.json());
-
-  const endpoints = (env.OVERPASS_URLS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const body2 = `data=${encodeURIComponent(bordersQuery(req.points))}`;
-  for (const endpoint of endpoints.length ? endpoints : DEFAULT_OVERPASS) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15_000);
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': env.TRIP_USER_AGENT ?? 'navWeather/0.1 (trip planner; Cloudflare Worker)', accept: 'application/json' },
-        body: body2,
-        signal: ctrl.signal,
-      });
-      if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) continue;
-      const countries = parseBorders((await res.json()) as { elements?: { type: string; tags?: Record<string, string> }[] }, req.points.length, req.locale);
-      const out: BordersResponse = { countries, crossings: crossingsFrom(countries, req.alongM) };
-      // Only remember answers that found countries (an overloaded server can answer with nothing).
-      if (countries.some(Boolean)) {
-        await cache?.put(key, new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${BORDERS_TTL_S}` } })).catch(() => undefined);
-      }
-      return json(out);
-    } catch {
-      /* next endpoint */
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  return json({ error: 'unavailable' }, 503);
+  countries ??= decodeCountries(countriesFile as CountriesFile);
+  const found = req.points.map((p) => countryAt(countries!, p, req.locale));
+  const out: BordersResponse = { countries: found, crossings: crossingsFrom(found, req.alongM) };
+  return json(out);
 }

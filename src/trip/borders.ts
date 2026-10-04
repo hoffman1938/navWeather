@@ -1,11 +1,9 @@
 import type { LngLat } from '../types/geo';
 
 /**
- * BORDER CROSSINGS — which country each of a few dozen points along the
- * route is in (OpenStreetMap country areas via one Overpass `is_in` query),
- * and where the country changes. Points at sea or outside any mapped country
- * have no country and are skipped, so a ferry leg doesn't count as a border.
- * Crossing positions are approximate (between two sampled points).
+ * BORDER CROSSINGS — types and the API contract of `/api/v1/trips/borders`. The countries themselves come from
+ * Natural Earth boundaries on the device and in the Worker (`trip/countries.ts`, DP-4.5) — no Overpass. Points at
+ * sea or outside any country have no country and are skipped, so a ferry leg doesn't count as a border.
  */
 
 export interface CountryRef {
@@ -35,49 +33,8 @@ export interface BordersResponse {
   crossings: BorderCrossing[];
 }
 
-/** 20 points answer in ~6 s on the public Overpass; 40 timed out (2026-10-02). */
+/** Most points one `/api/v1/trips/borders` request may ask about (the API contract of v1). */
 export const MAX_BORDER_POINTS = 20;
-
-/** Points at least 25 km apart (at most MAX_BORDER_POINTS) along a route, ends included. */
-export function borderSamplePoints(totalDistM: number, pointAt: (alongM: number) => LngLat): { points: LngLat[]; alongM: number[] } {
-  const n = Math.max(1, Math.min(MAX_BORDER_POINTS - 1, Math.ceil(totalDistM / 25_000)));
-  const step = Math.max(25_000, totalDistM / n);
-  const alongM: number[] = [];
-  for (let i = 0; i * step < totalDistM - 1 && alongM.length < MAX_BORDER_POINTS - 1; i++) alongM.push(Math.round(i * step));
-  alongM.push(Math.round(totalDistM));
-  return { points: alongM.map(pointAt), alongM };
-}
-
-/** One query: a marker element before each point's country, so points without a country stay aligned. */
-export function bordersQuery(points: LngLat[]): string {
-  const parts = points.map(
-    ([lon, lat], i) => `make p ref="${i}";out;is_in(${lat.toFixed(5)},${lon.toFixed(5)})->.a;area.a["admin_level"="2"]["boundary"="administrative"];out tags;`,
-  );
-  return `[out:json][timeout:25];${parts.join('')}`;
-}
-
-interface Element {
-  type: string;
-  tags?: Record<string, string>;
-}
-
-export function parseBorders(data: { elements?: Element[] }, count: number, locale = 'en'): (CountryRef | null)[] {
-  const out: (CountryRef | null)[] = new Array(count).fill(null);
-  let current = -1;
-  for (const el of data.elements ?? []) {
-    const tags = el.tags ?? {};
-    if (el.type === 'p') {
-      const i = Number(tags.ref);
-      current = Number.isInteger(i) && i >= 0 && i < count ? i : -1;
-      continue;
-    }
-    if (current < 0 || out[current]) continue;
-    const name = tags[`name:${locale}`] || tags['name:en'] || tags.name;
-    if (!name) continue;
-    out[current] = { code: tags['ISO3166-1'] || tags['ISO3166-1:alpha2'] || '', name };
-  }
-  return out;
-}
 
 /** Country changes along the route (points without a country are skipped). */
 export function crossingsFrom(countries: (CountryRef | null)[], alongM: number[]): BorderCrossing[] {
