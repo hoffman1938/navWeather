@@ -1,45 +1,31 @@
-# ADR-006 — Map: MapLibre GL JS + OpenFreeMap vector tiles; PMTiles fallback
+# ADR-006 — Map: MapLibre GL JS + own vector tiles (PMTiles in R2); OpenFreeMap as fallback
 
-**Status:** Accepted · **Date:** 2026-10-02 · Facts verified 2026-10-02
-**Update 2026-10-04:** amended by [ADR-015](ADR-015-free-software-own-hosting.md)/[ADR-016](ADR-016-all-on-cloudflare-workers.md): our own PMTiles in R2 become primary (DP-5.5), OpenFreeMap becomes the fallback.
+**Status:** Accepted · **Date:** 2026-10-02 · **Revised:** 2026-10-04 (aligned with ADR-015/016; history in git)
 
 ## Context
-Rendering: MapLibre GL JS (BSD-3-Clause). Tiles and styles: OpenFreeMap
-(positron / dark), OpenMapTiles schema, OpenStreetMap data (ODbL).
-
-OpenFreeMap: "Using our public instance is completely free: there are no
-limits on the number of map views or requests"; commercial use "Yes"; no
-registration or API keys; attribution "OpenFreeMap © OpenMapTiles Data from
-OpenStreetMap" (the OpenFreeMap part optional); "I don't offer SLA guarantees";
-self-hosting supported with weekly planet builds. ToS: provided "AS-IS", no
-"automated" data collection without permission, Hungarian law.
-OpenMapTiles: design CC-BY 4.0, attribution "© OpenMapTiles © OpenStreetMap
-contributors". OSM attribution may collapse behind an "(i)" if still findable.
-
-## Options
-1. OpenFreeMap public (current).
-2. Self-hosted PMTiles (Protomaps/OpenMapTiles build) on R2 served by the Worker.
-3. Commercial tile APIs (MapTiler, Mapbox, Stadia…).
+Rendering: MapLibre GL JS (BSD-3-Clause). Today the tiles and styles come from OpenFreeMap (positron / dark,
+OpenMapTiles schema, OSM data): "no limits on the number of map views or requests", commercial use allowed, no keys,
+but no SLA and donation-funded. ADR-015 requires every component to stay free forever; ADR-016 puts hosting on
+Cloudflare. Attribution: "© OpenMapTiles © OpenStreetMap contributors" (plus OpenFreeMap when its tiles are shown).
 
 ## Decision
-Keep **OpenFreeMap public** for MVP and beta. Before public launch, prepare a
-**fallback style pointing at a regional PMTiles archive on R2** (served through
-the Worker with range requests), switchable by `VITE_MAP_STYLE_*`. Keep the
-map attribution control visible top-right (already) and the data credits in
-the sheets.
+- **Own vector tiles** built from OSM with Planetiler (Apache-2.0) in the OpenMapTiles schema, packed as **PMTiles** and
+  stored in **R2** (small regional sets may be static assets), served by the Worker with range requests and, once the
+  custom domain exists, the Cache API (DP-5.5).
+- **OpenFreeMap** stays as the automatic fallback when our tiles fail (DP-6.8) — it has no limits and no paid tier.
+- Styles light/dark, fonts (Noto, OFL) and sprites are ours; the map attribution control stays visible.
+- Never bulk-download OpenFreeMap tiles (their ToS).
 
 ## Reason
-Free, commercial use allowed, no keys, vector tiles that MapLibre renders
-natively on web and (MapLibre Native) on iOS/Android. The single risk is
-availability (no SLA, donation-funded) — mitigated by a self-hosted fallback.
+Own tiles remove the single external availability risk of the map and keep its cost to R2 storage and operations (no
+egress fees); MapLibre renders the same PMTiles on the web and natively.
 
 ## Consequences
-- R2 becomes justified only when the fallback is built (free tier: 10 GB-month,
-  1M Class A, 10M Class B ops, free egress). A regional archive fits easily.
-- Offline regions for native apps reuse the same PMTiles builds (ADR-012).
-- Never bulk-download OpenFreeMap tiles (their ToS); build our own instead.
+- Weekly tile builds per region in the data pipeline (Planetiler needs memory proportional to the region; planet-size
+  builds are split by region).
+- Offline regions reuse the same PMTiles (DP-9.8, ADR-018).
+- Satellite, terrain and transit/cycling layers are added as extra sources (DP-8.x).
 
 ## Alternatives rejected
-- **Commercial tiles now:** cost and keys with no capability gain.
-- **Raster OSM tiles from tile.openstreetmap.org:** OSMF tile policy is for
-  light use; vector tiles are better for styling and dark mode.
+- **Commercial tile APIs:** per-request fees (ADR-015).
+- **Raster tiles from tile.openstreetmap.org:** OSMF policy is for light use; vector tiles are better for styling and dark mode.

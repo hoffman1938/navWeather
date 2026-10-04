@@ -3,7 +3,7 @@
 > **Update 2026-10-04 (ADR-015/016):** the providers in §1 are the current code. The target replaces them with our own
 > engines on Cloudflare: Valhalla in Containers (car, walk, bike, truck, motorcycle), a D1 FTS5 geocoder (Photon if
 > needed), a Places API on D1/R2, own PMTiles in R2 (OpenFreeMap as fallback), own weather cells in R2, MOTIS in
-> Containers. MET Norway is not planned. See [FREE_STACK_PLAN §4, §6a](../FREE_STACK_PLAN.md).
+> Containers. See [FREE_STACK_PLAN §4, §6a](../FREE_STACK_PLAN.md).
 
 ## 1. Six separate systems
 
@@ -18,7 +18,7 @@
 | **Weather** | forecasts along the route | Open-Meteo | `WeatherProvider` | CC BY 4.0, non-commercial free | stale label, last forecast kept |
 
 Keeping them separate means each can be replaced without touching the others
-(e.g. Valhalla for routing, PMTiles for tiles, MET Norway for weather).
+(e.g. Valhalla for routing, own PMTiles for tiles, our weather pipeline for forecasts).
 
 ## 2. Routing engine
 Decision and comparison: [ADR-004](decisions/ADR-004-routing-engine.md).
@@ -74,7 +74,7 @@ push-to-talk and the Settings screen says so.
   and MapLibre expect. APIs that use lat,lon order (Nominatim, MOTIS
   `fromPlace=lat,lon`, Open-Meteo params) are converted at the provider edge.
 - **Precision:** 5–6 decimals for routing; ≤4 for weather requests (enough for
-  0.02° cells; MET Norway requires ≤4); 5 for reports.
+  0.02° cells); 5 for reports.
 - **Projection:** Web Mercator only for rendering; all distances are
   great-circle (haversine) in metres; route progress for line gradients uses
   Mercator length to match MapLibre's `line-progress`.

@@ -30,7 +30,7 @@ weather. It is not "a map site" or "a weather site" — keep that direction.
   docs updated? tests present? debt recorded?
 
 ## Rules that must not be broken
-- **Only hosting is paid; free for users (ADR-015, owner, 2026-10-04 — supersedes the zero-cost part of ADR-014):**
+- **Only hosting is paid; free for users (ADR-015, owner, 2026-10-04):**
   the owner pays for hosting (compute, storage, bandwidth, CDN, domain) and nothing else. Never add a paid API
   plan, key, per-request fee, paid data, store account or paid feature; no ads or subscriptions; no sponsors,
   grants or credits. Every third-party component is free software or open data with its licence recorded, and it
@@ -73,22 +73,18 @@ npm run test:reports
 Work on branch **`claude/navweather-dev`**; commit every finished change there
 and push it. Commit messages: what and why; reference requirement IDs.
 
-## Map of the docs
-- Requirements: `docs/PROJECT_REQUIREMENTS.md` · Roadmap/MVP: `docs/ROADMAP.md`
-- Decisions: `docs/architecture/decisions/` · Target architecture, weather
-  engine, maps/routing/GIS: `docs/architecture/`
-- API: `docs/api/API_V1.md` · Data: `docs/database/DATA_MODEL.md`, `database/migrations/`
-- Security: `docs/security/SECURITY.md` · Privacy, licensing: `docs/legal/`
-- Mobile/CarPlay/Android Auto: `docs/mobile/` · UX/SEO/analytics/i18n: `docs/product/`
-- Cost & scale, CI/CD, testing, DR: `docs/operations/`
-- Feature specs (source of truth per feature): `docs/features/` (Long Trip Mode)
+## Map of the docs (only current documents; history lives in git)
+- Requirements: `docs/PROJECT_REQUIREMENTS.md`
 - **The single work plan: `docs/DEVELOPMENT_PLAN.md`** (stages 0–13, tasks DP-x.y with localhost and Workers checks,
   release gates G1–G13, risks, owner decisions) — ADR-015, ADR-016
 - Catalogue of free replacements, Google Maps gaps and Cloudflare placement: `docs/FREE_STACK_PLAN.md` (§1.1 "always
   free" rule, §6a Cloudflare)
-- History: `docs/PRODUCTION_READINESS_PLAN.md` (PR-x.y), `docs/ROADMAP.md`, `docs/AUDIT/IMPLEMENTATION_ROADMAP.md` —
-  superseded; their tasks are mapped in DEVELOPMENT_PLAN ("Было")
-- Latest docs audit: `docs/AUDIT/2026-10-04-docs-audit.md`; latest code audit: `docs/AUDIT/MASTER_AUDIT.md`
-  (2026-10-03: status of every requirement, confirmed defects `B-xx`), with `docs/AUDIT/FEATURE_GAP_ANALYSIS.md`;
-  previous: `docs/AUDIT/2026-10-02-platform-audit.md`
-- Product iteration log (Russian): `docs/PLAN.md`
+- Defect register `B-xx`: `docs/AUDIT/DEFECTS.md` · documentation audit and cleanup: `docs/AUDIT/2026-10-04-docs-audit.md`
+- Decisions: `docs/architecture/decisions/` · Target architecture, weather engine, maps/routing/GIS: `docs/architecture/`
+- Current implementation: `docs/ARCHITECTURE.md` · Environment: `docs/ENVIRONMENT.md` · Testing: `docs/TESTING.md`
+- API: `docs/api/API_V1.md` · Data: `docs/database/DATA_MODEL.md`, `database/migrations/`
+- Security: `docs/security/SECURITY.md` · Privacy, licensing: `docs/legal/`
+- Mobile/CarPlay/Android Auto: `docs/mobile/` · UX/SEO/analytics/i18n: `docs/product/`
+- Cost & scale, CI/CD, DR: `docs/operations/`
+- Feature specs (source of truth per feature): `docs/features/` (Long Trip Mode)
+- Language: ADRs and technical specs in English; plans, audits and the catalogue in Russian.

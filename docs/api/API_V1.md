@@ -1,16 +1,11 @@
 # navWeather HTTP API — v1
 
-> **Planned additions (2026-10-04, ADR-015/016, [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md)):** `/places/*` (DP-4.3),
-> `/geocode` (DP-4.4), `/weather/*` cells from our own pipeline (DP-4.6 — replaces the paid-key `/weather/points`
-> below), `/route` → Valhalla in Cloudflare Containers (DP-5.2), `/transit` → MOTIS (DP-5.3), `/radar/*` (DP-5.4),
-> `/reports/query` corridor (DP-7.2). Each contract is written here when its task starts.
-
 Base path: **`/api/v1`** on the app's origin. The unversioned `/api/…` paths
 are aliases of v1 for clients from before versioning (ADR-009). Types are
 shared code: `src/api/v1.ts`, `src/share/protocol.ts`, `src/reports/protocol.ts`.
 
 Status column: **IMPLEMENTED** (live in `worker/index.ts`) or **PLANNED**
-(designed here; build with the phase named in [ROADMAP](../ROADMAP.md)).
+(designed here; built by the task named in [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md)).
 
 ## Conventions
 
@@ -78,45 +73,62 @@ along that route) when replanning.
 
 ## Planned
 
-### `POST /reports/query` — PLANNED (P1, REQ-CF-009)
-Replaces up to 24 bbox requests per refresh. Body: `{ "corridor": <encoded
-polyline, precision 5, ≤500 points>, "widthM": 300 }` → same response as the
-bbox list. Server-side: decode, bbox prefilter, distance-to-line filter.
+All planned endpoints are served by the same Worker on Cloudflare (ADR-016); engines behind them run in Containers,
+data in D1/R2. Each contract is finalised here when its DEVELOPMENT_PLAN task starts. No endpoint proxies a
+third-party service with usage limits (ADR-015).
 
-### `POST /weather/points` — PLANNED (Growth, ADR-005)
-Body: `{ points: [{lat, lon}] ≤100 (≤4 decimals), untilMs }` → `{ forecasts:
-LocationForecast[] keyed by grid cell, modelRun, stale: string[] }`. Edge
-cache key = grid cell (0.02°) + model run; no user identifiers. Rate limit
-per client; the Worker holds the provider key.
+### `POST /reports/query` — PLANNED (DP-7.2, REQ-CF-009)
+Replaces up to 24 bbox requests per refresh. Body: `{ "corridor": <encoded polyline, precision 5, ≤500 points>,
+"widthM": 300 }` → same response as the bbox list. Server-side: decode, bbox prefilter, distance-to-line filter.
 
-### `POST /route` — PLANNED (public beta, ADR-004)
-Body: `{ mode: drive|walk|bike, points: [[lon,lat]…] ≤5, alternatives?:
-bool, avoid?: [tolls|highways|ferries], bearingDeg? }` → `{ routes: Route[] }`
-(normalised, same type as `src/types/route.ts`). Proxies the self-hosted
-router; identical requests cached briefly; never logged with coordinates.
+### `POST /route` — PLANNED (DP-5.2, ADR-004)
+Body: `{ mode: drive|walk|bike|truck|motorcycle, points: [[lon,lat]…] ≤5, alternatives?: bool,
+avoid?: [tolls|highways|ferries], vehicle?: {heightM, weightT…}, bearingDeg?, departAtMs?|arriveByMs? }` →
+`{ routes: Route[] }` (normalised, same type as `src/types/route.ts`). Valhalla in Containers; identical requests cached
+briefly; never logged with coordinates. Related: `POST /route/matrix`, `POST /route/optimize`, `POST /route/isochrone`
+(DP-9.4, DP-9.5).
+
+### `GET /geocode` — PLANNED (DP-4.4)
+`?q=&lang=&near=lon,lat` (search and autocomplete) and `?reverse=lon,lat&lang=` → `{ places: Place[] }`. FTS5 index in
+D1 per country (Photon in Containers only if decision D10 says so).
+
+### `/places/*` — PLANNED (DP-4.3)
+`GET /places/tile/:z/:x/:y?cat=` (cacheable), `POST /places/corridor` (polyline + width + categories; also speed
+limits, cameras, level crossings), `GET /places/:id` → normalised places with source and licence per record.
+
+### `GET /weather/*` — PLANNED (DP-4.6)
+`GET /weather/cells?ids=` (forecast cells: grid cell + model run, hourly variables), `GET /weather/meta` (latest model
+runs) → shapes compatible with `WeatherService`. Cells are files in R2 produced by our pipeline; air quality the same way.
+
+### `POST /transit` — PLANNED (DP-5.3)
+MOTIS `plan` request shape (`fromPlace`, `toPlace`, `time`, `arriveBy`) → itineraries, as consumed by `MotisProvider`.
+
+### `GET /radar/*` — PLANNED (DP-5.4)
+Tile endpoints of LibreWXR (precipitation; "model estimate" where no radar exists).
 
 ### `POST /telemetry` — PLANNED (REQ-OBS-003/004)
-Body: `{ appVersion, events: [{ kind: "provider-error"|"client-error",
-provider?, code, count }] }` — counts only, no coordinates, no ids → Workers
-Analytics Engine.
+Body: `{ appVersion, events: [{ kind: "engine-error"|"client-error", component?, code, count }] }` — counts only, no
+coordinates, no ids → Workers Analytics Engine.
 
-### Accounts — PLANNED (Phase 3, ADR-008)
+### Push — PLANNED (DP-7.5)
+`POST /push/subscribe` · `DELETE /push/subscribe` (Web Push subscription, VAPID); opt-in only.
+
+### Accounts — PLANNED (DP-7.6, ADR-008)
 | Method & path | Purpose |
 | --- | --- |
 | `POST /auth/passkey/register/options` · `POST /auth/passkey/register` | create account / add passkey (WebAuthn) |
 | `POST /auth/passkey/login/options` · `POST /auth/passkey/login` | sign in |
-| `POST /auth/email/start` (Turnstile token) · `POST /auth/email/verify` | magic link / code fallback |
 | `POST /auth/refresh` | mobile: rotate refresh token → new access token |
 | `POST /auth/logout` | revoke current session |
 | `GET /account` | profile, sign-in methods, sessions |
-| `DELETE /account` | delete account and all associated data now (Apple 5.1.1(v), Google Play) |
+| `DELETE /account` | delete account and all associated data now |
 | `GET /settings` · `PUT /settings` | synced preferences (JSON document with version) |
-| `GET /places` · `POST /places` · `PATCH /places/:id` · `DELETE /places/:id` | synced saved places (Home/Work/favourites) with `updatedAt` for merge |
-| `POST /devices` · `DELETE /devices/:id` | FUTURE: push registration (mobile) |
+| `GET /saved-places` · `POST /saved-places` · `PATCH /saved-places/:id` · `DELETE /saved-places/:id` | synced saved places with `updatedAt` for merge |
+| `GET /lists/:id` · `POST /lists` · … | shared lists of places (DP-9.10) |
 
-Auth: web — `HttpOnly; Secure; SameSite=Lax` session cookie; mobile —
-`Authorization: Bearer <access token>` (15 min) + refresh token rotation.
-Unauthenticated → 401 `{ error: "unauthenticated" }`.
+No e-mail or SMS sign-in (no paid sending service). Auth: web — `HttpOnly; Secure; SameSite=Lax` session cookie;
+mobile — `Authorization: Bearer <access token>` (15 min) + refresh token rotation. Unauthenticated → 401
+`{ error: "unauthenticated" }`.
 
 ### Not planned (by design)
 `POST /routes` storing routes, `GET /routes/:id/weather`, location history,

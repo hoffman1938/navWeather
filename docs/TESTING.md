@@ -71,8 +71,8 @@ dialog, arrival) is captured at 320, 375, 390, 430, 768, 1024, 1280, 1440 and
 Chrome driving the dev build (emulated GPS; provider responses replayed from
 the test fixtures when the network is closed). Each capture is also checked
 for page-level horizontal overflow, controls off screen, tiny touch targets
-and unlabelled buttons. axe-core runs on 10 states in both themes. Findings
-and fixes: `docs/PLAN.md` §3 and §7.
+and unlabelled buttons. axe-core runs on 10 states in both themes (0 violations after fixes, 2026-10-02);
+automation of this check is DEVELOPMENT_PLAN DP-11.4.
 
 ## Manual / browser checks performed
 
@@ -83,7 +83,7 @@ and fixes: `docs/PLAN.md` §3 and §7.
 - Production build served by Cloudflare's runtime (`wrangler dev`): headers,
   SPA fallback, service worker offline reload.
 
-Live check 2026-10-03 ([MASTER_AUDIT](AUDIT/MASTER_AUDIT.md) §1): dev build against the real public providers —
+Live check 2026-10-03 (code audit; defects in [AUDIT/DEFECTS.md](AUDIT/DEFECTS.md)): dev build against the real public providers —
 Tbilisi → Batumi (OSRM `alternatives=3` + via probes answered; one alternative road), Tbilisi → Istanbul and
 Tbilisi → Berlin Long Trip plans through the local Worker, and a 60× simulated drive that spoke a heavy-rain
 alert ~35 min ahead. Both public Overpass instances failed one request each during that run.

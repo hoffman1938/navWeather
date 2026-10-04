@@ -273,7 +273,7 @@ Overpass; Georgia/Turkey countries via `is_in`.
 Truck routing restrictions (needs Valhalla, ADR-004) · verified
 jurisdiction rest rules for commercial drivers · EV charging time from car
 model and charger power, weather impact on range · fuel prices (if a
-reliable open source appears) · booking partner for real availability (a
-commercial decision, ADR-005/011 impact) · saved trips (device-only, opt-in)
+reliable open source appears) · real hotel availability (no free open source exists;
+the project stays non-commercial, ADR-015) · saved trips (device-only, opt-in)
 · multi-night stays · voice: "where do we sleep tonight?" · CarPlay/Android
 Auto trip overview · fleet mode (same engine server-side).

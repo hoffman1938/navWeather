@@ -3,8 +3,8 @@
 > **Update 2026-10-04 ([ADR-016](../architecture/decisions/ADR-016-all-on-cloudflare-workers.md)):** environments become
 > `dev` (localhost: Vite + Cloudflare Vite plugin with local Durable Objects/D1/R2 + Docker for engines), `preview`
 > (own Worker, Durable Objects, D1, R2 — never production data) and `production`; one E2E suite must pass on localhost
-> and on preview (REQ-DEV-001). Provider fallbacks below (MET Norway, a second public router) are replaced by our own
-> engines. See [DEVELOPMENT_PLAN §2](../DEVELOPMENT_PLAN.md), tasks DP-2.x and DP-3.x.
+> and on preview (REQ-DEV-001). Fallbacks come from our own engines
+> (another regional instance) and stale caches. See [DEVELOPMENT_PLAN §2](../DEVELOPMENT_PLAN.md), tasks DP-2.x and DP-3.x.
 
 ## 1. Environments
 
@@ -47,14 +47,14 @@ rolled back (protocols are versioned and additive for that reason).
 
 | Layer | Tooling | Exists | Next |
 | --- | --- | --- | --- |
-| Unit (engines, utils, protocols) | vitest | ~60 files, 548 tests | keep ≥ current coverage for every engine change |
+| Unit (engines, utils, protocols) | vitest | 65 files, 586 tests (2026-10-03) | keep ≥ current coverage for every engine change |
 | Scenario / integration (store end-to-end with fake providers, Tbilisi → Batumi fixtures) | vitest + harness | yes | more international/timezone fixtures |
 | API (Worker) | `scripts/*-smoke.mjs` against wrangler dev | share 7 checks, reports 5 checks, both prefixes | add to CI (done) |
 | Live providers | `npm run test:live` (opt-in) | partial | run weekly in CI with a budget |
 | E2E browser | — | none | Playwright: search → route → simulate → arrive; transit plan; offline |
-| Accessibility | axe-core (manual run, PLAN.md §7.3) | 0 violations | automate in Playwright |
+| Accessibility | axe-core (manual run 2026-10-02) | 0 violations | automate in Playwright (DP-11.4) |
 | Performance | — | none | Lighthouse CI on preview |
-| Security | review rounds (AUDIT.md) | yes | dependency audit in CI; WAF tests on staging |
+| Security | review rounds (code audits) | yes | dependency audit in CI (DP-11.6); security review DP-11.9; WAF on the domain (DP-12.1) |
 | Mobile | — | — | device lab / real devices before public beta (REQ-TEST-004) |
 
 **Special cases** (REQ-TEST-003) and where they stand:
@@ -65,7 +65,7 @@ rolled back (protocols are versioned and additive for that reason).
 | Weather provider failure | `WeatherService.test.ts` (stale fallback), store tests |
 | Route recalculation | `store.test.ts`, `roads.test.ts` |
 | GPS drift / bad signal / tunnel | deviation + progress tests (accuracy gating, persistence) — add tunnel (no fixes for 2 min) scenario |
-| Offline mode | manual (PLAN.md §7.4) — automate in Playwright |
+| Offline mode | manual (2026-10-02) — automate in Playwright (DP-11.3) |
 | Duplicate alerts | `weatherAlerts.test.ts`, `driverAlerts.test.ts` |
 | Forecast update during a drive | store refresh tests (model-update reason) |
 | Long route (>1,000 km) | sampling budget tests — add an end-to-end fixture |
@@ -83,7 +83,7 @@ rolled back (protocols are versioned and additive for that reason).
 | D1 (future) | **Time Travel**: restore to any minute within 7 days (Free) / 30 days (Paid) | weekly export to R2 (Cron) for longer retention; test a restore quarterly |
 | KV / Cache (future) | caches — rebuildable | none |
 | Configuration | in git (`wrangler.toml`, `_headers`, `.env.example`) | secrets listed (names only) in `docs/ENVIRONMENT.md`; re-create from the providers' consoles |
-| Providers | — | fallbacks: stale weather, MET Norway (Growth), second router, PMTiles fallback style |
+| Engines and data | Containers restart; R2/D1 are durable | another regional instance; stale weather cells with a label; OpenFreeMap tile fallback; pipelines rebuild data |
 
 Incident response: SECURITY §7. A Cloudflare-wide outage takes the app down
 for new visits; installed PWAs open from the shell cache but need the network

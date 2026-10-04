@@ -191,7 +191,7 @@ online voices (the sentence is sent to Google to be spoken). The approximate
 start is worked out by the app's own Worker from the connection and is not
 stored.
 
-## Deploy (Cloudflare, Free plan)
+## Deploy (Cloudflare Workers)
 
 ```bash
 npm run build
@@ -199,9 +199,9 @@ npx wrangler login
 npx wrangler deploy      # app + live-sharing and reports relay (Worker + Durable Objects)
 ```
 
-`public/_headers` sets the CSP. The static app alone also runs on Cloudflare
-Pages (`dist/`), just without live sharing and driver reports (shown as
-unavailable).
+`public/_headers` sets the CSP. Hosting is one Cloudflare **Worker** project (not Pages) — see
+[ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md). Separate `preview` and `production`
+environments and the one-command local stack arrive with DEVELOPMENT_PLAN stage 2.
 
 ## Docs
 
@@ -210,15 +210,11 @@ source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
 
 - **[Development plan](docs/DEVELOPMENT_PLAN.md)** (in Russian) — the single plan from start to finish: stages, tasks with localhost and Cloudflare Workers checks, release gates, risks, owner decisions ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md), [ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md))
 - **[Free stack catalogue](docs/FREE_STACK_PLAN.md)** (in Russian) — free self-hosted replacements for every service, the Google Maps features we lack and their free sources, where each part runs on Cloudflare
-- [Documentation audit 2026-10-04](docs/AUDIT/2026-10-04-docs-audit.md) (in Russian) — status of every document, contradictions, remaining fixes
-- [Production readiness plan](docs/PRODUCTION_READINESS_PLAN.md) — history (2026-10-03), superseded by the development plan
-- [Master audit 2026-10-03](docs/AUDIT/MASTER_AUDIT.md) — status of every requirement, confirmed defects, cost, roadmap ([gap analysis](docs/AUDIT/FEATURE_GAP_ANALYSIS.md), [implementation roadmap](docs/AUDIT/IMPLEMENTATION_ROADMAP.md))
-- [Platform audit 2026-10-02](docs/AUDIT/2026-10-02-platform-audit.md) — findings, fixes, sources
-- [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md) · [Roadmap & MVP](docs/ROADMAP.md)
+- [Defect register](docs/AUDIT/DEFECTS.md) (in Russian) — confirmed defects B-xx and the tasks that fix them
+- [Documentation audit and cleanup 2026-10-04](docs/AUDIT/2026-10-04-docs-audit.md) (in Russian) — what was removed, what remains
+- [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md)
 - [API v1](docs/api/API_V1.md) · [Data model](docs/database/DATA_MODEL.md) · [Security](docs/security/SECURITY.md) · [Privacy](docs/legal/PRIVACY.md) · [Licensing matrix](docs/legal/LICENSING_MATRIX.md)
 - [Weather engine](docs/architecture/WEATHER_ENGINE.md) · [Maps, routing, GIS](docs/architecture/MAPS_ROUTING_GEO.md) · [Mobile strategy](docs/mobile/MOBILE_STRATEGY.md) · [Cost & scale](docs/operations/COST_AND_SCALE.md) · [Delivery](docs/operations/DELIVERY.md)
 - [Architecture](docs/ARCHITECTURE.md) — engines, data flow, providers, state, relay
 - [Environment](docs/ENVIRONMENT.md) — every variable and binding
 - [Testing](docs/TESTING.md) — what is covered, dev tools, what isn't tested
-- [Product plan](docs/PLAN.md) — competitor study, what goes on the map, design audit, roadmap, iteration logs (in Russian)
-- [Audit & backlog](docs/AUDIT.md) — findings, status, remaining gaps

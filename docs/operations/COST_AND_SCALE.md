@@ -1,115 +1,56 @@
-# Cost control and scalability model
+# Cost and scale model
 
-> ⚠️ **Superseded again (2026-10-04, ADR-015/016):** the only cost is Cloudflare hosting (Workers Paid, R2, D1,
-> Durable Objects, Queues, Containers) and a domain; no paid API keys or data. The figures below are history; the new
-> hosting cost model per 1,000 DAU comes from the capacity pilot DP-5.6 ([DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md),
-> [FREE_STACK_PLAN §6.1/§6a](../FREE_STACK_PLAN.md)).
+Decisions: [ADR-015](../architecture/decisions/ADR-015-free-software-own-hosting.md) — the only cost is hosting; every
+third-party component is free forever. [ADR-016](../architecture/decisions/ADR-016-all-on-cloudflare-workers.md) —
+hosting is Cloudflare. Placement of each component: [FREE_STACK_PLAN §6a](../FREE_STACK_PLAN.md).
 
-> ⚠️ **Superseded for all paid steps by [ADR-014](../architecture/decisions/ADR-014-zero-cost.md) (2026-10-03): the app is
-> free for users and costs $0 to run.** Paid plans, keys, compute and domains below are history, not plans. The
-> zero-cost capacity model, budgets and degradation ladder are in
-> [PRODUCTION_READINESS_PLAN](../PRODUCTION_READINESS_PLAN.md) §5–§6; this file is rewritten in task PR-2.13.
+**Status:** the measured model (hosting cost per 1,000 daily active users) comes from the capacity pilot
+**DP-5.6** and is then reported monthly (DP-12.7). Until then this file lists the cost drivers, list prices and the
+method. Prices verified 2026-10-04 at developers.cloudflare.com.
 
-All numbers are **ESTIMATES** from the request patterns in the code
-(2026-10-02) unless marked **KNOWN** (verified list price) or
-**PROVIDER-DEPENDENT** (price not published / not verified). Cloudflare list
-prices verified 2026-10-02 at developers.cloudflare.com.
+## 1. What costs money (only Cloudflare hosting)
 
-## 1. Request pattern per daily active user (DAU)
-
-Two profiles: **planner** (70 % of DAU: 2 route plans, 4 place/chip
-lookups, 1 weather-layer area) and **driver** (30 %: 1 plan + 2 h of real
-navigation with reports on). Live sharing: 2 % of DAU share for 1 h.
-
-| Source | What triggers calls | Planner/day | Driver/day | Blended/DAU |
-| --- | --- | --- | --- | --- |
-| **Open-Meteo** (weighted calls: 14 variables ⇒ ×1.4 per location; per-location counting **REQUIRES VERIFICATION**) | plan ≈ 70 locations (3 roads + refinement) ≈ 98; place/chip ≈ 2.4; layer 49 loc ≈ 69; driving refresh every 20 min ≈ 70 each | ≈ 275 | ≈ 520 | **≈ 350** |
-| **Routing** (OSRM public) | plan = 1 + ≤4 via probes; detour table; re-routes; weather-reroute check every 10 min driving | ≈ 11 | ≈ 20 | **≈ 14** |
-| **Geocoding** (Photon, Nominatim) | autocomplete (300 ms debounce), submit, naming display points | ≈ 35 | ≈ 20 | **≈ 30** |
-| **Overpass** | places per plan; limits/cameras/crossings per drive; POI search | ≈ 3 | ≈ 5 | **≈ 3.5** |
-| **Worker API** (today) | report boxes ≤24 per load, refresh every 5 min driving; live share PUT every ≥5 s | ≈ 20 | ≈ 250 | **≈ 105** |
-| **Worker API** (after REQ-CF-009 corridor request) | one request per load/refresh | ≈ 2 | ≈ 25 | **≈ 25** |
-| **Long Trip Mode** (drivers on LONG trips, est. 10 % of drivers) | 1 plan + ≤1 replan per hour driving + 1–4 stop-places + 1 borders call | — | ≈ 5–8 Worker requests; ≈ 2–5 Overpass queries (edge-cached by area) | **≈ 0.5** |
-| Static assets | page loads | free (KNOWN: not billed) | | |
-| Map tiles | OpenFreeMap CDN (not our bill) | ~100–300 tile requests per session | | |
-
-## 2. Why the architecture must change before growth
-
-**Open-Meteo, client-direct (today):** ≈350 calls/DAU. The free tier is
-"less than 10,000 API calls per day" for non-commercial use — at **~30 DAU
-the app as a whole exceeds it** even though each user's browser stays far
-below. Relying on per-IP enforcement would breach the spirit of the terms →
-**REQUIRES REVIEW with Open-Meteo**; plan the paid key + edge cache for the
-private beta, not only for commercial launch (ADR-005 updated).
-
-**With the shared edge cache** (Cache API per PoP → KV → Open-Meteo, keyed by
-0.02° cell + model run, TTL until the next model run):
-upstream calls ≈ distinct cells touched × model updates per day × 1.4,
-independent of user count once cells are warm. Georgia ≈ 19,000 cells in
-total; trips realistically touch 2,000–5,000/day.
-
-| Refresh policy | Upstream calls/day (5,000 cells) | Per month |
-| --- | --- | --- |
-| hourly TTL | 5,000 × 24 × 1.4 ≈ 168,000 | ≈ 5.0M (Professional-size) |
-| per model run (~3 h) | 5,000 × 8 × 1.4 ≈ 56,000 | ≈ 1.7M |
-| per model run, ≤10 variables | 5,000 × 8 × 1.0 ≈ 40,000 | ≈ 1.2M (≈ Standard-size) |
-
-Plan prices: **PROVIDER-DEPENDENT** (allowances verified: Standard 1M,
-Professional 5M, Enterprise >50M calls/month).
-
-## 3. Scale table (per day unless noted)
-
-| Metric | 1 DAU | 1,000 | 10,000 | 100,000 | 1,000,000 |
-| --- | --- | --- | --- | --- | --- |
-| Worker API requests (today, 105/DAU) | 105 | 105k | 1.05M | 10.5M | 105M |
-| Worker API requests (after corridor fix, 25/DAU) | 25 | 25k | 250k | 2.5M | 25M |
-| Workers plan | Free | Free (after fix) | Paid | Paid | Paid |
-| Reports DO load, avg (after fix ≈ 9/DAU) | — | 0.1 req/s | 1 req/s | 10 req/s | ≈ 104 req/s avg, peaks ~500 → **shard** (soft limit 1,000 req/s per object) |
-| Reports DO load, avg (today ≈ 89/DAU) | — | 1 req/s | 10 req/s | 100 req/s | ≈ 1,030 req/s → **over the limit** |
-| Open-Meteo direct (350/DAU) | 350 | 350k | 3.5M | 35M | 350M |
-| Open-Meteo via edge cache (Georgia-scale, model-run TTL) | 350 | ≤ 56k | ≤ 56k | ≤ 56k | international: ~0.5–2M (cells × runs) → Enterprise or self-hosted |
-| Routing requests (14/DAU) | 14 | 14k | 140k (1.6/s) | 1.4M (16/s, peaks ~80/s) | 14M (160/s, peaks ~800/s) |
-| Geocoding (30/DAU) | 30 | 30k | 300k | 3M (35/s) | 30M (350/s) |
-| D1 rows read (10 % signed in, ~10 rows/request, ~20 req) | — | 20k | 200k | 2M | 20M (Free 5M/day; Paid 25B/month included) |
-
-Public services' limits (KNOWN): OSRM demo and FOSSGIS 1 req/s per user and
-non-commercial; Nominatim 1 req/s and no heavy use; Overpass "regular
-application" guidance ~100 queries/day. **From ~1,000 DAU these are not
-appropriate** → self-hosted routing/geocoding/OSM extracts (ADR-004).
-
-## 4. Monthly cost estimates (Cloudflare KNOWN unit prices; usage ESTIMATED)
-
-| Item | 10k DAU | 100k DAU | 1M DAU |
+| Item | Price (list) | Cost driver | How we keep it low |
 | --- | --- | --- | --- |
-| Workers Paid base | $5 | $5 | $5 |
-| Worker requests (25/DAU × 30) | 7.5M → within 10M included: $0 | 75M → (75−10)M × $0.30 ≈ $20 | 750M → ≈ $222 |
-| Worker CPU (assume ~2 ms avg) | within 30M ms | 150M ms → ≈ $2.4 | 1.5B ms → ≈ $29 |
-| Durable Objects requests (≈22/DAU) | 6.6M → ≈ $0.8 | 66M → ≈ $9.8 | 660M → ≈ $99 (+ duration, sharding) |
-| KV (weather cells; Cache API absorbs most reads) | ≈ $0 | ≈ $0–20 (writes $5/M beyond 1M) | ≈ $20–100 |
-| D1 | $0 | $0 | ≈ $0–5 |
-| Routing compute (Valhalla) | Containers standard-1 ≈ $53 (ESTIMATED, always-on behaviour REQUIRES VERIFICATION) | 2 × standard-2 ≈ $185 | external cluster, PROVIDER-DEPENDENT |
-| Geocoding (self-hosted Photon) | shares routing host or ≈ $50 | ≈ $100 | PROVIDER-DEPENDENT |
-| Open-Meteo plan | Standard–Professional, PROVIDER-DEPENDENT | Professional, PROVIDER-DEPENDENT | Enterprise or self-host, PROVIDER-DEPENDENT |
-| Map tiles | OpenFreeMap (free) — consider sponsoring | self-host PMTiles: R2 storage ≈ $0; **serving cost depends on method** (Worker requests vs R2 Class B $0.36/M) — REQUIRES DESIGN | 6B tile requests/month ⇒ ~$1.8–2.2k via Worker/R2 list prices → CDN-cached static tiles needed |
+| Workers Paid base | $5/month, 10 M requests included, then $0.30 per million | API requests | static assets for everything that fits (free, unlimited); one corridor request for reports; caching |
+| Static assets | free, unlimited requests | — | app, small regional tile sets, borders |
+| R2 | storage and operations; **egress free** | tile/places/weather reads | Cache API on the custom domain; immutable files; offline region packs |
+| D1 | rows read/written, storage | geocoder and places queries | answers by tile → cache; one database per region |
+| Durable Objects | requests and active duration | live share, reports, traffic aggregates | hibernating WebSockets (incoming messages billed 20:1); sharding by geohash |
+| Queues | messages | push fan-out, traffic ingestion | aggregation on the device; drop raw points |
+| Containers | $0.000020 per vCPU-second, $0.0000025 per GiB-second, disk per GB-second, only while running; egress $0.025/GB in North America/Europe (1 TB/month included) | routing, transit, radar requests | regional instance groups; scale to zero; cache identical requests; matrices only on demand |
+| Domain | registrar price | — | attached to the Worker (DP-12.1) |
 
-## 5. Cost-control rules (implemented ✓ / planned ○)
-- ✓ Batch up to 50 locations per weather request; snap to 0.02° grid; dedupe.
-- ✓ Client TTL cache (20 min), stale fallback, refresh only on age or new model run.
-- ✓ Driving re-matches cached forecasts; no per-GPS-fix requests.
-- ✓ One Overpass queue with endpoint fallback; soft deadlines.
-- ✓ OSRM ≤1 req/s per server queue; Nominatim ≤1 req/s.
-- ○ Edge cache keyed by cell + model run; request coalescing (one upstream
-  fetch per cell in flight — a Durable Object per region or KV lock).
-- ○ ≤10 Open-Meteo variables per call.
-- ○ Reports corridor request; regional DO shards.
-- ○ Weather layer from fixed-grid cells (cacheable across users).
-- ○ Alerts on spend: Cloudflare usage notifications; provider dashboards.
+Development and the preview Worker cost $0 on Workers Free until the first engine runs in Containers (DP-5.1).
 
-## 6. Triggers
+## 2. Request pattern per daily active user (to be measured)
+
+The pilot measures, per role, requests per DAU and requests per second one container instance sustains:
+
+| Role | What triggers requests | Measured in |
+| --- | --- | --- |
+| Routing (Valhalla) | plan (1 + alternatives), re-routes, detour matrices, weather re-route checks | DP-5.6 |
+| Geocoder (D1) | autocomplete (debounced), submit, reverse naming | DP-5.6 |
+| Places (R2/D1) | places along the route, POI search, limits/cameras by corridor | DP-5.6 |
+| Weather cells (R2) | plan samples, place cards, map layer; refresh on new model runs | DP-5.6 |
+| Real time (DO) | live share updates, report corridor refreshes | DP-5.6 |
+| Tiles (R2 / static) | map views; offline region downloads | DP-5.6 |
+
+## 3. Scale rules
+
+- Upstream data volume (model files, OSM extracts, feeds) depends on regions and refresh cadence, **not on users**.
+- Every server role is stateless and horizontally scalable; Durable Objects are sharded by region before any object
+  nears ~1,000 req/s (REQ-CF-008).
+- Engines run per region; a region is added by the procedure DP-13.9.
+- If container limits (4 vCPU / 12 GiB / 20 GB per instance; 1,500 vCPU per account) block planet-scale engines, the
+  heavy engines move to rented servers behind the same Worker routes — decided by the pilot, recorded in an ADR.
+
+## 4. Triggers
+
 | Trigger | Action |
 | --- | --- |
-| >~25 DAU sustained, or any commercial feature | Open-Meteo paid plan + `/api/v1/weather/points` edge cache |
-| >50k Worker requests/day sustained | Workers Paid |
-| Public beta | self-hosted Valhalla + Photon + OSM extract; WAF; logs; legal pages |
-| Reports DO > 200 req/s peak | shard by region |
-| International launch | planet routing on external compute; Enterprise/self-hosted weather; tile hosting plan |
+| First engine needed on preview | enable Workers Paid; spend alerts (DP-5.1) |
+| Custom domain bought | Cache API in front of tiles, places and weather; WAF rules (DP-12.1) |
+| Reports object > 200 req/s at peak | shard by region (DP-7.2) |
+| Container group CPU > 70 % sustained | more instances in that region; review cache hit rates |
+| New region | data pipeline + engine images + checks (DP-13.9) |

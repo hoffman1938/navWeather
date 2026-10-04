@@ -1,8 +1,9 @@
 # Architecture
 
-navWeather is a single-page React app plus a small Cloudflare Worker for live
-location sharing. Everything else runs in the browser against free public
-services. The product idea — weather **where you will be, when you will be
+navWeather is a single-page React app plus a Cloudflare Worker (live location sharing, driver reports,
+approximate location, the Long Trip planner). Everything else currently runs in the browser against free public
+services; the target moves them onto our own engines on Cloudflare ([TARGET_ARCHITECTURE](architecture/TARGET_ARCHITECTURE.md),
+[DEVELOPMENT_PLAN](DEVELOPMENT_PLAN.md)). This document describes the code as it is. The product idea — weather **where you will be, when you will be
 there** — lives in plain TypeScript modules that have no React or DOM
 dependencies, so they are unit-tested directly and can move to a native shell
 later.
@@ -127,14 +128,6 @@ that names implementations, chosen by `VITE_*` variables.
 `derive()` is a pure function of the app state and returns everything the UI
 shows; components read narrow selectors.
 
-## Location
-
-`services/location.ts` owns one reference-counted `watchPosition`. Reasons
-(`locate`, `navigate`, `share`) acquire and release it; navigation and sharing
-ask for GPS precision, "show my location" is happy with Wi-Fi, and a precise
-watch that times out falls back to coarse. Errors are classified
-(`insecure`, `denied`, `unavailable`, `timeout`, `unsupported`) and each has
-its own message, including iOS-specific instructions.
 
 ## Live location sharing
 
@@ -194,9 +187,12 @@ VoiceQueue (priorities, interruptions, expiry)
 
 ## Location
 
-- One watcher (`services/location.ts`) for the map, navigation and sharing;
-  a one-shot `locateOnce` for trips: a quick network fix, then GPS if that
-  times out **or can't work out a position**.
+- One reference-counted `watchPosition` (`services/location.ts`) for the map, navigation and sharing: reasons
+  (`locate`, `navigate`, `share`) acquire and release it; navigation and sharing ask for GPS precision, "show my
+  location" is happy with Wi-Fi, and a precise watch that times out falls back to coarse. Errors are classified
+  (`insecure`, `denied`, `unavailable`, `timeout`, `unsupported`), each with its own message (incl. iOS instructions).
+- A one-shot `locateOnce` for trips:
+  a quick network fix, then GPS if that times out **or can't work out a position**.
 - `tripStart` (a trip from "Your location"): the device position, else the
   connection's rough area from `GET /api/whereami` (the Worker reads
   Cloudflare's `request.cf`; nothing stored, no third party). The field then
@@ -217,8 +213,8 @@ working in memory and are labelled stale.
 
 One Cloudflare Worker with static assets (`wrangler.toml`): `/api/*` runs the
 Worker, everything else is served from `dist/` with `public/_headers` (CSP,
-Permissions-Policy) and SPA fallback. All of it fits the Workers Free plan.
-The static app alone also works on Cloudflare Pages — without live sharing.
+Permissions-Policy) and SPA fallback. Today it runs on Workers Free; hosting stays on Cloudflare Workers (not Pages)
+and moves to Workers Paid when the engines arrive in Containers (ADR-016).
 
 ## Travel modes
 

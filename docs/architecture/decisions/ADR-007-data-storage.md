@@ -1,41 +1,36 @@
-# ADR-007 — Storage: no server DB for MVP; D1 with accounts; Durable Objects for real time; KV narrowly
+# ADR-007 — Storage: device first; D1 per region for places, geocoder and accounts; Durable Objects for real time; R2 for files
 
-**Status:** Accepted · **Date:** 2026-10-02 · Facts verified 2026-10-02
-**Update 2026-10-04:** amended by [ADR-016](ADR-016-all-on-cloudflare-workers.md): D1 also holds regional places and FTS5 geocoder indexes (one database per region/country); places tiles and weather cells in R2.
+**Status:** Accepted · **Date:** 2026-10-02 · **Revised:** 2026-10-04 (aligned with ADR-016; history in git)
 
 ## Context
-Today the server stores only: live shares (one SQLite DO per link: latest
-position, route once, expiry) and driver reports (one SQLite DO: reports and
-votes with daily-salted reporter hashes, hourly expiry). Preferences, saved
-places and recents are in the browser (localStorage). No accounts.
+Today the server stores only live shares (one SQLite Durable Object per link: latest position, route once, expiry) and
+driver reports (one SQLite Durable Object: reports and votes with daily-salted reporter hashes, hourly expiry).
+Preferences, saved places and recents are in the browser. ADR-016 adds own places data, a geocoder index, weather cells,
+tiles and optional accounts — all on Cloudflare.
 
 ## Decision
 
 | Data | Store | Why |
 | --- | --- | --- |
 | Preferences, saved places, recents (anonymous) | device only | privacy; no server needed |
-| Accounts, auth identities, passkeys, sessions, synced settings, synced saved places, security events | **D1** (when accounts ship) | relational, strongly consistent per DB, cheap (Free: 5M rows read/day, 100k written/day, 500 MB/DB) |
+| Places index and FTS5 geocoder index | **D1**, one database per region/country (≤10 GB each) | relational queries and full-text search; 50,000 databases per account |
+| Places tiles, map PMTiles, weather cells, terrain, imagery, data snapshots | **R2** | object storage, free egress, range requests |
+| Accounts, auth identities, passkeys, sessions, synced settings, saved places and lists, security events | **D1** (when accounts ship) | relational, strongly consistent per database |
 | Live share state, WebSocket fan-out | **Durable Object** per share | single-writer coordination, hibernating WebSockets |
-| Driver reports | **Durable Object** (shard by region later) | one coordinated writer per area, SQLite inside |
-| Weather/geocode response cache | **Cache API** (per data centre) + **KV** for hot shared cells | KV is eventually consistent, 1 write/s per key — fine for a cache, wrong for records |
-| Feature flags / remote config | KV (or `wrangler.toml` vars until needed) | read-heavy, rarely written |
-| Map tile archives, exports, backups | **R2** (only when needed) | object storage, free egress |
+| Driver reports, traffic aggregates | **Durable Objects**, sharded by region (geohash) | one coordinated writer per area, SQLite inside |
+| Response caching (tiles, places, weather) | **Cache API** on the custom domain | per data centre; no effect on `*.workers.dev` |
 | Routes, positions, trip history | **nowhere** on the server | REQ-PRIV-001 |
 
 ## Reason
-D1 is a SQLite database per binding, "inherently single-threaded"
-(≈1,000 queries/s at 1 ms each), 500 MB (Free) / 10 GB (Paid) per database,
-Time Travel 7/30 days. That suits account data at this product's scale; a
-global per-user table stays small because we store no trips. Real-time and
-per-link state belongs in Durable Objects (soft limit 1,000 req/s per object).
+D1 is a SQLite database per binding (single-threaded; ≈1,000 queries/s at 1 ms each), so data is split by region; R2
+holds large immutable files cheaply; Durable Objects give one writer per share or area.
 
 ## Consequences
-- Migrations live in `database/migrations/` (first one proposed, not applied).
-- If one D1 database ever becomes a bottleneck, shard by user id (D1 allows
-  many databases per account on Paid) — not before measured need.
-- Weather cache never goes into D1 (row writes cost; no TTL).
+- Migrations live in `database/migrations/` (accounts migration proposed, not applied).
+- Regional databases are rebuilt by the data pipelines and swapped atomically (new database → switch binding).
+- Weather data never goes into D1 (cells are files in R2).
 
 ## Alternatives rejected
-- **KV as a user database:** eventually consistent, no queries, 1 write/s/key.
-- **External Postgres (Supabase/Neon) now:** unjustified for this data volume;
-  Hyperdrive would be the Cloudflare path if ever needed.
+- **KV as a database or weather cache:** eventually consistent, 1 write/s per key, small free write quota.
+- **PostGIS in a container:** container disk is ephemeral; data would be lost when an instance sleeps.
+- **External Postgres:** another provider and bill; not needed for this data.

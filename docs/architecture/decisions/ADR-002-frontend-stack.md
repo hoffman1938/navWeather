@@ -16,7 +16,7 @@ worker. The brief asks to choose a framework on requirements, not popularity.
 
 ## Decision
 Keep **Vite + React SPA**. Add server rendering only for a small number of
-static content pages if SEO work proves them valuable (ROADMAP, UX_AND_GROWTH
+static content pages if SEO work proves them valuable (UX_AND_GROWTH
 §SEO) — and then as prerendered HTML, not a framework migration.
 
 ## Reason

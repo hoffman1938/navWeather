@@ -1,10 +1,7 @@
 # UX, driving safety, performance, SEO, analytics, i18n, monetisation, AI
 
-> **Docs audit 2026-10-04:** §9 "Monetisation" contradicts the binding constraint REQ-COST-006 / ADR-015
-> (non-commercial forever: no subscriptions, ads or paid features) and is void; it is removed in DP-0.7.
-
-Product plan and competitor feature study (Russian): [PLAN.md](../PLAN.md).
-This document sets the rules; PLAN.md tracks iterations.
+This document sets the UX rules. Google Maps features we lack and their free sources: [FREE_STACK_PLAN §5](../FREE_STACK_PLAN.md);
+work order: [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md).
 
 ## 1. Competitor landscape (positioning, not a feature race)
 
@@ -47,7 +44,7 @@ queue priorities). Native car surfaces enforce it by platform templates.
 ## 4. Responsive web
 Phone: bottom sheet (compact/default/expanded), thumb-reach controls, safe
 areas. Tablet/desktop: left side panel (400 px), map controls right. Verified
-widths 320–1920 px, light/dark, en/ru (PLAN.md §7.4). Not a shrunken desktop.
+widths 320–1920 px, light/dark, en/ru (screenshot audit 2026-10-02). Not a shrunken desktop.
 
 ## 5. Performance
 Targets REQ-PERF-001 (LCP ≤2.5 s, INP ≤200 ms, CLS ≤0.1 on a mid-range phone).
@@ -89,21 +86,11 @@ Engine via `POST /api/v1/telemetry` for product counters.
   rules via `Intl.PluralRules`, road-sign conventions (speed limits per OSM;
   driving side from the router).
 - Future languages: same catalogue shape; RTL support would need a layout pass.
-- Currencies: none needed until monetisation.
+- Currencies: none needed (non-commercial).
 
-## 9. Monetisation (not in MVP)
-> ⚠️ **Void** — see the note at the top (REQ-COST-006, ADR-015: non-commercial forever).
-
-Options: free core + premium (multi-day trip planning, longer "when to leave"
-windows, saved route alerts, offline regions), B2B route-weather API, fleet
-dashboards, white-label. **Advertising is not recommended** (driver
-distraction, privacy, and it makes Open-Meteo/Transitous use commercial).
-
-Infrastructure decisions that monetisation changes (so plan them now):
-Open-Meteo paid key + Worker proxy (ADR-005); self-hosted routing/geocoding
-(ADR-004); Transitous replacement or permission (ADR-011); accounts and
-entitlements (ADR-008; `subscriptions` table only then); App Store/Play
-billing rules for digital subscriptions.
+## 9. Non-commercial
+navWeather is free for everyone and non-commercial forever — no ads, subscriptions, paid features or in-app
+purchases (REQ-COST-006, ADR-015). The only cost is hosting (ADR-016).
 
 ## 10. AI features (deterministic core stays in charge)
 Useful: natural-language trip requests ("tomorrow morning to Batumi avoiding

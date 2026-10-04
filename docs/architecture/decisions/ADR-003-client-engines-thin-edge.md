@@ -1,6 +1,6 @@
 # ADR-003 — Deterministic engines in shared TypeScript; thin edge API
 
-**Status:** Accepted · **Date:** 2026-10-02
+**Status:** Accepted · **Date:** 2026-10-02 · **Revised:** 2026-10-04 (edge scope aligned with ADR-015/016)
 
 ## Context
 The brief sketches a server-side pipeline (`POST /api/v1/routes`,
@@ -20,9 +20,9 @@ does what needs a server (live sharing, reports, approximate location).
 ## Decision
 **Option 1 now, option 3 when a native client needs it.** The engines stay
 platform-neutral TypeScript packages (`src/algorithms`, `src/intelligence`,
-`src/navigation`, `src/types`). The edge grows only for: secrets (paid
-provider keys), shared caches (weather, routing proxy), multi-user state
-(sharing, reports, accounts). A `POST /api/v1/route-weather` endpoint is added
+`src/navigation`, `src/types`). The edge grows only for: our own engines and data that
+clients cannot hold (routing, geocoding, places, transit, weather cells — ADR-015/016), shared caches, multi-user
+state (sharing, reports, accounts) and secrets (e.g. Web Push keys). A `POST /api/v1/route-weather` endpoint is added
 only if ADR-010's spike shows a native client cannot run the TS core.
 
 ## Reason
@@ -31,13 +31,12 @@ only if ADR-010's spike shows a native client cannot run the TS core.
 - **Latency and offline:** the driving loop (map matching, deviation, alerts,
   voice) must work in a tunnel; it cannot depend on a round-trip.
 - **Cost:** derive() runs on the user's CPU; a server engine would multiply
-  Worker CPU time per active driver (10 ms/invocation on Free).
+  Worker CPU time per active driver (engines that must run on servers — routing, search — are the exception, ADR-004).
 - **Correctness:** one implementation, already covered by tests.
 
 ## Consequences
-- Weather and routing providers are called from browsers until the edge cache
-  exists (ADR-004, ADR-005). Terms that limit per-user rates (OSRM 1 req/s,
-  Nominatim 1 req/s) are enforced in the client.
+- Until DEVELOPMENT_PLAN stage 6 the browser still calls public providers directly, with their per-user limits
+  (OSRM 1 req/s, Nominatim 1 req/s) enforced in the client; afterwards it calls only our Worker and engines.
 - Native apps must either embed a JS runtime for the core or port it — the
   decisive factor in ADR-010.
 - Server-side caching only ever stores provider responses keyed by grid cell

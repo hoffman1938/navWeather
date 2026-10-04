@@ -17,9 +17,9 @@ planned accounts. Requirements: PROJECT_REQUIREMENTS §13 (REQ-SEC-*).
 | Worker / DO availability | request floods, oversized bodies, slow bodies | Cloudflare DDoS (platform), rate limits, streamed body caps (48 KB share, 300 B report), WebSocket viewer cap (IMPLEMENTED); zone WAF rules (PLANNED, needs custom domain) |
 | Users' browsers | XSS, clickjacking, malicious tiles/styles | CSP `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, no inline scripts; names sanitised (control/bidi chars stripped); React escaping (IMPLEMENTED) |
 | Cross-site writes | CSRF | `Sec-Fetch-Site` check on non-GET; JSON-only writes force a CORS preflight that is never granted (IMPLEMENTED) |
-| Secrets | API keys in the bundle | no secrets exist today; rule: `VITE_*` = public, paid keys only as Worker secrets (IMPLEMENTED as policy) |
+| Secrets | API keys in the bundle | no secrets exist today; rule: `VITE_*` = public, server secrets (e.g. Web Push keys, admin credentials) only as Worker secrets (IMPLEMENTED as policy) |
 | Accounts (planned) | credential stuffing, brute force, session theft | passkeys (no passwords), email codes single-use 15 min with attempt cap, Turnstile, per-email-hash + per-IP limits, HttpOnly/Secure/SameSite cookies, refresh rotation with reuse detection (PLANNED) |
-| Provider quotas | scraping our app to proxy free APIs | client-direct calls today; proxies (Growth) rate-limited per user and cached by grid cell (PLANNED) |
+| Our engines and hosting bill | scraping our routing/geocoding/places APIs, request floods | per-client rate limits on every endpoint, caching of identical requests, spend alerts (PLANNED, DP-3.4, DP-5.1) |
 | Location privacy | logs/analytics leaking coordinates | observability off; rule REQ-PRIV-004 for when it's on (PLANNED) |
 
 ## 2. Authentication & authorisation (planned, ADR-008)
@@ -45,7 +45,7 @@ only (`sql.exec(query, ...params)`); the D1 schema adds CHECK constraints.
   sharer's own link), (c) a fake report at a fake place → mitigated by rate
   limits, expiry, "still there?" voting, and the "reported" label. A report is
   never treated as fact.
-- **Malicious route requests:** proxied routing (Growth) validates point count
+- **Malicious route requests:** our routing endpoint (`/api/v1/route`, DP-5.2) validates point count
   (≤5), coordinate ranges, total span, and rate-limits per client; responses
   for identical requests are cached briefly.
 - **Map-tile/style injection:** styles come only from configured HTTPS hosts

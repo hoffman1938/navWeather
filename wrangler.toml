@@ -1,5 +1,6 @@
-# navWeather on Cloudflare Workers: the static app (dist/) plus the live
-# location relay (Durable Object). Everything fits the Workers Free plan.
+# navWeather on Cloudflare Workers (not Pages): the static app (dist/) plus the API (live sharing, driver reports,
+# approximate location, Long Trip planner). Runs on Workers Free today; Workers Paid from the first engine in
+# Containers (docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md).
 #
 #   npm run build && npx wrangler deploy     # deploy
 #   npm run dev:api                          # local relay for `npm run dev`

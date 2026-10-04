@@ -1,34 +1,27 @@
-# ADR-011 — Public transport via Transitous, switchable off
+# ADR-011 — Public transport: own MOTIS in Cloudflare Containers with open feeds; switchable off
 
-**Status:** Accepted (terms pending owner action) · **Date:** 2026-10-02 · Facts verified 2026-10-02
-**Update 2026-10-04:** amended by [ADR-015](ADR-015-free-software-own-hosting.md)/[ADR-016](ADR-016-all-on-cloudflare-workers.md): our own MOTIS in Cloudflare Containers with open feeds only (DP-5.3, DP-6.7) replaces Transitous.
+**Status:** Accepted · **Date:** 2026-10-02 · **Revised:** 2026-10-04 (aligned with ADR-015/016; history in git)
 
 ## Context
-Public transport needs timetables. There is no free worldwide timetable API
-without a key except Transitous (community-run MOTIS over operators' open
-GTFS feeds; CORS-enabled; `api.transitous.org`). Its usage policy: the project
-must be **open source**, **not commercial**, **light on resources**; requests
-identify themselves (User-Agent, or Referer for browsers); link to
-`https://transitous.org/sources/` visibly; "Please contact us before using any
-potentially resource-intensive API endpoints (such as routing…)"; "Commercial
-use is not allowed". Coverage for Georgia (sources page, 2026-10-02): Tbilisi
-Transport Company (buses, metro) and Georgian Railway (ODbL) — but Tbilisi →
-Batumi returned no itineraries in live tests.
+Public transport needs timetables. The current code uses Transitous (community-run MOTIS over operators' open GTFS
+feeds). Its policy: open-source and non-commercial projects only, light use, contact before routing use — a limit that
+ADR-015 does not allow. MOTIS itself is MIT-licensed and supports GTFS/NeTEx, GTFS-RT/SIRI, GBFS and OSM street routing.
+Coverage for Georgia: Tbilisi Transport Company (buses, metro); Georgian Railway is published but returned no
+itineraries for Tbilisi → Batumi in live tests (2026-10-02).
 
 ## Decision
-Use Transitous (`TransitousProvider`, MOTIS `plan` v5) for the transit mode,
-plan-only (no turn-by-turn), with the sources link shown on every trip. The
-mode is switched off by `VITE_TRANSIT_URL=` (empty), and the UI then says so.
-Every itinerary is an option; each starts at its timetabled time; a departure
-change re-plans; no "when to leave" comparison.
+- **Own MOTIS** instance group per region in **Cloudflare Containers**, behind `/api/v1/transit` (DP-5.3), with the
+  region's timetables baked into the image (ephemeral disk) and rebuilt on feed updates.
+- **Only open feeds without keys or quotas**, each with its licence checked; Transitous' public feed list is a starting
+  point for discovery. Real time (GTFS-RT) and bike/scooter sharing (GBFS) are added the same way (DP-9.6, DP-9.7).
+- Plan-only (no turn-by-turn for transit); every itinerary is an option starting at its timetabled time; a departure
+  change re-plans; operators' attribution shown on every trip. The mode is switched off by configuration and the UI says so.
+- Until DP-6.7 the code keeps using Transitous with its sources link.
 
-## Conditions (owner actions)
-1. Make the repository open source (licence) or stop using Transitous (Open question #2).
-2. Contact Transitous about routing use before public beta.
-3. No ads/subscriptions while Transitous is used.
+## Consequences
+- `TransitousProvider` becomes `MotisProvider` (same MOTIS `plan` API, our endpoint).
+- Coverage equals what operators publish; "No public transport found" stays honest.
 
-## Alternatives
-- Google/HERE/Navitia transit APIs need keys and payment; possible paid
-  replacements if commercial — recorded here for that decision.
-- Self-hosted MOTIS with the same GTFS feeds (Tbilisi feed is published) — the
-  Growth option if Transitous' terms can't be met.
+## Alternatives rejected
+- **Transitous in production:** usage conditions (ADR-015).
+- **Commercial transit APIs (Google, HERE, Navitia):** keys and per-request fees.

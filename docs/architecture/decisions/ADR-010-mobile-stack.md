@@ -47,7 +47,7 @@ option anyway.
 
 ## Consequences (if accepted)
 - Monorepo packages: `packages/core` (engines, types), `packages/api-client`,
-  `packages/i18n`; `apps/web`, `apps/mobile` (ROADMAP §Repository structure).
+  `packages/i18n`; `apps/web`, `apps/mobile` (MOBILE_STRATEGY §2).
   Do the split only when the mobile app starts.
 - Native modules: CarPlay scene, Android Auto CarAppService, location FGS, TTS.
 

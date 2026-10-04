@@ -2,7 +2,7 @@
 
 > **Update 2026-10-04:** the PWA row "Offline map regions — impractical" is being re-evaluated: DEVELOPMENT_PLAN DP-9.8
 > plans user-initiated region downloads (PMTiles + places) and starts with ADR-018, which may amend ADR-012. Store apps
-> stay blocked by fees (ADR-014/015).
+> stay blocked by fees (ADR-015).
 
 There are no native apps yet. This document prepares them so the backend and
 the core don't need a rewrite. Stack decision: [ADR-010](../architecture/decisions/ADR-010-mobile-stack.md)
@@ -34,13 +34,30 @@ navigator; real in-car use needs native apps.
 | Route, weather, navigation models (`src/types`) | yes | `packages/core` |
 | Engines: timing, sampling, weather matching, grouping, alert engines, deviation, guidance, voice phrasing | yes (the main asset) | `packages/core`, run in Hermes (RN) or an embedded JS engine; or ported if ADR-010 chooses full native |
 | Validation (protocol sanitizers) | yes | shared with the Worker already |
-| i18n messages (en, ru, ka) | yes | `packages/i18n` (spoken + display forms) |
+| i18n messages (en, ru; ka if restored) | yes | `packages/i18n` (spoken + display forms) |
 | Analytics abstraction | yes | counts-only event names |
 | UI | no | web React DOM; native/RN screens designed for each platform |
 | Map rendering | partly | same style JSON; MapLibre GL JS / MapLibre Native |
 | GPS, background, TTS, notifications, car screens | no | native modules per platform |
 
-Repository split happens only when the mobile work starts (ROADMAP §Repository structure).
+Repository split happens only when the mobile work starts; until then the current layout stays (moving files
+without a second consumer is churn). Target layout:
+
+```
+apps/
+  web/            current Vite app (src/components, src/state, public/)
+  mobile/         native app (if ADR-010 accepts), Android via F-Droid
+packages/
+  core/           today's src/algorithms, src/intelligence, src/navigation, src/types, src/trip (no DOM)
+  api/            src/api/v1.ts, src/share/protocol.ts, src/reports/protocol.ts (+ generated OpenAPI)
+  i18n/           messages + spoken forms
+workers/
+  api/            today's worker/ (Durable Objects, routes)
+infra/            engine images (Valhalla, MOTIS, LibreWXR) — DEVELOPMENT_PLAN stage 2
+pipelines/        open-data builds (OSM, places, weather cells, tiles) — stage 4
+database/
+  migrations/     D1 SQL
+```
 
 ## 3. iOS
 

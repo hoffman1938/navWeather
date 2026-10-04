@@ -3,9 +3,8 @@
 **Status:** Accepted · **Date:** 2026-10-04 · **Decision by:** owner
 **Extends:** [ADR-001](ADR-001-cloudflare-first.md) (one Worker with static assets, not Pages) ·
 **Implements the hosting part of:** [ADR-015](ADR-015-free-software-own-hosting.md) ·
-**Amends:** [ADR-004](ADR-004-routing-engine.md), [ADR-005](ADR-005-weather-provider.md), [ADR-006](ADR-006-map-stack.md),
-[ADR-007](ADR-007-data-storage.md), [ADR-011](ADR-011-public-transport.md), [ADR-013](ADR-013-trip-planner.md), [ADR-014](ADR-014-zero-cost.md)
-(Workers Free only) · **Plan:** [DEVELOPMENT_PLAN](../../DEVELOPMENT_PLAN.md) · **Catalogue:** [FREE_STACK_PLAN §6a](../../FREE_STACK_PLAN.md)
+**Revised accordingly:** [ADR-004](ADR-004-routing-engine.md), [ADR-006](ADR-006-map-stack.md), [ADR-007](ADR-007-data-storage.md),
+[ADR-011](ADR-011-public-transport.md), [ADR-013](ADR-013-trip-planner.md) · **Plan:** [DEVELOPMENT_PLAN](../../DEVELOPMENT_PLAN.md) · **Catalogue:** [FREE_STACK_PLAN §6a](../../FREE_STACK_PLAN.md)
 
 ## Context
 ADR-015 allows exactly one cost — hosting — and requires every third-party API and data source to be free forever.
@@ -74,8 +73,7 @@ platform's limits allow.
 - **B-23** (Long Trip planner over 10 ms CPU) disappears on Workers Paid; moving the planner to the client stays
   useful for offline use. **B-22** (Cache API on `workers.dev`) disappears with the custom domain; until then
   shared data comes from R2/D1/static assets.
-- REQ-CF-007 (Workers Paid) and REQ-SEC-007 (WAF on a custom domain) are revived; REQ-CF-005/006/012 change
-  (PROJECT_REQUIREMENTS §6).
+- PROJECT_REQUIREMENTS §6: REQ-CF-007 (Workers Paid), REQ-CF-011…018; §13: REQ-SEC-007 (WAF on the custom domain).
 - **Scale risk:** one container is at most 4 vCPU / 12 GiB / 20 GB ephemeral disk. Regional engines fit
   (Georgia/Caucasus); a planet routing graph or a planet Photon index (≈95 GB disk, ≥64 GB RAM) does not fit one
   instance. Plan: region-sharded engines (one graph per region with overlap; Valhalla tiles loaded from R2 to be

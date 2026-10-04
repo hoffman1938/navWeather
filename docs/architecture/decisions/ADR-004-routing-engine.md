@@ -1,90 +1,50 @@
-# ADR-004 — Routing: public OSRM now, self-hosted Valhalla before public beta
+# ADR-004 — Routing: self-hosted Valhalla in Cloudflare Containers, per region
 
-**Status:** Accepted (migration planned) · **Date:** 2026-10-02 · Facts verified 2026-10-02
-**Update 2026-10-04:** amended by [ADR-015](ADR-015-free-software-own-hosting.md) (no public OSRM/FOSSGIS anywhere, not even in development) and [ADR-016](ADR-016-all-on-cloudflare-workers.md) (Valhalla in Cloudflare Containers, one instance group per region; external servers only if the capacity pilot DP-5.6 says so).
+**Status:** Accepted · **Date:** 2026-10-02 · **Revised:** 2026-10-04 (aligned with ADR-015/016; history in git)
 
 ## Context
-Car routing uses the public OSRM demo server (`router.project-osrm.org`);
-walking and cycling use FOSSGIS's OSRM instances (`routing.openstreetmap.de`).
-Their policies:
-
-- OSRM demo: "reasonable, non-commercial use-cases", "Do not exceed 1 request
-  per second", "no guarantees wrt. uptime, latency, or data updates"
-  ([wiki](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server)).
-- FOSSGIS: "One request per second max", "no scraping, no heavy usage", a valid
-  User-Agent/Referer, display attribution **and a link to the map-improvement
-  page**; data updated roughly every two days
-  ([about](https://routing.openstreetmap.de/about.html)).
-
-The audit found the app could send several requests per second (best route +
-up to four via-point probes + detour table). Fixed on 2026-10-02: one queue per
-server, ≥1 s apart (`VITE_OSRM_MIN_INTERVAL_MS`), plus the required credit and
-"Report a map error" link. Overpass (places, POIs, speed limits, cameras) has
-the same problem class: its guidance for a "regular application" is roughly
-"100 queries fetching less 10 MB of data per day", and "Commercial use should
-use self-hosted or paid Overpass servers"
-([wiki](https://wiki.openstreetmap.org/wiki/Overpass_API)).
-
-A routing engine cannot run inside a Worker (multi-GB graph, long-lived process).
+Routing must stay free forever at any scale (ADR-015) and run on Cloudflare (ADR-016). The current code still calls
+the public OSRM demo (car) and FOSSGIS OSRM (walk, bike); their policies allow ≤1 request/s, light non-commercial use and
+no production use, so they are replaced (DEVELOPMENT_PLAN stage 6). A routing engine cannot run inside a Worker
+(multi-GB graph, long-lived process).
 
 ## Options (engines)
 
 | | OSRM | Valhalla | GraphHopper (OSS) |
 | --- | --- | --- | --- |
 | Licence | BSD-2-Clause | MIT | Apache-2.0 |
-| Turn-by-turn, lanes | yes | yes | yes (45+ languages) |
+| Turn-by-turn, lanes | yes | yes | yes |
 | Alternatives | yes | yes | yes |
-| Avoid tolls/highways/ferries at request time | only `exclude` classes compiled into the profile | yes (costing options) | yes (custom models) |
-| Truck / bus / motorcycle | separate profile + re-processing | yes (costing) | yes (profiles) |
-| Time-dependent | no (traffic only by re-weighting) | yes | partly (public transit via GTFS) |
-| Map matching | yes | yes (Meili) | yes |
-| Isochrones / matrix | table only / yes | yes / yes | yes / yes |
+| Avoid tolls/highways/ferries at request time | only classes compiled into the profile | yes (costing options) | yes (custom models) |
+| Truck / motorcycle / wheelchair | separate profile + re-processing | yes (costing) | yes (profiles) |
+| Map matching, isochrones, matrix, optimised route | partly | yes | yes |
 | Elevation | no | yes | yes |
-| Offline / on-device | no | yes — tiled graph, "small memory footprint", mobile builds | yes (Android) |
-| Profile change cost | full re-process | runtime costing | runtime custom model |
-| Speed | fastest (CH/MLD) | fast | fast (CH/LM) |
-
-Hosted APIs considered: GraphHopper Directions API (Free plan "for
-non-commercial use only", 500 credits/day; paid from €69/month), others
-(Mapbox, Google, HERE) are proprietary with storage/display restrictions.
-
-## Options (where it runs)
-1. Keep public servers (non-commercial, no SLA) — development and private beta only.
-2. **Cloudflare Containers** (Workers Paid): instance types up to 4 vCPU,
-   12 GiB, 20 GB disk; on-demand with an inactivity timeout. Regional graphs
-   fit (Georgia + neighbours: well under 20 GB); a planet graph does not.
-3. External compute (small VM or managed Kubernetes) behind the Worker.
+| Live/historic traffic speeds | segment speed updates | yes | partly |
+| On-device / offline (future native) | no | yes (tiled graph, mobile builds) | yes (Android) |
 
 ## Decision
-- **Now (MVP, private beta):** public OSRM servers, rate-limited, attributed.
-- **Before public beta:** self-host **Valhalla** for the launch region, called
-  only through the Worker (`/api/v1/route` proxy with per-client rate limits and
-  a short cache for identical requests). First choice of compute: **Cloudflare
-  Containers** (standard-1/2) if a spike confirms it can stay warm; otherwise a
-  small external VM. Overpass-derived data (speed limits, cameras, crossings,
-  POIs) moves to a precomputed extract (or own Overpass) in the same step.
-- **International scale:** external compute for a planet graph, Worker in front.
+- **Valhalla**, self-hosted, one instance group per region in **Cloudflare Containers** (Workers Paid), called only
+  through the Worker: `POST /api/v1/route` with per-client rate limits and a short cache for identical requests.
+- One engine for car, walking, cycling, later truck/motorcycle/wheelchair, isochrones, optimised stop order and
+  traffic speeds (DP-5.2, DP-6.2, DP-6.3, DP-9.x, DP-10.4).
+- The regional graph is built from OSM by our pipeline and baked into the image (container disk is ephemeral); rebuilt
+  weekly. Locally the same image runs in Docker (ADR-016 localhost parity).
+- OSRM stays as an optional provider in the code (it is the tested integration today) until `ValhallaProvider` passes
+  the same scenario tests.
 
 ## Reason
-Valhalla meets the product's needs that OSRM can't without re-processing:
-avoid options, truck profiles, time-dependent routing and **on-device offline
-routing for the future native apps** (ADR-012), under a permissive MIT licence.
-GraphHopper is a close second (Java, larger memory; strong custom models).
-OSRM stays the fallback because it is the current, tested integration.
+Valhalla covers what the product needs without re-processing (avoid options, vehicle profiles, traffic, matching,
+isochrones), has a permissive licence and a tiled graph suitable for regional sharding and future on-device routing.
 
 ## Consequences
-- New provider class (`ValhallaProvider`) behind `RoutingProvider`; Valhalla's
-  OSRM-compatible output format may let it reuse the OSRM normaliser —
-  **REQUIRES VERIFICATION** in the spike.
-- Estimated Containers cost for one always-on instance (30-day month, list
-  prices verified 2026-10-02, upper bound assuming provisioned vCPU is billed):
-  standard-1 ≈ $53/month, standard-2 ≈ $92/month, plus Workers Paid $5.
-  Always-on behaviour **REQUIRES VERIFICATION**.
-- Re-processing the regional graph weekly (OSM updates) is a scheduled job
-  (Cron Trigger → container, or CI).
+- New provider class `ValhallaProvider` behind `RoutingProvider`; whether Valhalla's OSRM-compatible output can reuse
+  the OSRM normaliser is checked in DP-6.2.
+- A container instance holds at most 4 vCPU / 12 GiB / 20 GB disk: regional graphs fit; a planet graph does not. If the
+  capacity pilot (DP-5.6) shows regional sharding is not enough, the engine moves to rented servers behind the same
+  Worker route (new ADR).
+- Cold starts (~1–3 s) and minimum warm instances are part of capacity planning.
 
 ## Alternatives rejected
-- **Public servers in production:** violates their terms, no SLA.
-- **Proprietary routing APIs:** cost per request and display/storage terms
-  conflict with weather sampling along the full geometry.
-- **Routing inside Workers/WASM:** graph size and CPU limits make it unrealistic.
+- **Public routing servers:** usage limits and no production use (ADR-015).
+- **Proprietary routing APIs:** per-request fees (ADR-015).
+- **Routing inside Workers/WASM:** graph size and memory limits.

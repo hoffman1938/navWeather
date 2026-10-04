@@ -46,7 +46,7 @@ erDiagram
 
 **Rejected tables** (not justified now): `routes`, `route_points`,
 `saved_routes` (no server-side trips; REQ-PRIV-001), `weather_cache`,
-`weather_forecasts` (Cache API/KV, ADR-005), `weather_alerts` (computed on
+`weather_forecasts` (weather cells are files in R2, ADR-007), `weather_alerts` (computed on
 device), `notifications`, `devices` (until mobile push), `subscriptions` (until
 monetisation), `api_keys` (until a public API), `reports` (Durable Objects).
 
