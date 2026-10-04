@@ -8,6 +8,7 @@ export interface TripThresholds {
   EXTENDED_TRIP_TIME_MINUTES: number;
   LONG_TRIP_MIN_REST_STOPS: number;
   PLAN_FROM_CATEGORY: TripCategory;
+  AUTO_ON_FROM_CATEGORY: TripCategory;
 }
 
 /**
@@ -28,6 +29,12 @@ export const TRIP_THRESHOLDS: TripThresholds = {
   LONG_TRIP_MIN_REST_STOPS: 3,
   /** Ask the planner for EXTENDED trips too (stops without an overnight). */
   PLAN_FROM_CATEGORY: 'EXTENDED',
+  /**
+   * Long Trip Mode switches itself on only from this category. A shorter trip (e.g. Tbilisi → Batumi in the
+   * evening, past the pace's latest arrival) is offered the mode instead: switching on by itself would move
+   * every ETA of a 5-hour drive to the next morning (B-24).
+   */
+  AUTO_ON_FROM_CATEGORY: 'EXTENDED',
 };
 
 /**

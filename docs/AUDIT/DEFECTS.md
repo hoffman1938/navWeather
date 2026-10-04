@@ -33,4 +33,6 @@
 | B-22 | P1 | Кэш мест и границ в Worker построен на Cache API, который **не работает на `*.workers.dev`** → каждый вызов идёт в публичный Overpass | документация Cloudflare | `worker/trips.ts` (`edgeCache`, `tripBorders`) — CONFIRMED | DP-4.5, DP-6.5 (и DP-12.1 — домен) |
 | B-23 | P1 | Планировщик Long Trip превышает 10 мс CPU плана Workers Free (10,5 мс на 1 600 км, 78 мс на 3 800 км) | временный замер | `worker/trips.ts`, `src/trip/planning/*` — CONFIRMED | DP-5.1 (Workers Paid) |
 
+| B-24 | P1 | Long Trip Mode включался сам для **средней** поездки (Тбилиси → Батуми с выездом в 18:27: прибытие 23:19 позже 22:00 → «нужна ночёвка»), но план не запрашивался (запрос только с категории EXTENDED) → вечный «Planning stops…»; после простого исправления все ETA 5-часовой поездки ушли бы на утро | регрессионные тесты `trip.test.tsx`, `trip.test.ts`; живой прогон на localhost 2026-10-04 | `src/state/trip.ts` (`refresh`), `src/trip/classification/classify.ts` — CONFIRMED | ✅ исправлено 2026-10-04: режим включается сам только с `AUTO_ON_FROM_CATEGORY` (EXTENDED), короче — предлагается; при включённом режиме план запрашивается всегда |
+
 Номер B-18 не использован.

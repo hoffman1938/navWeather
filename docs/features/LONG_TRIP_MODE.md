@@ -49,8 +49,12 @@ Thresholds live **only** in `src/trip/config.ts` (`TRIP_THRESHOLDS`):
 Long Trip Mode switches on (`longTripMode`, with `reasons`) when any of:
 distance ≥ `LONG_TRIP_DISTANCE_KM` (800) · driving ≥ `LONG_TRIP_TIME_MINUTES`
 (600) · the schedule needs an overnight · ≥ `LONG_TRIP_MIN_REST_STOPS` (3)
-breaks/meals. The user can override per trip (on/off); the override is
-non-blocking. Classification also reports estimated total time (stops
+breaks/meals — **and** the trip is at least `AUTO_ON_FROM_CATEGORY` (EXTENDED).
+A shorter trip with reasons (e.g. Tbilisi → Batumi leaving at 18:30, which
+arrives after the balanced pace's 22:00) keeps standard navigation and its
+ETAs; the reasons are kept and the mode is offered ("Plan stops for this
+trip"). Whenever the mode is on, the stops are planned (B-24). The user can
+override per trip (on/off); the override is non-blocking. Classification also reports estimated total time (stops
 included), recommended breaks, time-zone changes and border crossings
 (`requiresBorderCrossing`: null until the borders lookup answers).
 

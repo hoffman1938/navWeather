@@ -153,7 +153,10 @@ export const useTripStore = create<TripState>()((set, get) => ({
     });
     set({ classification });
 
-    const wanted = get().override === 'on' || (get().override === 'auto' && atLeast(classification.category, TRIP_THRESHOLDS.PLAN_FROM_CATEGORY));
+    // Plan whenever Long Trip Mode is on — also when it switched itself on for a shorter trip
+    // (an evening departure with three breaks) — or the trip is long enough to plan stops for.
+    const override = get().override;
+    const wanted = longTripActive({ override, classification }) || (override === 'auto' && atLeast(classification.category, TRIP_THRESHOLDS.PLAN_FROM_CATEGORY));
     if (!wanted) {
       if (get().plan) set({ plan: null, status: 'idle' });
       useAppStore.getState().rederive();

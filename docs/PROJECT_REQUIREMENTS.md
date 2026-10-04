@@ -79,7 +79,7 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | ID | Requirement | Priority | Status | Traceability |
 | --- | --- | --- | --- | --- |
 | REQ-TRIP-001 | One trip classification engine (SHORT/MEDIUM/EXTENDED/LONG) with configurable thresholds — never hard-coded in components | P1 | VERIFIED | `src/trip/config.ts`, `classification/classify.ts`; `trip.test.ts` |
-| REQ-TRIP-002 | Long Trip Mode on automatically (distance, driving time, overnight, several breaks), user override, non-blocking | P1 | VERIFIED | `state/trip.ts`, `components/Trip/LongTrip.tsx`; `trip.test.tsx` |
+| REQ-TRIP-002 | Long Trip Mode on automatically (distance, driving time, overnight, several breaks) from EXTENDED trips up — shorter trips are offered it, never switched (B-24); user override, non-blocking; whenever it is on, the stops are planned | P1 | VERIFIED | `state/trip.ts`, `components/Trip/LongTrip.tsx`; `trip.test.tsx` |
 | REQ-TRIP-003 | Trip plan: segments, breaks, meals, fuel/charge, overnights, days, timeline | P1 | DEFECT (B-04; DP-1.4) | `planning/schedule.ts`, `planner.ts` |
 | REQ-TRIP-004 | Every ETA and forecast match includes planned stop durations (weather at the real times) | P0 | VERIFIED | `state/derive.ts` (`tripStops`), `routeIntelligence.ts` (`dwellBeforeS`) |
 | REQ-TRIP-005 | Overnight areas from driving time, latest arrival, settlement size, no-extra-night rule; user can choose another town | P1 | DEFECT (B-05; DP-1.5) | `planning/overnight.ts`, `chooseOvernight`, `state/trip.ts` |

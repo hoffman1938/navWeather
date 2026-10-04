@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { zonedParts } from '../utils/timezone';
-import { categoryOf, classifyTrip } from './classification/classify';
+import { categoryOf, classifyFromSchedule, classifyTrip } from './classification/classify';
 import { PACE_PRESETS, STOP_DEFAULTS, TRIP_THRESHOLDS } from './config';
 import { createTripPlan } from './planning/planner';
 import { buildSchedule } from './planning/schedule';
@@ -50,6 +50,17 @@ describe('trip classification', () => {
     expect(c.requiresOvernight).toBe(false);
     expect(c.longTripMode).toBe(false);
     expect(c.recommendedRestStops).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a shorter trip whose stops would help is offered Long Trip Mode, not switched into it (B-24)', () => {
+    const late = classify(390, 80, tbilisi(5, 18, 27)); // MEDIUM, ~4 h 53 min from 18:27: arrival 23:19, past 22:00
+    expect(late.category).toBe('MEDIUM');
+    expect(late.reasons).toContain('overnight');
+    expect(late.longTripMode).toBe(false);
+    // The category it switches itself on from is configuration, like every other threshold.
+    const req = routeRequest(390, 80, { departAtMs: tbilisi(5, 18, 27) });
+    const schedule = buildSchedule({ profile: profileOf(req), startAlongM: 0, startMs: req.departAtMs, tzAt, pace: PACE_PRESETS.balanced, vehicle: req.vehicle });
+    expect(classifyFromSchedule(profileOf(req), schedule, {}, { ...TRIP_THRESHOLDS, AUTO_ON_FROM_CATEGORY: 'SHORT' }).longTripMode).toBe(true);
   });
 
   it('800 km switches Long Trip Mode on by distance; 720 km at 10.5 h by time', () => {

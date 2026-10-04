@@ -61,12 +61,12 @@ const hotels: RawPlace[] = [
   { id: 'n/1', category: 'hotel', type: 'hotel', lat: 42.27, lon: 42.7, tags: { tourism: 'hotel', name: 'Kutaisi Hotel', stars: '3' } },
 ];
 
-async function plan(factor = 1) {
+async function plan(factor = 1, departAtMs = BASE) {
   if (factor !== 1) h.providers.routing = slowCarRouter(factor);
   const s = useAppStore.getState();
   s.setOriginText('Tbilisi');
   s.setDestinationText('Batumi');
-  useAppStore.setState({ departure: { mode: 'at', utcMs: BASE } });
+  useAppStore.setState({ departure: { mode: 'at', utcMs: departAtMs } });
   await useAppStore.getState().calculateRoute();
 }
 
@@ -122,6 +122,23 @@ describe('Long Trip Mode in the app', () => {
     expect(t.classification!.longTripMode).toBe(false);
     expect(longTripActive()).toBe(false);
     expect(requests).toHaveLength(0);
+  });
+
+  it('an evening departure past the latest arrival: offered, not switched on — and planned when the user asks (B-24)', async () => {
+    await plan(1, Date.UTC(2026, 9, 5, 14, 27)); // 18:27 in Tbilisi: arrival 23:19, after the balanced pace's 22:00
+    await vi.waitFor(() => expect(useTripStore.getState().classification?.reasons).toContain('overnight'));
+    const c = useTripStore.getState().classification!;
+    expect(c.category).toBe('MEDIUM');
+    // A 5-hour drive never moves to the next morning by itself…
+    expect(c.longTripMode).toBe(false);
+    expect(longTripActive()).toBe(false);
+    expect(useAppStore.getState().derived.arrivalMs).toBe(Date.UTC(2026, 9, 5, 14, 27) + useAppStore.getState().plan!.timed.totalTimeS * 1000);
+    expect(requests).toHaveLength(0);
+    // …but the user can turn it on, and then the stops are planned (never left "Planning stops…").
+    useTripStore.getState().setOverride('on');
+    await vi.waitFor(() => expect(useTripStore.getState().status).toBe('ready'));
+    expect(requests).toHaveLength(1);
+    expect(useTripStore.getState().plan!.recommendedStops.some((st) => st.kinds.includes('overnight'))).toBe(true);
   });
 
   it('the user can switch it on for a shorter trip: stops are planned and every ETA after them moves', async () => {

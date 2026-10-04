@@ -7,7 +7,8 @@ import type { LongTripReason, TripCategory, TripClassification, TripPreferences,
  * TRIP CLASSIFICATION ENGINE — the one place that decides how "long" a trip is
  * (docs/features/LONG_TRIP_MODE.md §3). Distance sets the band; driving time
  * can raise it; Long Trip Mode switches on for LONG trips, overnight trips or
- * trips with several real breaks. Thresholds: `TRIP_THRESHOLDS`.
+ * trips with several real breaks — from `AUTO_ON_FROM_CATEGORY` up (shorter
+ * trips are only offered it). Thresholds: `TRIP_THRESHOLDS`.
  */
 
 const ORDER: TripCategory[] = ['SHORT', 'MEDIUM', 'EXTENDED', 'LONG'];
@@ -53,7 +54,8 @@ export function classifyFromSchedule(
     requiresBorderCrossing: opts.borderCrossings === undefined || opts.borderCrossings === null ? null : opts.borderCrossings > 0,
     recommendedRestStops: breaks,
     timeZoneChanges: opts.timeZoneChanges ?? 0,
-    longTripMode: reasons.length > 0,
+    // The reasons say why planned stops would help; the mode turns itself on only for long enough trips.
+    longTripMode: reasons.length > 0 && atLeast(category, t.AUTO_ON_FROM_CATEGORY),
     reasons,
   };
 }
