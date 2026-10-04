@@ -149,8 +149,16 @@ built in**; Settings says so. Adding them needs verified rules per country.
 ## 8. Weather logic
 - The client sends hourly **hazard codes** per route sample (from its own
   forecasts: rain, heavy rain, snow, storm, fog, strong wind, freezing with
-  precipitation; same thresholds as the alert engine). The Worker never calls
-  a weather API.
+  precipitation; same thresholds as the alert engine), as far as its forecasts
+  reach (≤ 400 h). The Worker never calls a weather API.
+- The forecasts are loaded for the whole trip, stops included, from the first
+  load (the instant classification's total time); if the plan moves points
+  further out, they are loaded once more (B-06). Every new forecast load while
+  planning asks for a new plan, and so do settlements found after the first
+  plan (B-07, B-05).
+- Forecasts that end before the trip does: `dataStatus.weather = 'partial'`
+  with `weatherUntilMs`; the dashboard says the weather after that time is
+  not known yet — missing data is never "no risk" (B-21).
 - Risks are evaluated at **stop-aware** planned times and grouped into
   stretches (`WeatherRisk`).
 - **Stop earlier:** a high-severity risk driven in the last 3 h before an

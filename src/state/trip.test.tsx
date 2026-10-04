@@ -181,6 +181,39 @@ describe('Long Trip Mode in the app', () => {
     expect(useTripStore.getState().classification!.requiresBorderCrossing).toBe(true);
   });
 
+  it('a multi-day trip: forecasts for the whole trip, stops included, from the first load; codes past 4 days (B-06, B-21)', async () => {
+    await plan(5); // ~24.5 h of driving: three days with the nights
+    await vi.waitFor(() => expect(useTripStore.getState().status).toBe('ready'));
+    const t = useTripStore.getState();
+    expect(t.plan!.arriveAtMs - BASE).toBeGreaterThan(48 * 3_600_000);
+    // The first request already asked far enough (not the 48-hour default), and every point has its forecast.
+    const first = h.weather.requests[0];
+    expect(Date.now() + first.forecastHours * 3_600_000).toBeGreaterThanOrEqual(t.plan!.arriveAtMs);
+    expect(useAppStore.getState().derived.points.every((p) => p.weather !== null)).toBe(true);
+    // The planner got hazard codes for the whole trip, not only the first 96 hours' worth of samples.
+    const hours = Math.max(...requests.at(-1)!.weather!.map((w) => w.h.length));
+    expect(BASE - 3_600_000 + hours * 3_600_000).toBeGreaterThanOrEqual(t.plan!.arriveAtMs);
+    expect(t.plan!.dataStatus.weather).toBe('ok');
+  });
+
+  it('new forecasts while planning re-plan the risks; settlements found later re-plan the nights (B-07, B-05)', async () => {
+    await plan(3);
+    await vi.waitFor(() => expect(useTripStore.getState().status).toBe('ready'));
+    const n = requests.length;
+    expect(useTripStore.getState().plan!.weatherRisks.some((r) => r.kind === 'storm')).toBe(false);
+    // A new model run puts thunderstorms everywhere.
+    h.weather.hourFn = () => ({ temperature: 18, code: 95, precipitationProbability: 90, precipitation: 6 });
+    await useAppStore.getState().loadWeather({ force: true, reason: 'model-update' });
+    await vi.waitFor(() => expect(requests.length).toBe(n + 1));
+    await vi.waitFor(() => expect(useTripStore.getState().plan!.weatherRisks.some((r) => r.kind === 'storm')).toBe(true));
+    // A town arrives after the plan was made: the plan is asked for again with it.
+    const app = useAppStore.getState();
+    const extra = { ...app.plan!.places[0], id: 'late-town', name: 'Late Town', distanceAlongM: app.plan!.timed.totalDistM / 2 };
+    useAppStore.setState({ plan: { ...app.plan!, places: [...app.plan!.places, extra] } });
+    await vi.waitFor(() => expect(requests.length).toBe(n + 2));
+    expect(requests.at(-1)!.places!.some((p) => p.name === 'Late Town')).toBe(true);
+  });
+
   it('the plan screen: banner, totals, overnight stay with hotels labelled "not checked", day-by-day timeline', async () => {
     await plan(3);
     await vi.waitFor(() => expect(useTripStore.getState().status).toBe('ready'));

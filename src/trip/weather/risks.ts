@@ -49,6 +49,20 @@ export function weatherRisks(
   return risks;
 }
 
+/**
+ * The earliest planned time (stops included) at which a sample has no forecast — the trip's weather is only known
+ * until then (B-21). Null when the forecasts cover every sample at its planned time.
+ */
+export function forecastEndsAt(profile: RouteProfile, schedule: Schedule, samples: TripWeatherSample[]): number | null {
+  let end: number | null = null;
+  for (const s of samples) {
+    if (s.alongM < schedule.startAlongM) continue;
+    const at = wallAtAlong(schedule, profile, s.alongM);
+    if (codeAt(s, at) < 0 && (end === null || at < end)) end = at;
+  }
+  return end;
+}
+
 /** Highest hazard severity on [fromM, toM] if that stretch is driven starting at `startMs` from `startAlongM`. */
 function severityIfDriven(profile: RouteProfile, samples: TripWeatherSample[], startAlongM: number, startMs: number, fromM: number, toM: number): number {
   const T0 = timeAtAlong(profile, startAlongM);

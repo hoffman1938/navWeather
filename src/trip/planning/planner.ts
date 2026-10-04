@@ -19,7 +19,7 @@ import type {
   TripSegment,
   TripStop,
 } from '../types';
-import { nearestPlace, stopEarlierAdvice, weatherRisks } from '../weather/risks';
+import { forecastEndsAt, nearestPlace, stopEarlierAdvice, weatherRisks } from '../weather/risks';
 import { overnightCandidates } from './overnight';
 import { buildSchedule, wallAtAlong, type Schedule, type ScheduledStop } from './schedule';
 
@@ -183,6 +183,7 @@ export async function createTripPlan(req: TripPlanRequest, deps: PlannerDeps): P
   });
 
   const risks = samples.length ? weatherRisks(profile, schedule, samples, req.places) : [];
+  const weatherEndsMs = samples.length ? forecastEndsAt(profile, schedule, samples) : null;
   const advice: TripAdvice[] = samples.length
     ? stopEarlierAdvice({ profile, schedule, risks, samples, places: req.places, pace, tzAt })
     : [];
@@ -262,7 +263,11 @@ export async function createTripPlan(req: TripPlanRequest, deps: PlannerDeps): P
       weatherRisks: risks.length,
       borderCrossings: null,
     },
-    dataStatus: { places: placesStatus, weather: samples.length ? 'ok' : 'missing' },
+    dataStatus: {
+      places: placesStatus,
+      weather: !samples.length ? 'missing' : weatherEndsMs !== null ? 'partial' : 'ok',
+      ...(weatherEndsMs !== null ? { weatherUntilMs: weatherEndsMs } : {}),
+    },
     ...(progress ? { progress } : {}),
   };
 }

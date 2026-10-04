@@ -168,6 +168,9 @@ export function LongTripDashboard() {
           </button>
         </p>
       ) : null}
+      {plan.dataStatus.weather === 'partial' && plan.dataStatus.weatherUntilMs !== undefined ? (
+        <p className="ltrip__note">{m.trip.weatherPartial(when(plan.dataStatus.weatherUntilMs, tz, m))}</p>
+      ) : null}
       <TripAdvice plan={plan} />
     </section>
   );

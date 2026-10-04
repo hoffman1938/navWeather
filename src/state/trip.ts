@@ -12,7 +12,7 @@ import { timeAtDistance } from '../algorithms/routeTiming';
 import { deviceTimeZone } from '../utils/timezone';
 import { formatDuration } from '../i18n/format';
 import { currentMessages, fullRangeKm, useSettings, type Settings } from './settings';
-import { setTripStopsProvider, useAppStore } from './store';
+import { setTripEndProvider, setTripStopsProvider, useAppStore } from './store';
 
 /**
  * LONG TRIP MODE — client state (docs/features/LONG_TRIP_MODE.md).
@@ -48,7 +48,7 @@ export interface TripState {
 
   setOverride(mode: LongTripOverride): void;
   /** Re-classify and (when the trip calls for it) ask for a plan. */
-  refresh(reason: 'route' | 'weather' | 'departure' | 'settings' | 'retry'): void;
+  refresh(reason: 'route' | 'weather' | 'places' | 'departure' | 'settings' | 'retry'): void;
   chooseOvernight(stopId: string, alongM: number): void;
   loadStopPlaces(stopId: string): void;
   reset(): void;
@@ -241,6 +241,7 @@ async function requestPlan(lookup: ReturnType<typeof forecastLookupFn>, progress
     if (ctrl.signal.aborted || useTripStore.getState().routeId !== ctx.plan.timed.route.id) return;
     useTripStore.setState({ plan, status: 'ready', error: null, stopPlaces: {}, classification: plan.classification });
     useAppStore.getState().rederive();
+    reloadWeatherIfShort(ctx.plan.timed.route.id);
     // The arrival moved enough to tell the driver (replanning while driving).
     if (progress && before && Math.abs(plan.arriveAtMs - before.arriveAtMs) >= REPLAN.notifyChangeS * 1000) {
       const m = currentMessages();
@@ -256,6 +257,36 @@ async function requestPlan(lookup: ReturnType<typeof forecastLookupFn>, progress
   } finally {
     if (planAbort === ctrl) planAbort = null;
   }
+}
+
+/** The end of the trip on screen, planned stops included (UTC ms), while Long Trip Mode is on. */
+function tripEndMs(): number | undefined {
+  const t = useTripStore.getState();
+  const app = useAppStore.getState();
+  if (!app.plan || t.routeId !== app.plan.timed.route.id || !longTripActive(t)) return undefined;
+  const fromClassification = t.classification ? departureMs() + t.classification.estimatedTotalTimeMinutes * 60_000 : 0;
+  const fromPlan = t.plan?.routeId === t.routeId ? t.plan.arriveAtMs : 0;
+  return Math.max(fromClassification, fromPlan) || undefined;
+}
+
+/** Forecasts are offered up to 16 days ahead; a point later than that has none to load. */
+const FORECAST_REACH_MS = 15.5 * 86_400_000;
+let horizonReloadKey = '';
+
+/**
+ * The plan's stops moved some points beyond the forecasts loaded so far: load them once more for the longer
+ * horizon (B-06). Once per route and arrival hour, so a provider with a shorter horizon can't cause a loop.
+ */
+function reloadWeatherIfShort(routeId: string) {
+  const app = useAppStore.getState();
+  const plan = useTripStore.getState().plan;
+  if (!plan || app.mode !== 'planning' || app.weatherStatus === 'loading' || app.plan?.timed.route.id !== routeId) return;
+  const reach = Date.now() + FORECAST_REACH_MS;
+  const short = app.derived.points.some((p) => p.weather === null && p.arrivalMs < reach);
+  const key = `${routeId}:${Math.round(plan.arriveAtMs / 3_600_000)}`;
+  if (!short || key === horizonReloadKey) return;
+  horizonReloadKey = key;
+  void app.loadWeather({ reason: 'auto' });
 }
 
 let lastCheckAt = 0;
@@ -319,6 +350,7 @@ export function initTrip(): () => void {
     if (!t.plan || !longTripActive(t) || !app.plan || t.plan.routeId !== app.plan.timed.route.id) return undefined;
     return t.plan.recommendedStops;
   });
+  setTripEndProvider(tripEndMs);
   const unsubs = [
     useAppStore.subscribe(
       (s) => s.plan?.timed.route.id ?? null,
@@ -327,9 +359,19 @@ export function initTrip(): () => void {
     useAppStore.subscribe(
       (s) => s.weatherStatus,
       (status, prev) => {
+        // New or longer forecasts: plan again, so the risks and advice use them (B-07). One plan request per load.
         if ((status === 'ready' || status === 'error') && prev === 'loading' && useAppStore.getState().mode === 'planning') {
-          const t = useTripStore.getState();
-          if (!t.plan || t.status === 'error') t.refresh('weather');
+          useTripStore.getState().refresh('weather');
+        }
+      },
+    ),
+    // Settlements found after the first plan: overnight areas can name towns now (B-05).
+    useAppStore.subscribe(
+      (s) => s.plan?.places,
+      (places, prev) => {
+        const app = useAppStore.getState();
+        if (places && prev && places !== prev && places.length > prev.length && app.mode === 'planning' && app.weatherStatus !== 'loading') {
+          useTripStore.getState().refresh('places');
         }
       },
     ),
@@ -348,6 +390,8 @@ export function initTrip(): () => void {
   return () => {
     unsubs.forEach((u) => u());
     setTripStopsProvider(() => undefined);
+    setTripEndProvider(() => undefined);
+    horizonReloadKey = '';
     started = false;
   };
 }

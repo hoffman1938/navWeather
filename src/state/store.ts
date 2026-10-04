@@ -439,6 +439,15 @@ export function setTripStopsProvider(fn: () => TripStop[] | undefined): void {
   tripStopsProvider = fn;
 }
 
+/**
+ * When a Long Trip on screen ends, planned stops included (UTC ms) — known before its plan from the instant
+ * classification — so the first forecast request already covers the whole trip (B-06). state/trip.ts registers it.
+ */
+let tripEndProvider: () => number | undefined = () => undefined;
+export function setTripEndProvider(fn: () => number | undefined): void {
+  tripEndProvider = fn;
+}
+
 function departureMsOf(s: Pick<AppState, 'departure' | 'clockMs'>): number {
   return s.departure.mode === 'now' ? s.clockMs : s.departure.utcMs;
 }
@@ -806,6 +815,7 @@ export const useAppStore = create<AppState>()(
       const longest = Math.max(plan.timed.totalTimeS, ...s.routeOptions.map((o) => o.timed.totalTimeS));
       const latestArrival = Math.max(
         s.derived.arrivalMs ?? 0,
+        tripEndProvider() ?? 0,
         departureMsOf(s) + longest * 1000,
         ...s.routeOptions.map((o) => o.timed.route.transit?.arriveMs ?? 0),
         s.mode === 'simulating' ? s.sim.nowMs + plan.timed.totalTimeS * 1000 : 0,

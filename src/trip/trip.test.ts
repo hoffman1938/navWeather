@@ -312,6 +312,18 @@ describe('trip planner', () => {
     expect(plan.timeline.some((e) => e.kind === 'weather' && e.hazard === 'snow')).toBe(true);
   });
 
+  it('forecasts that end before the trip does: later risks are unknown, not absent (B-21)', async () => {
+    const req = routeRequest(1580, 80);
+    const t0 = req.departAtMs - 3_600_000;
+    const short = await createTripPlan({ ...req, weather: weatherEvery(1580, 40, t0, () => 0, 24) }, { nowMs: NOW });
+    expect(short.dataStatus.weather).toBe('partial');
+    expect(short.dataStatus.weatherUntilMs).toBeGreaterThan(req.departAtMs);
+    expect(short.dataStatus.weatherUntilMs).toBeLessThan(short.arriveAtMs);
+    const full = await createTripPlan({ ...req, weather: weatherEvery(1580, 40, t0, () => 0, 120) }, { nowMs: NOW });
+    expect(full.dataStatus).toMatchObject({ weather: 'ok' });
+    expect(full.dataStatus.weatherUntilMs).toBeUndefined();
+  });
+
   it('without forecasts the plan says the weather is missing instead of inventing it', async () => {
     const plan = await createTripPlan(routeRequest(900, 90), { nowMs: NOW });
     expect(plan.dataStatus.weather).toBe('missing');

@@ -610,6 +610,7 @@ export const en = {
     offline: 'Offline — the trip plan will be made when you are back online.',
     retry: 'Try again',
     stale: 'This plan may be out of date.',
+    weatherPartial: (until: string) => `The forecast reaches only until ${until}: the weather after that is not known yet and not counted in the risks.`,
     tiles: {
       driving: 'Driving',
       overnights: 'Overnight',

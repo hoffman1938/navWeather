@@ -311,7 +311,10 @@ export interface TripPlan {
   };
   dataStatus: {
     places: 'ok' | 'partial' | 'unavailable' | 'skipped';
-    weather: 'ok' | 'missing';
+    /** 'partial': the forecasts end before the trip does (`weatherUntilMs`); later risks are unknown, not absent. */
+    weather: 'ok' | 'partial' | 'missing';
+    /** Planned time from which no forecast covers the trip (UTC ms), when 'partial'. */
+    weatherUntilMs?: number;
   };
   /** Echo of the replanning state, when the plan was made from the car's position. */
   progress?: TripProgressState;

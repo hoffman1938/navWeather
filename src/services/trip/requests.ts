@@ -36,12 +36,18 @@ export function profileFromTimed(timed: TimedRoute): RouteProfile {
   };
 }
 
-/** Hourly hazard codes for each sample, from forecasts already loaded (≤ `hours` from the hour before departure). */
+/** Most hours of hazard codes per sample the planner accepts (`src/trip/protocol.ts`). */
+const MAX_WEATHER_HOURS = 400;
+
+/**
+ * Hourly hazard codes for each sample, from forecasts already loaded: from the hour before departure as far as the
+ * forecasts reach (they were loaded for the whole trip, stops included) — never a fixed 4 days (B-21).
+ */
 export function weatherSamples(
   samples: RouteSample[],
   forecastFor: (s: RouteSample) => LocationForecast | undefined,
   departAtMs: number,
-  hours = 96,
+  hours = MAX_WEATHER_HOURS,
 ): TripWeatherSample[] {
   const t0 = Math.floor(departAtMs / 3_600_000) * 3_600_000 - 3_600_000;
   const out: TripWeatherSample[] = [];
