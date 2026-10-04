@@ -214,6 +214,7 @@ source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
 
 - **[Development plan](docs/DEVELOPMENT_PLAN.md)** (in Russian) — the single plan from start to finish: stages, tasks with localhost and Cloudflare Workers checks, release gates, risks, owner decisions ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md), [ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md))
 - **[Free stack catalogue](docs/FREE_STACK_PLAN.md)** (in Russian) — free self-hosted replacements for every service, the Google Maps features we lack and their free sources, where each part runs on Cloudflare
+- [Full audit 2026-10-04](docs/AUDIT/2026-10-04-full-audit.md) (in Russian) — branches, localhost status, what was fixed, open findings, Cloudflare Pages vs Workers
 - [Defect register](docs/AUDIT/DEFECTS.md) (in Russian) — confirmed defects B-xx and the tasks that fix them
 - [Documentation audit and cleanup 2026-10-04](docs/AUDIT/2026-10-04-docs-audit.md) (in Russian) — what was removed, what remains
 - [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md)

@@ -98,6 +98,12 @@ local wall clock read in that stop's own time zone:
    towns are returned as `alternatives`.
 5. Segments, days, timeline, summary, weather risks and advice are derived
    from the final schedule.
+6. **Night driving** (00:00–06:00 local, `STOP_DEFAULTS.nightDriving`): a
+   plan that drives at least an hour then gets the advice `night-driving`
+   (hours, and the pace's next morning start to consider). Only before the
+   trip; the plan itself is never changed (B-04). Open (DP-1.4): a night
+   departure still gets its first "overnight" in the morning, when the daily
+   driving runs out.
 
 Pace presets (`PACE_PRESETS`) are **preferences, not medical or legal
 rules**:
@@ -110,13 +116,6 @@ rules**:
 
 Jurisdiction-specific driving/rest rules (e.g. commercial drivers) are **not
 built in**; Settings says so. Adding them needs verified rules per country.
-
-6. **Night driving** (00:00–06:00 local, `STOP_DEFAULTS.nightDriving`): a
-   plan that drives at least an hour then gets the advice `night-driving`
-   (hours, and the pace's next morning start to consider). Only before the
-   trip; the plan itself is never changed (B-04). Open (DP-1.4): a night
-   departure still gets its first "overnight" in the morning, when the daily
-   driving runs out.
 
 ## 5. Accommodation logic
 - Overnight **areas** come from the plan (fast, no lookups). **Hotels** for an

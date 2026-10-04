@@ -80,7 +80,8 @@ and push it. Commit messages: what and why; reference requirement IDs.
   release gates G1–G13, risks, owner decisions) — ADR-015, ADR-016
 - Catalogue of free replacements, Google Maps gaps and Cloudflare placement: `docs/FREE_STACK_PLAN.md` (§1.1 "always
   free" rule, §6a Cloudflare)
-- Defect register `B-xx`: `docs/AUDIT/DEFECTS.md` · documentation audit and cleanup: `docs/AUDIT/2026-10-04-docs-audit.md`
+- Defect register `B-xx`: `docs/AUDIT/DEFECTS.md` · full audit (branches, localhost, fixes, open findings, Pages vs Workers):
+  `docs/AUDIT/2026-10-04-full-audit.md` · documentation audit and cleanup: `docs/AUDIT/2026-10-04-docs-audit.md`
 - Decisions: `docs/architecture/decisions/` · Target architecture, weather engine, maps/routing/GIS: `docs/architecture/`
 - Current implementation: `docs/ARCHITECTURE.md` · Environment: `docs/ENVIRONMENT.md` · Testing: `docs/TESTING.md`
 - API: `docs/api/API_V1.md` · Data: `docs/database/DATA_MODEL.md`, `database/migrations/`
