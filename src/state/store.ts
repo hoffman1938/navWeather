@@ -119,6 +119,10 @@ interface TripTracker {
   maxTemp: number | null;
   reroutes: number;
   simulated: boolean;
+  /** The range entered in Settings when this drive started (or when it was last changed), km. */
+  rangeKm: number | null;
+  /** Range used before the current route's start (earlier routes of this drive), minus where the range was last entered (m). */
+  rangeBaseM: number;
 }
 
 /** "Trip complete" — shown on arrival, never stored. */
@@ -342,7 +346,23 @@ function startTrip(plannedDurationS: number, startedAt: number, simulated: boole
     maxTemp: null,
     reroutes: 0,
     simulated,
+    rangeKm: settingsSnapshot().fuelRangeKm,
+    rangeBaseM: 0,
   };
+}
+
+/**
+ * Distance driven since the range was entered (km): the route being driven plus the routes before a re-route.
+ * Entering a new range (e.g. after refuelling) starts counting again from there. Memory only.
+ */
+function rangeUsedKm(progressAlongM: number): number {
+  if (!trip) return progressAlongM / 1000;
+  const declared = settingsSnapshot().fuelRangeKm;
+  if (declared !== trip.rangeKm) {
+    trip.rangeKm = declared;
+    trip.rangeBaseM = -progressAlongM;
+  }
+  return Math.max(0, trip.rangeBaseM + progressAlongM) / 1000;
 }
 
 /** Distance driven and the weather actually encountered at the vehicle. */
@@ -464,6 +484,7 @@ function derive(s: AppState): Derived {
     speedLimits: s.speedLimits,
     // Fuel, charging and driving breaks are for drivers.
     fuelRangeKm: s.travelMode === 'drive' ? settings.fuelRangeKm : null,
+    rangeUsedKm: navigating ? rangeUsedKm(s.progress!.distanceAlongM) : 0,
     vehicle: settings.vehicle,
     incidents: s.incidents,
     breakReminders: settings.breakReminders && s.travelMode === 'drive',
@@ -1874,6 +1895,8 @@ async function adoptRoute(plan: PlannedRoute, coordinate: LngLat, headingDeg: nu
   spokenManeuvers.clear();
   spokenCameras.clear();
   spokenHazards.clear();
+  // The range used on the old route still counts on the new one (B-02, B-01).
+  if (trip && cur.progress) trip.rangeBaseM += cur.progress.distanceAlongM;
   // A simulated drive restarts on the new route (its clock keeps running).
   const simulating = cur.mode === 'simulating';
   const now = simulating ? cur.sim.nowMs : Date.now();

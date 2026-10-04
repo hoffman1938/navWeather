@@ -126,7 +126,13 @@ built in**; Settings says so. Adding them needs verified rules per country.
 - Only from data the user declared: remaining range (Settings) and tank or
   battery size + consumption per 100 km (→ full-tank range). Nothing is
   estimated. Without a range: advice "Add your range (and tank size) in
-  Settings to plan fuel stops".
+  Settings to plan fuel stops". With a range but no tank size, only the
+  first fill is planned and the advice `enter-tank` says so (B-20).
+- While driving, the range is used up: a replan sends the range left at the
+  car (`rangeLeftAt`: from the last planned fill passed — a full tank, known
+  only with the tank size — else from the range the plan started with), and
+  a re-route carries it over; a replan never falls back to the range the trip
+  started with (B-01).
 - Stations within 2 km of the route; preferred brand (+), 24/7 at night (+),
   closed at arrival (removed); trucks prefer `hgv`/HGV diesel stations; EV:
   charging stations within 4 km, ≥ 50 kW preferred, power shown.
@@ -170,7 +176,9 @@ Approximate position; no border wait times (no source).
   **replace** the generic 2-hour break and range-based fuel reminders.
 - Weather alerts are unchanged (deduplicated, escalation-only repeats).
 - Replanning while driving: at most every 10 min, only when ≥ 20 min off the
-  plan; the user is told only when the arrival moves by ≥ 15 min.
+  plan; the user is told only when the arrival moves by ≥ 15 min. Time spent
+  at a planned stop (within 2 km of it) up to its planned departure is not a
+  delay; staying longer is (B-03).
   (`REPLAN` in config.)
 - Before departure, the dashboard is the "long trip ahead" message — no
   separate pop-up.

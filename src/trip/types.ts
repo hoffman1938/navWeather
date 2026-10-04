@@ -262,6 +262,8 @@ export type TripAdvice =
       tz: string;
     }
   | { kind: 'enter-range' }
+  /** A range is known but not the tank/battery size: stops after the first fill can't be planned (B-20). */
+  | { kind: 'enter-tank' }
   | { kind: 'no-places'; category: PlaceCategory; stopId: string };
 
 /** 'border' entries are added by the client from the borders lookup. */

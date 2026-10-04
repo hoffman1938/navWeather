@@ -342,6 +342,75 @@ describe('replanning', () => {
     expect(replanned.arriveAtMs).toBeGreaterThanOrEqual(plan.arriveAtMs);
   });
 
+  it('a replan sends the range left at the car: the next fuel stop is never past the tank (B-01)', async () => {
+    const req = routeRequest(1580, 80, { vehicle: { kind: 'car', powertrain: 'fuel', rangeKm: 500 } });
+    const profile = profileOf(req);
+    const plan = await createTripPlan(req, { nowMs: NOW });
+    const fuel = plan.recommendedStops.find((s) => s.kinds.includes('fuel'))!;
+    expect(fuel.alongM).toBeGreaterThan(300_000);
+    expect(fuel.alongM).toBeLessThanOrEqual(375_000);
+    // 300 km driven, 30 min late: 200 km left in the tank.
+    const at = 300_000;
+    const state = progressStateFor(plan, at, plannedTimeAt(plan, at) + 30 * 60_000, (m) => timeAtAlong(profile, m), { declaredKm: 500 });
+    expect(state.rangeKm).toBeCloseTo(200, 0);
+    const replanned = await createTripPlan({ ...req, progress: state }, { nowMs: NOW });
+    const next = replanned.recommendedStops.find((s) => s.kinds.includes('fuel'))!;
+    expect(next.alongM).toBeLessThanOrEqual(450_000); // was 660 km: past an empty tank
+    // A second replan counts from the first one's range, not from the declared range again.
+    const at2 = 350_000;
+    const state2 = progressStateFor(replanned, at2, plannedTimeAt(replanned, at2), (m) => timeAtAlong(profile, m), { declaredKm: 500 });
+    expect(state2.rangeKm).toBeCloseTo(150, 0);
+  });
+
+  it('after a planned fuel stop the car has the full range again, if the tank size is known (B-01)', async () => {
+    const req = routeRequest(1580, 80, { vehicle: { kind: 'car', powertrain: 'fuel', rangeKm: 300, fullRangeKm: 600 } });
+    const profile = profileOf(req);
+    const plan = await createTripPlan(req, { nowMs: NOW });
+    const fuel = plan.recommendedStops.find((s) => s.kinds.includes('fuel'))!;
+    const at = fuel.alongM + 100_000;
+    const known = progressStateFor(plan, at, plannedTimeAt(plan, at), (m) => timeAtAlong(profile, m), { declaredKm: 300, fullKm: 600 });
+    expect(known.rangeKm).toBeCloseTo(500, 0);
+    // Without the tank size the range after a fill is unknown: nothing is guessed.
+    const unknown = progressStateFor(plan, at, plannedTimeAt(plan, at), (m) => timeAtAlong(profile, m), { declaredKm: 300 });
+    expect(unknown.rangeKm).toBeUndefined();
+  });
+
+  it('a range without the tank size: the first fill is planned and the driver is told the rest cannot be (B-20)', async () => {
+    const plan = await createTripPlan(routeRequest(1580, 80, { vehicle: { kind: 'car', powertrain: 'fuel', rangeKm: 400 } }), { nowMs: NOW });
+    expect(plan.recommendedStops.filter((s) => s.kinds.includes('fuel'))).toHaveLength(1);
+    expect(plan.advice).toContainEqual({ kind: 'enter-tank' });
+    // With the tank size every fill is planned and nothing more is asked.
+    const full = await createTripPlan(routeRequest(1580, 80, { vehicle: { kind: 'car', powertrain: 'fuel', rangeKm: 400, fullRangeKm: 600 } }), { nowMs: NOW });
+    expect(full.recommendedStops.filter((s) => s.kinds.includes('fuel')).length).toBeGreaterThan(1);
+    expect(full.advice).not.toContainEqual({ kind: 'enter-tank' });
+    // A trip the first fill (at least as far as the range entered) covers needs no tank size.
+    const short = await createTripPlan(routeRequest(600, 80, { vehicle: { kind: 'car', powertrain: 'fuel', rangeKm: 400 } }), { nowMs: NOW });
+    expect(short.recommendedStops.filter((s) => s.kinds.includes('fuel'))).toHaveLength(1);
+    expect(short.advice).not.toContainEqual({ kind: 'enter-tank' });
+    // Replanning after a fill without the tank size: no stop is guessed from the range at the start.
+    const req = routeRequest(1580, 80, { vehicle: { kind: 'car', powertrain: 'fuel', rangeKm: 400 } });
+    const fill = plan.recommendedStops.find((s) => s.kinds.includes('fuel'))!;
+    const state = progressStateFor(plan, fill.alongM + 50_000, plannedTimeAt(plan, fill.alongM + 50_000), (m) => timeAtAlong(profileOf(req), m), { declaredKm: 400 });
+    const replanned = await createTripPlan({ ...req, progress: state }, { nowMs: NOW });
+    expect(replanned.recommendedStops.some((s) => s.kinds.includes('fuel'))).toBe(false);
+    expect(replanned.advice).toContainEqual({ kind: 'enter-tank' });
+  });
+
+  it('time at a planned stop, up to its planned departure, is not a delay (B-03)', async () => {
+    const plan = await createTripPlan(routeRequest(1580, 80), { nowMs: NOW });
+    const stop = plan.recommendedStops.find((s) => !s.kinds.includes('overnight') && s.dwellMinutes >= 40)!;
+    expect(stop).toBeDefined();
+    // 25 minutes into the stop, parked at it or a little before it on the road: on time.
+    expect(delaySeconds(plan, stop.alongM, stop.arriveMs + 25 * 60_000)).toBe(0);
+    expect(delaySeconds(plan, stop.alongM - 300, stop.arriveMs + 25 * 60_000)).toBe(0);
+    // Staying 20 minutes longer than planned is a 20-minute delay; arriving early is ahead of the plan.
+    expect(delaySeconds(plan, stop.alongM, stop.departMs + 20 * 60_000)).toBeCloseTo(1200, 0);
+    expect(delaySeconds(plan, stop.alongM, stop.arriveMs - 10 * 60_000)).toBeCloseTo(-600, 0);
+    // Elsewhere on the road a late car is still late.
+    const mid = (plan.segments[0].fromM + plan.segments[0].toM) / 2;
+    expect(delaySeconds(plan, mid, plannedTimeAt(plan, mid) + 30 * 60_000)).toBeCloseTo(1800, 0);
+  });
+
   it('dwellBetween adds only stops strictly between two positions', async () => {
     const plan = await createTripPlan(routeRequest(1580, 80), { nowMs: NOW });
     const night = plan.recommendedStops.find((s) => s.kinds.includes('overnight'))!;

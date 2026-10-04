@@ -24,9 +24,18 @@ export function plannedTimeAt(plan: TripPlan, alongM: number): number {
   return plan.arriveAtMs;
 }
 
-/** Seconds behind (+) or ahead of (−) the plan at this position and time. */
+/** A car this close (along the road) to a planned stop may be taking it. */
+const AT_STOP_M = 2000;
+
+/**
+ * Seconds behind (+) or ahead of (−) the plan at this position and time. Time spent at a planned stop, up to its
+ * planned departure, is not a delay — staying longer is (B-03).
+ */
 export function delaySeconds(plan: TripPlan, alongM: number, nowMs: number): number {
-  return (nowMs - plannedTimeAt(plan, alongM)) / 1000;
+  const late = (nowMs - plannedTimeAt(plan, alongM)) / 1000;
+  if (late <= 0) return late;
+  const stop = plan.recommendedStops.find((s) => Math.abs(s.alongM - alongM) <= AT_STOP_M && nowMs >= s.arriveMs);
+  return stop ? Math.min(late, Math.max(0, (nowMs - stop.departMs) / 1000)) : late;
 }
 
 /** Stop durations to add to every ETA between two positions (the client's timing uses driving time only). */
@@ -37,14 +46,32 @@ export function dwellBetween(plan: TripPlan | null, fromM: number, toM: number):
   return s;
 }
 
+/** The range the user entered: left at the start of the drive, and a full tank/battery (km). */
+export interface DeclaredRange {
+  declaredKm?: number;
+  fullKm?: number;
+}
+
+/**
+ * Range left at the car (km), assuming planned stops were taken: from the last planned fuel/charge stop passed (a full
+ * tank — known only with the tank size), else from the range the plan started with (B-01). Undefined when unknown.
+ */
+export function rangeLeftAt(plan: TripPlan, alongM: number, range: DeclaredRange): number | undefined {
+  const fill = [...plan.recommendedStops].reverse().find((s) => s.alongM <= alongM && (s.kinds.includes('fuel') || s.kinds.includes('charge')));
+  const [fromKm, fromM] = fill ? [range.fullKm, fill.alongM] : plan.progress ? [plan.progress.rangeKm, plan.progress.alongM] : [range.declaredKm, 0];
+  if (fromKm === undefined) return undefined;
+  return Math.max(0, Math.round((fromKm - (alongM - fromM) / 1000) * 10) / 10);
+}
+
 /** The replanning state at the car: driving today and since the last break, assuming planned stops were taken. */
-export function progressStateFor(plan: TripPlan, alongM: number, nowMs: number, driveTimeAt: (alongM: number) => number, rangeKm?: number): TripProgressState {
+export function progressStateFor(plan: TripPlan, alongM: number, nowMs: number, driveTimeAt: (alongM: number) => number, range: DeclaredRange = {}): TripProgressState {
   const now = driveTimeAt(alongM);
   const passed = plan.recommendedStops.filter((s) => s.alongM <= alongM);
   const lastNight = [...passed].reverse().find((s) => s.kinds.includes('overnight'));
   const lastBreak = [...passed].reverse().find((s) => s.kinds.some((k) => k === 'overnight' || k === 'rest' || k === 'meal' || k === 'charge'));
   const origin = plan.progress;
   const fromOrigin = (offset: number) => (origin ? offset + (now - driveTimeAt(origin.alongM)) : now - driveTimeAt(0));
+  const rangeKm = rangeLeftAt(plan, alongM, range);
   return {
     alongM,
     nowMs,

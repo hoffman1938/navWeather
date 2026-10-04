@@ -69,7 +69,7 @@ Target scale: Google-Maps-class (ADR-015).
 | REQ-CORE-010 | Live location sharing (latest position only, expiring) | P2 | VERIFIED | `worker/liveShare.ts`, `share/*`; `liveShare.test.ts`, `scripts/share-smoke.mjs` |
 | REQ-CORE-011 | Driver reports, always labelled "reported" | P2 | VERIFIED | `worker/reports.ts`, `reports/protocol.ts`; `scripts/reports-smoke.mjs` |
 | REQ-CORE-012 | Weather-aware re-route offers while driving (never automatic) | P2 | VERIFIED | `state/store.ts` (weather reroute); tests |
-| REQ-CORE-013 | Fuel/charging reminders from the user's declared range stay fixed to the road: the range is consumed as the car drives, so the reminder comes closer | P0 | DEFECT (B-02; DP-1.2) | `intelligence/routeIntelligence.ts`; `routeIntelligence.test.ts` (progress 0 only) |
+| REQ-CORE-013 | Fuel/charging reminders from the user's declared range stay fixed to the road: the range is consumed as the car drives, so the reminder comes closer | P0 | VERIFIED (B-02 fixed 2026-10-04) | `intelligence/routeIntelligence.ts`, `state/store.ts` (`rangeUsedKm`, carried over re-routes, restarts when a new range is entered); `routeIntelligence.test.ts`, `state/range.test.ts` |
 
 ### 3a. Long Trip Mode
 
@@ -84,10 +84,10 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-TRIP-004 | Every ETA and forecast match includes planned stop durations (weather at the real times) | P0 | VERIFIED | `state/derive.ts` (`tripStops`), `routeIntelligence.ts` (`dwellBeforeS`) |
 | REQ-TRIP-005 | Overnight areas from driving time, latest arrival, settlement size, no-extra-night rule; user can choose another town | P1 | DEFECT (B-05; DP-1.5) | `planning/overnight.ts`, `chooseOvernight`, `state/trip.ts` |
 | REQ-TRIP-006 | Hotels from open data near the area, within the user's distance; never claim availability | P1 | VERIFIED (OSM via Overpass today; our Places API in DP-6.5) | `stops/recommend.ts`, `/api/v1/trips/places` |
-| REQ-TRIP-007 | Fuel/charging only from user-declared range or tank + consumption; never estimated | P0 | DEFECT (B-01, B-20; DP-1.1, DP-1.8) | `schedule.ts`, `settings.ts` (`fullRangeKm`), `state/trip.ts` |
+| REQ-TRIP-007 | Fuel/charging only from user-declared range or tank + consumption; never estimated — without the tank size only the first fill is planned and the driver is told (`enter-tank`) | P0 | VERIFIED (B-01, B-20 fixed 2026-10-04) | `schedule.ts`, `planner.ts`, `settings.ts` (`fullRangeKm`), `state/trip.ts`; `trip.test.ts` |
 | REQ-TRIP-008 | Meal places closed at the planned arrival are excluded (OSM opening hours, safe subset) | P1 | VERIFIED | `stops/openingHours.ts` |
 | REQ-TRIP-009 | Weather risks at stop-aware times; "stop earlier" advice with reason, never applied silently | P1 | DEFECT (B-07, B-21, B-08/B-09; DP-1.7, DP-11.1) | `weather/risks.ts`, `weather/hazards.ts`, `services/trip/requests.ts` |
-| REQ-TRIP-010 | Replan from the car when ≥ 20 min off plan (10 min cooldown), carry today's driving over re-routes; announce arrival changes ≥ 15 min | P1 | DEFECT (B-03, B-01; DP-1.3, DP-1.1) | `state/trip.ts`, `replanning/progress.ts` |
+| REQ-TRIP-010 | Replan from the car when ≥ 20 min off plan (10 min cooldown), carry today's driving over re-routes; announce arrival changes ≥ 15 min | P1 | VERIFIED (B-03, B-01 fixed 2026-10-04) | `state/trip.ts`, `replanning/progress.ts`; `trip.test.ts`, `trip.test.tsx` |
 | REQ-TRIP-011 | Planned stops as route events replacing generic break/fuel reminders; no notification spam | P1 | VERIFIED | `routeIntelligence.ts` |
 | REQ-TRIP-012 | Border crossings along the route, shown in dashboard and timeline; borders from Natural Earth on the client | P2 | VERIFIED (via Overpass today); client-side borders PLANNED (DP-4.5) | `trip/borders.ts`, `/api/v1/trips/borders` |
 | REQ-TRIP-013 | Vehicle-specific planning: car/van/motorcycle/truck/EV (stops and places); truck road restrictions | P2 | PARTIALLY (restrictions PLANNED with Valhalla, DP-9.2) | `stops/places.ts`, `recommend.ts` |
@@ -95,9 +95,9 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-TRIP-015 | Planner stateless on Cloudflare; no stored trips, no position logs | P0 | IMPLEMENTED (CPU limit B-23 disappears on Workers Paid, DP-5.1) | `worker/trips.ts`, ADR-013 |
 | REQ-TRIP-016 | Jurisdiction-specific driving/rest rules for commercial drivers | P3 | PLANNED (needs verified rules) | — |
 | REQ-TRIP-017 | Cheapest fuel and live hotel availability | P3 | BLOCKED (no free data source; fuel prices only where governments publish them, DP-8.10) | — |
-| REQ-TRIP-018 | Remaining range is tracked along the drive (declared range − distance since the last fill) and sent with every replan and re-route | P0 | PLANNED (fixes B-01; DP-1.1) | `state/trip.ts`, `replanning/progress.ts` |
+| REQ-TRIP-018 | Remaining range is tracked along the drive (declared range − distance since the last fill) and sent with every replan and re-route | P0 | VERIFIED (2026-10-04) | `state/trip.ts`, `replanning/progress.ts` (`rangeLeftAt`), `planner.ts` (a replan never falls back to the starting range); `trip.test.ts`, `trip.test.tsx` |
 | REQ-TRIP-019 | Plausible days for any departure time: overnights only in the local evening/night window, a meal at least every ~6 h awake, night driving (00:00–06:00) flagged with advice to start in the morning — never changed silently | P1 | PLANNED (fixes B-04; DP-1.4) | `planning/schedule.ts`, `config.ts` |
-| REQ-TRIP-020 | Time spent at a planned stop, up to its planned departure, is not a delay | P1 | PLANNED (fixes B-03; DP-1.3) | `replanning/progress.ts` |
+| REQ-TRIP-020 | Time spent at a planned stop, up to its planned departure, is not a delay | P1 | VERIFIED (2026-10-04) | `replanning/progress.ts` (`delaySeconds`, within 2 km of the stop); `trip.test.ts` |
 | REQ-TRIP-021 | The plan is refreshed when its inputs arrive or change while planning: late settlements, new or longer forecasts (debounced, no notification spam) | P1 | PLANNED (fixes B-05, B-07; DP-1.5, DP-1.7) | `state/trip.ts` |
 | REQ-TRIP-022 | Long Trip planning can also run in the browser (Web Worker) with the same `src/trip` module, so planning works offline | P3 | FUTURE | `services/trip/requests.ts`, `state/trip.ts` |
 

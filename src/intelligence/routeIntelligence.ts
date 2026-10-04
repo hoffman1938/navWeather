@@ -43,6 +43,11 @@ export interface IntelligenceInput {
   weatherPrefs: WeatherAlertPrefs;
   speedLimits: SpeedLimitProfile | null;
   fuelRangeKm: number | null;
+  /**
+   * Distance driven since the range was entered (km): this route so far plus earlier routes of the same drive.
+   * Defaults to `progressM` (the drive started at this route's start).
+   */
+  rangeUsedKm?: number;
   vehicle?: 'fuel' | 'ev';
   /** Incidents on the route (provider-normalized; may be unverified reports). */
   incidents?: RouteIncident[];
@@ -208,14 +213,18 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
     }
   }
 
-  // Fuel / charging: only from the user's own range — never estimated.
+  // Fuel / charging: only from the user's own range — never estimated. The range is used up as the car drives,
+  // so the stop stays where 70 % of it is gone (fixed to the road, B-02), or is due now once that point is behind.
   if (!input.tripStops?.length && input.fuelRangeKm !== null && input.fuelRangeKm > 0) {
     const remainingM = timed.totalDistM - progressM;
     const rangeM = input.fuelRangeKm * 1000;
-    if (remainingM > rangeM * 0.9) {
-      const at = progressM + rangeM * 0.7;
+    const usedM = Math.max(0, input.rangeUsedKm !== undefined ? input.rangeUsedKm * 1000 : progressM);
+    const leftM = Math.max(0, rangeM - usedM);
+    if (remainingM > leftM * 0.9) {
+      const aheadM = Math.min(remainingM, Math.max(0, rangeM * 0.7 - usedM));
+      const at = progressM + aheadM;
       const ev = input.vehicle === 'ev';
-      const spoken = spokenDistance(rangeM * 0.7, units.distance, m);
+      const spoken = spokenDistance(aheadM, units.distance, m);
       events.push(
         routeEvent(
           {
@@ -224,7 +233,7 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
             category: ev ? 'charging' : 'fuel',
             severity: 'medium',
             title: ev ? m.alert.title.CHARGE_STOP : m.alert.title.FUEL_STOP,
-            shortMessage: formatDistance(rangeM * 0.7, units.distance, m),
+            shortMessage: formatDistance(aheadM, units.distance, m),
             voiceMessage: ev ? m.alert.voice.chargeStop(spoken) : m.alert.voice.fuelStop(m.poi.category.fuel, spoken),
             icon: ev ? 'charging' : 'fuel',
             source: 'user-range',

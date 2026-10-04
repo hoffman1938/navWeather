@@ -121,6 +121,8 @@ export interface DeriveInput {
   weatherPrefs: WeatherAlertPrefs;
   speedLimits: SpeedLimitProfile | null;
   fuelRangeKm: number | null;
+  /** Distance driven since the range was entered (km), across re-routes; while planning, 0. */
+  rangeUsedKm?: number;
   vehicle?: 'fuel' | 'ev';
   incidents?: RouteIncident[];
   breakReminders?: boolean;
@@ -214,6 +216,7 @@ export function deriveRouteWeather(input: DeriveInput): Derived {
     weatherPrefs: input.weatherPrefs,
     speedLimits: input.speedLimits,
     fuelRangeKm: input.fuelRangeKm,
+    rangeUsedKm: navigating ? input.rangeUsedKm : 0,
     vehicle: input.vehicle,
     incidents: input.incidents,
     breakReminders: input.breakReminders,

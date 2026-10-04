@@ -680,6 +680,7 @@ export const en = {
     stopEarlierAction: (area: string, eta: string) =>
       `Staying in ${area} (arrive ${eta}) means driving that stretch in the morning, when the forecast is better.`,
     enterRange: 'Add your range (and tank size) in Settings to plan fuel stops.',
+    enterTank: 'Only the first refuel or charge can be planned: add your tank or battery size and consumption in Settings for the rest.',
     nextStop: 'Next planned stop',
     settings: {
       section: 'Long trips',

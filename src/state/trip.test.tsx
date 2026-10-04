@@ -214,6 +214,7 @@ describe('Long Trip Mode in the app', () => {
   });
 
   it('replans from the car when a real drive falls well behind the plan', async () => {
+    useSettings.getState().update({ fuelRangeKm: 300 });
     await plan(3);
     await vi.waitFor(() => expect(useTripStore.getState().status).toBe('ready'));
     const timed = useAppStore.getState().plan!.timed;
@@ -226,6 +227,8 @@ describe('Long Trip Mode in the app', () => {
     const replan = requests[1];
     expect(replan.progress!.alongM).toBe(along);
     expect(replan.progress!.drivenTodayS).toBeGreaterThan(0);
+    // The range used on the way is subtracted, not reset to what the trip started with (B-01).
+    expect(replan.progress!.rangeKm).toBeCloseTo(240, 0);
     await vi.waitFor(() => expect(useTripStore.getState().plan!.progress?.alongM).toBe(along));
   });
 

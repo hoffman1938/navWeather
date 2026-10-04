@@ -44,6 +44,38 @@ describe('range-based stop advice (user-entered only)', () => {
     expect(stop.source).toBe('user-range');
   });
 
+  it('the stop stays fixed to the road while the car drives towards it (B-02)', () => {
+    const at = (progressM: number, rangeUsedKm: number) =>
+      buildRouteIntelligence(input({ fuelRangeKm: 200, progressM, rangeUsedKm, clock: { mode: 'navigating', nowMs: Date.UTC(2026, 8, 26, 5), modelTimeS: timeAtDistance(timed, progressM) } })).events.find(
+        (e) => e.type === 'FUEL_STOP',
+      )!;
+    const start = at(0, 0);
+    const later = at(100_000, 100);
+    expect(start.distanceAlongM).toBeCloseTo(140_000, -3);
+    expect(later.distanceAlongM).toBeCloseTo(140_000, -3); // not 240 km: the range was used up on the way
+    expect(later.id).toBe(start.id);
+    expect(later.voiceMessage).toBe('Consider a fuel stop: gas station, 40 kilometers ahead.');
+    // Past the 70 % mark it is due now, not pushed ahead again.
+    const due = at(150_000, 150);
+    expect(due.distanceAlongM).toBeCloseTo(150_000, -3);
+    expect(due.distanceFromCurrentM).toBe(0);
+  });
+
+  it('distance driven before a re-route counts against the range too (B-02)', () => {
+    // 120 km driven on an earlier route, 10 km on this one: 70 % of 200 km is 10 km ahead.
+    const stop = buildRouteIntelligence(
+      input({ fuelRangeKm: 200, progressM: 10_000, rangeUsedKm: 130, clock: { mode: 'navigating', nowMs: Date.UTC(2026, 8, 26, 5), modelTimeS: timeAtDistance(timed, 10_000) } }),
+    ).events.find((e) => e.type === 'FUEL_STOP')!;
+    expect(stop.distanceAlongM).toBeCloseTo(20_000, -3);
+  });
+
+  it('a range that still covers the rest of the trip asks for nothing, even after driving (B-02)', () => {
+    const left = timed.totalDistM / 1000 - 300; // 300 km to go
+    const r = buildRouteIntelligence(input({ fuelRangeKm: 400, progressM: timed.totalDistM - 300_000, rangeUsedKm: left }));
+    // 400 − 57 = 343 km left in the tank > 300 km to go ÷ 0.9.
+    expect(r.events.some((e) => e.type === 'FUEL_STOP')).toBe(false);
+  });
+
   it('EV: the same rule produces charging advice', () => {
     const r = buildRouteIntelligence(input({ fuelRangeKm: 200, vehicle: 'ev' }));
     expect(r.events.some((e) => e.type === 'FUEL_STOP')).toBe(false);

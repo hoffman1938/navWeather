@@ -74,7 +74,8 @@ export async function createTripPlan(req: TripPlanRequest, deps: PlannerDeps): P
     vehicle: req.vehicle,
     drivenTodayS: progress?.drivenTodayS ?? 0,
     sinceRestS: progress?.sinceRestS ?? 0,
-    rangeLeftKm: progress?.rangeKm ?? req.vehicle.rangeKm,
+    // Replanning: the range left at the car, never the range the trip started with (B-01); unknown stays unknown.
+    rangeLeftKm: progress ? progress.rangeKm : req.vehicle.rangeKm,
   };
 
   // ---- Places: one lookup per stop area, cached for this plan, within a budget ----
@@ -187,6 +188,13 @@ export async function createTripPlan(req: TripPlanRequest, deps: PlannerDeps): P
     : [];
   const classification = classifyFromSchedule(profile, schedule, { timeZoneChanges: countTimeZoneChanges(samples.map((s) => s.tz)) });
   if (req.vehicle.rangeKm === undefined && progress?.rangeKm === undefined && atLeast(classification.category, 'EXTENDED')) advice.push({ kind: 'enter-range' });
+  // A range without the tank size: after a fill the range is unknown, so later fills can't be planned (B-20). A full
+  // tank reaches at least as far as the range entered, so say so only when the road after the fill is longer.
+  if (req.vehicle.rangeKm !== undefined && req.vehicle.fullRangeKm === undefined) {
+    const lastFill = schedule.stops.filter((s) => s.kinds.includes('fuel') || s.kinds.includes('charge')).at(-1);
+    const fromM = lastFill ? lastFill.alongM : progress && progress.rangeKm === undefined ? base.startAlongM : null;
+    if (fromM !== null && profile.totalDistM - fromM > req.vehicle.rangeKm * 1000 * 0.9) advice.push({ kind: 'enter-tank' });
+  }
   for (const s of stops) {
     for (const p of s.places) {
       if (p.status === 'none-found' && (p.category === 'hotel' || p.category === 'fuel' || p.category === 'charging')) {

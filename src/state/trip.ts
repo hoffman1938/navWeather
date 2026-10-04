@@ -292,7 +292,12 @@ function checkProgress() {
   if (now - t.lastReplanAt < REPLAN.cooldownMs || t.status === 'loading') return;
   const along = app.progress.distanceAlongM;
   const timed = app.plan.timed;
-  carry = progressStateFor(t.plan, along, now, (m) => timeAtDistance(timed, m));
+  const settings = useSettings.getState();
+  const full = fullRangeKm(settings);
+  carry = progressStateFor(t.plan, along, now, (m) => timeAtDistance(timed, m), {
+    ...(settings.fuelRangeKm !== null ? { declaredKm: settings.fuelRangeKm } : {}),
+    ...(full !== null ? { fullKm: full } : {}),
+  });
   if (Math.abs(delaySeconds(t.plan, along, now)) < REPLAN.delayThresholdS) return;
   useTripStore.setState({ lastReplanAt: now });
   void requestPlan(forecastLookupFn(getProviders(), app.forecasts), carry);

@@ -190,6 +190,7 @@ function TripAdvice({ plan }: { plan: TripPlan }) {
           );
         }
         if (a.kind === 'enter-range') return <p key={i} className="ltrip__note">{m.trip.enterRange}</p>;
+        if (a.kind === 'enter-tank') return <p key={i} className="ltrip__note">{m.trip.enterTank}</p>;
         return null;
       })}
     </>
