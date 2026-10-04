@@ -89,7 +89,7 @@ describe('real-time loop costs', () => {
     // A forecast left over from elsewhere is dropped at the next load.
     const stray = new Map(useAppStore.getState().forecasts);
     const any = [...stray.values()][0];
-    stray.set('stray-cell', { ...any, key: 'stray-cell' });
+    stray.set('stray-cell', { ...any });
     useAppStore.setState({ forecasts: stray });
     await useAppStore.getState().loadWeather({ reason: 'manual' });
     expect(useAppStore.getState().forecasts.has('stray-cell')).toBe(false);

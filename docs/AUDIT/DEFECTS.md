@@ -25,7 +25,7 @@
 | B-13 | P3 | Атрибуция «Routing: OSRM on FOSSGIS servers», хотя авто-маршруты идут через `router.project-osrm.org` | чтение кода | `src/i18n/en.ts`, `ru.ts` — CONFIRMED | DP-6.9 |
 | B-14 | P3 | Дубли событий камер в одной точке | живая симуляция | `src/algorithms/cameras.ts` — PLAUSIBLE | DP-11.11 |
 | B-15 | P3 | Предупреждение MapLibre `Image "circle-11" could not be loaded` | консоль браузера | слой/стиль карты — PLAUSIBLE | DP-11.11 |
-| B-16 | P2 | Уязвимость в dev-цепочке: `wrangler 4.142` → `miniflare` → `undici` (high) | `npm audit` | `package.json` — CONFIRMED | DP-11.6 |
+| B-16 | P2 | Уязвимость в dev-цепочке: `wrangler 4.142` → `miniflare` → `undici` (high) | `npm audit` | `package.json` — CONFIRMED | ✅ исправлено 2026-10-04: `wrangler` ^4.147.0 (`npm audit` — 0 уязвимостей); ESLint и `npm audit` в CI — DP-11.6 |
 | B-17 | P3 | Соль псевдонима отчётов меняется раз в сутки: проверки «свой отчёт / повторный голос» сбрасываются в полночь UTC | чтение кода | `worker/reports.ts` (`who`) — CONFIRMED; осознанный компромисс приватности | DP-7.3 (пересмотреть) |
 | B-19 | P2 | Голос: «найди заправку через 100 км» — расстояние игнорируется, ищется в 0–60 км | чтение кода | `src/voice/parser.ts`, `store.ts` (`searchPoi`) — CONFIRMED | DP-11.12 |
 | B-20 | P2 | Указан остаток, но не размер бака → после первой заправки остальные не планируются, без предупреждения | чтение кода | `schedule.ts`, `planner.ts` — CONFIRMED | ✅ исправлено 2026-10-04 (DP-1.8): совет `enter-tank`; после заправки без объёма бака запас не угадывается |

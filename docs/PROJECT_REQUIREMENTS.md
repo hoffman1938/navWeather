@@ -444,7 +444,7 @@ iOS, CarPlay, Android Auto and Google Play are BLOCKED by store fees (ADR-015).
 | DEBT-010 | Weather thresholds duplicated in 7 files with different values (B-08) | inconsistent alerts vs trip risks | REQ-WX-009, DP-11.1 |
 | DEBT-011 | ~~`forecasts` map in the app store is never pruned (B-11)~~ — fixed 2026-10-04: kept only for the trip's roads | — | DP-1.9 ✅ |
 | DEBT-012 | ~~`derive` throttle never applies during real navigation (B-10)~~ — fixed 2026-10-04: ≤1/s by the fixes' own clock | — | DP-1.9 ✅ |
-| DEBT-013 | Dev dependency `undici` (via `wrangler` 4.142) has a high advisory (B-16) | local/CI tooling | update `wrangler` (DP-11.6) |
+| DEBT-013 | ~~Dev dependency `undici` (via `wrangler` 4.142) has a high advisory (B-16)~~ — fixed 2026-10-04 (`wrangler` ^4.147.0, `npm audit` clean) | — | audit step in CI: DP-11.6 |
 | DEBT-014 | The repository lives in an iCloud-synced folder, which created 17 duplicate files `* 2.*` (removed 2026-10-04) | duplicates may reappear | move the repo out of iCloud sync (DP-0.2) |
 
 ## 34. External dependencies
