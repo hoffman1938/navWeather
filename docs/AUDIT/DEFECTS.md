@@ -19,8 +19,8 @@
 | **B-07** | P1 | Риски и советы Long Trip не пересчитываются при новом прогнозе в режиме планирования | после второй загрузки риски не изменились | `src/state/trip.ts` (`initTrip`) — CONFIRMED | ✅ исправлено 2026-10-04 (DP-1.7): каждая загрузка прогноза в режиме планирования даёт один новый план |
 | B-08 | P2 | Пороги опасностей расходятся между алертами, рисками поездки, сравнением дорог и полоской погоды (порывы 60 vs 70, гололёд ≤1 vs ≤0,5 °C) | чтение кода и временные тесты | `src/trip/weather/hazards.ts`, `weatherAlerts.ts`, `derive.ts`, `departurePlanner.ts`, `WeatherStrip.tsx`, `roadHazards.ts` — CONFIRMED | DP-11.1 |
 | B-09 | P2 | Коды опасностей для поездки сдвинуты ~на 1 ч (состояние из часа `i`, осадки из `i+1`) | чтение кода | `src/services/trip/requests.ts` (`weatherSamples`) — CONFIRMED | DP-11.1 |
-| B-10 | P2 | Троттлинг `derive` не работает в реальной навигации → `derive` и алерты на каждый GPS-фикс | чтение кода | `src/state/store.ts` (`lastDeriveSimMs`) — CONFIRMED | DP-1.9 |
-| B-11 | P3 | `forecasts` в store никогда не очищается | чтение кода | `src/state/store.ts` (`loadWeather`) — CONFIRMED | DP-1.9 |
+| B-10 | P2 | Троттлинг `derive` не работает в реальной навигации → `derive` и алерты на каждый GPS-фикс | чтение кода | `src/state/store.ts` (`lastDeriveSimMs`) — CONFIRMED | ✅ исправлено 2026-10-04 (DP-1.9): в реальной поездке троттлинг по времени GPS-фиксов (≤ 1/с), симуляция — как раньше |
+| B-11 | P3 | `forecasts` в store никогда не очищается | чтение кода | `src/state/store.ts` (`loadWeather`) — CONFIRMED | ✅ исправлено 2026-10-04 (DP-1.9): при каждой загрузке остаются только прогнозы дорог текущей поездки |
 | B-12 | P3 | Офлайн: ленивые чанки (Settings, LongTripDetails) не кэшируются заранее → первое открытие офлайн может упасть | чтение кода | `public/sw.js`, `src/App.tsx` — PLAUSIBLE | DP-11.10 |
 | B-13 | P3 | Атрибуция «Routing: OSRM on FOSSGIS servers», хотя авто-маршруты идут через `router.project-osrm.org` | чтение кода | `src/i18n/en.ts`, `ru.ts` — CONFIRMED | DP-6.9 |
 | B-14 | P3 | Дубли событий камер в одной точке | живая симуляция | `src/algorithms/cameras.ts` — PLAUSIBLE | DP-11.11 |

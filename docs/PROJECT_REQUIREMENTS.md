@@ -442,8 +442,8 @@ iOS, CarPlay, Android Auto and Google Play are BLOCKED by store fees (ADR-015).
 | DEBT-008 | Overpass called live per route (and per trip stop / borders) | violates its usage guidance at scale | our Places API and client borders (DP-4.5, DP-6.5) |
 | DEBT-009 | Main JS chunk 604 KB (196 KB gz) | LCP on slow phones | more lazy chunks (REQ-PERF-004, DP-11.5) |
 | DEBT-010 | Weather thresholds duplicated in 7 files with different values (B-08) | inconsistent alerts vs trip risks | REQ-WX-009, DP-11.1 |
-| DEBT-011 | `forecasts` map in the app store is never pruned (B-11) | memory in long sessions | DP-1.9 |
-| DEBT-012 | `derive` throttle never applies during real navigation (B-10) | CPU/battery per GPS fix | DP-1.9 |
+| DEBT-011 | ~~`forecasts` map in the app store is never pruned (B-11)~~ — fixed 2026-10-04: kept only for the trip's roads | — | DP-1.9 ✅ |
+| DEBT-012 | ~~`derive` throttle never applies during real navigation (B-10)~~ — fixed 2026-10-04: ≤1/s by the fixes' own clock | — | DP-1.9 ✅ |
 | DEBT-013 | Dev dependency `undici` (via `wrangler` 4.142) has a high advisory (B-16) | local/CI tooling | update `wrangler` (DP-11.6) |
 | DEBT-014 | The repository lives in an iCloud-synced folder, which created 17 duplicate files `* 2.*` (removed 2026-10-04) | duplicates may reappear | move the repo out of iCloud sync (DP-0.2) |
 

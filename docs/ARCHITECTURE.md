@@ -62,7 +62,7 @@ GPS fix (LocationWatcher) or simulation step
        └─ off route → re-plan from the car → everything below is rebuilt
   ─▶ guidance + maneuver voice (priority 1; weather is held while a turn is seconds away)
   ─▶ speed limit / speeding (hysteresis)
-  ─▶ throttled derive (≤1/s real time, every 30 s simulated)
+  ─▶ throttled derive (real drive: ≤1/s by the fixes' own clock; simulation: ≤1/s real time or every 30 s simulated)
   ─▶ DriverAlertEngine: time-to-event windows by severity, confidence gating,
      cooldown, grouping, recurrence suppression, hourly cap, escalation
   ─▶ voice queue + one visual banner
@@ -166,7 +166,7 @@ passing a report ──POST /api/reports/:id/vote {still|gone}──┘
 - Client (`ReportsIncidentProvider`, store): reports become unverified route
   events ("Accident · reported"), a "still there?" card appears 30–400 m after
   passing someone else's report on a real drive; nothing is sent from a
-  simulation. The Report button and prompt disappear when turned off in Settings.
+  simulation, and a simulated drive doesn't ask for the list either (DP-1.10). The Report button and prompt disappear when turned off in Settings.
 
 ## Voice
 
