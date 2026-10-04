@@ -467,7 +467,7 @@ export const en = {
     findAlongRoute: 'Find along route',
     clear: 'Clear',
     attribution:
-      'Weather: Open-Meteo (CC BY 4.0) · Routing: OSRM on FOSSGIS servers · Search: Nominatim, Photon · Public transport: Transitous · Map data © OpenStreetMap contributors. No account, no stored location history.',
+      'Weather: Open-Meteo (CC BY 4.0) · Routing: OSRM (cars: project-osrm.org; walking, cycling: FOSSGIS servers) · Search: Nominatim, Photon · Public transport: Transitous · Map data © OpenStreetMap contributors. No account, no stored location history.',
     fixMap: 'Report a map error',
   },
 

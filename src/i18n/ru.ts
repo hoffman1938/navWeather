@@ -460,7 +460,7 @@ export const ru: Messages = {
     findAlongRoute: 'Найти по маршруту',
     clear: 'Очистить',
     attribution:
-      'Погода: Open-Meteo (CC BY 4.0) · Маршруты: OSRM на серверах FOSSGIS · Поиск: Nominatim, Photon · Общественный транспорт: Transitous · Данные карты © участники OpenStreetMap. Без аккаунта, история поездок не хранится.',
+      'Погода: Open-Meteo (CC BY 4.0) · Маршруты: OSRM (авто: project-osrm.org; пешком, велосипед: серверы FOSSGIS) · Поиск: Nominatim, Photon · Общественный транспорт: Transitous · Данные карты © участники OpenStreetMap. Без аккаунта, история поездок не хранится.',
     fixMap: 'Сообщить об ошибке на карте',
   },
 

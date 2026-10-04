@@ -63,8 +63,8 @@ commercial release — **PLANNED**.
 
 ## Attribution as shipped
 - Map (top-right control): OpenFreeMap © OpenMapTiles Data from OpenStreetMap.
-- Sheets (`ui.attribution`): Weather: Open-Meteo (CC BY 4.0) · Routing: OSRM on
-  FOSSGIS servers · Search: Nominatim, Photon · Public transport: Transitous ·
+- Sheets (`ui.attribution`): Weather: Open-Meteo (CC BY 4.0) · Routing: OSRM (cars:
+  project-osrm.org; walking, cycling: FOSSGIS servers) · Search: Nominatim, Photon · Public transport: Transitous ·
   Map data © OpenStreetMap contributors · "Report a map error" →
   openstreetmap.org/fixthemap.
 - Transit trips: "Timetables: Transitous and its sources" → transitous.org/sources/.
