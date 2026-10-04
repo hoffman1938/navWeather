@@ -23,8 +23,8 @@
 | B-11 | P3 | `forecasts` в store никогда не очищается | чтение кода | `src/state/store.ts` (`loadWeather`) — CONFIRMED | ✅ исправлено 2026-10-04 (DP-1.9): при каждой загрузке остаются только прогнозы дорог текущей поездки |
 | B-12 | P3 | Офлайн: ленивые чанки (Settings, LongTripDetails) не кэшируются заранее → первое открытие офлайн может упасть | чтение кода | `public/sw.js`, `src/App.tsx` — PLAUSIBLE | DP-11.10 |
 | B-13 | P3 | Атрибуция «Routing: OSRM on FOSSGIS servers», хотя авто-маршруты идут через `router.project-osrm.org` | чтение кода | `src/i18n/en.ts`, `ru.ts` — CONFIRMED | DP-6.9 |
-| B-14 | P3 | Дубли событий камер в одной точке | живая симуляция | `src/algorithms/cameras.ts` — PLAUSIBLE | DP-11.11 |
-| B-15 | P3 | Предупреждение MapLibre `Image "circle-11" could not be loaded` | консоль браузера | слой/стиль карты — PLAUSIBLE | DP-11.11 |
+| B-14 | P3 | Дубли событий камер в одной точке | живая симуляция | `src/algorithms/cameras.ts` — CONFIRMED | ✅ исправлено 2026-10-04 (DP-11.11): камеры ближе 150 м по дороге — одна камера (строже ограничение); подтверждено живой симуляцией (пары узлов OSM) |
+| B-15 | P3 | Предупреждение MapLibre `Image "circle-11" could not be loaded` | консоль браузера | слой/стиль карты — CONFIRMED | ✅ исправлено 2026-10-04 (DP-11.11): тёмный стиль OpenFreeMap ссылается на `circle-11` и `wood-pattern`, которых нет в спрайте — подставляются точка и прозрачный узор (`setMissingStyleImageResolver`); точки городов снова видны |
 | B-16 | P2 | Уязвимость в dev-цепочке: `wrangler 4.142` → `miniflare` → `undici` (high) | `npm audit` | `package.json` — CONFIRMED | ✅ исправлено 2026-10-04: `wrangler` ^4.147.0 (`npm audit` — 0 уязвимостей); ESLint и `npm audit` в CI — DP-11.6 |
 | B-17 | P3 | Соль псевдонима отчётов меняется раз в сутки: проверки «свой отчёт / повторный голос» сбрасываются в полночь UTC | чтение кода | `worker/reports.ts` (`who`) — CONFIRMED; осознанный компромисс приватности | DP-7.3 (пересмотреть) |
 | B-19 | P2 | Голос: «найди заправку через 100 км» — расстояние игнорируется, ищется в 0–60 км | чтение кода | `src/voice/parser.ts`, `store.ts` (`searchPoi`) — CONFIRMED | DP-11.12 |

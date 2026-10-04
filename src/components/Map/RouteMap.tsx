@@ -22,7 +22,7 @@ import { lowerIndex, sliceLine } from '../../utils/distance';
 import { LocateIcon } from '../Icons/Icons';
 import { exposureLine, roadNames } from '../Plan/RouteOptions';
 import { WeatherMarker } from '../WeatherMarker/WeatherMarker';
-import { add3dBuildings, addRouteLayers, EMPTY_FC, lineFeature, pointFeature, routeGradient, setData } from './mapLayers';
+import { add3dBuildings, addRouteLayers, EMPTY_FC, fillMissingStyleImages, lineFeature, pointFeature, routeGradient, setData } from './mapLayers';
 import { useExploreLayer } from './useExploreLayer';
 import { useLiveLayer } from './useLiveLayer';
 import { useWeatherLayer } from './useWeatherLayer';
@@ -123,6 +123,7 @@ export default function RouteMap({ viewer = false }: { viewer?: boolean }) {
       return;
     }
     map.addControl(new AttributionControl({ compact: true }), 'top-right');
+    fillMissingStyleImages(map);
     map.on('style.load', () => {
       addRouteLayers(map);
       add3dBuildings(map);

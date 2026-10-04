@@ -20,6 +20,24 @@ describe('speed cameras (OSM, opt-in)', () => {
     expect(cams.map((c) => c.id)).toEqual(['a', 'b']);
   });
 
+  it('one camera mapped twice (two OSM nodes, one per direction) is one camera, with the stricter limit (B-14)', () => {
+    const cams = snapCamerasToRoute(
+      [
+        { id: 'n1', coordinate: at(79.7), kmh: 110 },
+        { id: 'n2', coordinate: at(79.75), kmh: 90 },
+        { id: 'n3', coordinate: at(88) },
+        { id: 'n4', coordinate: at(88.02), kmh: 50 },
+        { id: 'far', coordinate: at(90), kmh: 110 },
+      ],
+      timed,
+    );
+    expect(cams.map((c) => [c.id, c.kmh])).toEqual([
+      ['n1', 90],
+      ['n3', 50],
+      ['far', 110],
+    ]);
+  });
+
   it('announces each camera once, ~600 m (or 25 s) ahead', () => {
     const cams = snapCamerasToRoute([{ id: 'a', coordinate: at(40), kmh: 90 }], timed);
     const done = new Set<string>();

@@ -16,6 +16,36 @@ function cssVar(name: string, fallback: string): string {
   return c || fallback;
 }
 
+/**
+ * A stand-in for an image the basemap style names but its sprite lacks (OpenFreeMap's dark style asks for
+ * "circle-11" town dots and a "wood-pattern" fill, B-15): a small neutral dot for "circle-*" icons, else nothing
+ * visible. Without it MapLibre warns on every style load and draws no town dots.
+ */
+export function placeholderStyleImage(id: string): { width: number; height: number; data: Uint8Array } {
+  if (!/^circle-\d+$/.test(id)) return { width: 1, height: 1, data: new Uint8Array(4) };
+  const size = Math.max(5, Math.min(31, Number(id.slice(7)) || 11));
+  const data = new Uint8Array(size * size * 4);
+  const c = (size - 1) / 2;
+  const r = size / 2 - 1.5;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot(x - c, y - c);
+      const i = (y * size + x) * 4;
+      // A light grey dot with a darker rim, readable on light and dark maps.
+      const [rgb, a] = d <= r - 1 ? [176, 255] : d <= r + 0.5 ? [96, 255] : [0, 0];
+      data.set([rgb, rgb, rgb + 8, a], i);
+    }
+  }
+  return { width: size, height: size, data };
+}
+
+/** Fill images the basemap style references but its sprite doesn't have (MapLibre 6: a resolver, not the event). */
+export function fillMissingStyleImages(map: MLMap) {
+  map.setMissingStyleImageResolver((id) => {
+    if (!map.hasImage(id)) map.addImage(id, placeholderStyleImage(id));
+  });
+}
+
 /** Route + weather layers, inserted below the basemap's labels so place names stay readable. */
 export function addRouteLayers(map: MLMap) {
   const route = cssVar('--route', '#0a6cff');
