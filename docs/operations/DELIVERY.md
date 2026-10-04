@@ -10,7 +10,7 @@
 
 | Env | How | Config | Data |
 | --- | --- | --- | --- |
-| local | `npm run dev` (Vite :5173) + `npm run dev:api` (wrangler dev :8787, local DO state in `.wrangler/`) | `.env` (optional, public `VITE_*` only), `.dev.vars` (Worker secrets, git-ignored) | local |
+| local | `npm run dev` (Vite :5173 + wrangler dev :8787 in one command, local DO state in `.wrangler/`); `npm run preview:worker` for the production build | `.env` (optional, public `VITE_*` only), `.dev.vars` (Worker secrets, git-ignored) | local |
 | PR preview | `wrangler versions upload` → preview URL (deploy workflow, manual) | same as production unless `--env preview` is added | production DO namespaces — **add `[env.preview]` with its own bindings before previews touch real users' shares** |
 | staging | `wrangler deploy --env staging` (to add) | own D1/KV ids when they exist | synthetic |
 | production | `wrangler deploy` (manual or `deploy.yml`) | `wrangler.toml` + `wrangler secret` | real |

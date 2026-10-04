@@ -6,7 +6,7 @@
 npm test              # unit + store-level scenarios (deterministic fake providers, no network)
 npm run typecheck     # app + worker
 npm run test:live     # opt-in smoke test against the real public APIs (Tbilisi → Batumi)
-npm run dev:api       # local relay, then in another terminal:
+npm run dev           # app + local relay (or `npm run dev:api` for the relay only), then in another terminal:
 npm run test:share    # end-to-end checks of the live-sharing relay
 npm run test:reports  # end-to-end checks of the driver-reports relay
 ```

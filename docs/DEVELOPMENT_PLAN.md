@@ -145,7 +145,7 @@
 
 | ID | Задача | Локально | Workers | Критерий приёмки | Дни | Зависит |
 | --- | --- | --- | --- | --- | --- | --- |
-| DP-2.1 | Cloudflare Vite plugin: один `npm run dev` поднимает приложение + Worker + DO (+ D1/R2) вместо двух процессов и прокси | шаринг и сообщения работают на `localhost:5173` без `dev:api` | тот же бандл деплоится | `vite.config.ts`, `package.json`, `wrangler.toml`; README/ENVIRONMENT обновлены | 2 | DP-0.1 |
+| DP-2.1 | ◐ (2026-10-04: один `npm run dev` поднимает приложение и Worker с локальными DO — `scripts/dev.mjs`, без новых зависимостей; Cloudflare Vite plugin — после решения владельца Workers/Pages) Cloudflare Vite plugin: один `npm run dev` поднимает приложение + Worker + DO (+ D1/R2) вместо двух процессов и прокси | шаринг и сообщения работают на `localhost:5173` без `dev:api` | тот же бандл деплоится | `vite.config.ts`, `package.json`, `wrangler.toml`; README/ENVIRONMENT обновлены | 2 | DP-0.1 |
 | DP-2.2 | Окружения `wrangler.toml`: `dev`, `preview`, `production` с отдельными DO/D1/R2; `.dev.vars`; комментарий «всё на Workers Free» убран | `wrangler dev` берёт `dev` | `--env preview` не трогает боевые данные | DELIVERY/ENVIRONMENT обновлены | 1 | DP-2.1 |
 | DP-2.3 | Профили клиента: `.env.development` / `.env.preview` / `.env.production`; один базовый адрес API (по умолчанию тот же origin) | сборка `dev` | сборка `preview` | `src/config.ts`, `.env.example`, ENVIRONMENT | 1 | DP-2.1 |
 | DP-2.4 | Docker-окружение: каталог `infra/` с образами движков, одинаковыми для локального запуска и Containers; требования к Docker в README | `docker` + `npm run dev` поднимает пустые заглушки движков | образы собираются в CI | README «Docker нужен для движков» | 1 | DP-2.1 |

@@ -24,11 +24,15 @@ and driver reports.
 
 ```bash
 npm install
-npm run dev          # app on http://localhost:5173
-npm run dev:api      # (optional, second terminal) live-sharing + reports relay on :8787
+npm run dev          # everything on localhost: app on http://localhost:5173 + the Worker on :8787
+                     # (live sharing, driver reports, Long Trip planner; local Durable Objects, no account)
 npm test             # unit + end-to-end scenarios, no network
 npm run build        # type-check + production build
+npm run preview:worker   # the production build served by the Worker, as on Cloudflare: http://127.0.0.1:8787
 ```
+
+`npm run dev:web` starts only the app (sharing, reports and Long Trip plans then say the server is missing);
+`npm run dev:api` starts only the Worker.
 
 Use Node 22+ (required by the Cloudflare tooling; the tests need 20+).
 Location only works on `https://` or `localhost` — opening the dev server from

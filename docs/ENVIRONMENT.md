@@ -89,10 +89,13 @@ Configured in `wrangler.toml`; no secrets are required.
 | `REPORT_LIMITER` | rate limit for sending reports and votes (10 per minute per IP) |
 | `REPORT_LIST_LIMITER` | rate limit for reading reports (120 per minute per IP) |
 
-Local development: `npm run dev:api` starts the Worker on port 8787, and the
-Vite dev server proxies `/api` to it (`vite.config.ts`). Without it, the app
-works normally, "Share live location" explains that the server is missing,
-and driver reports show as "unavailable" in the Data panel.
+Local development: `npm run dev` starts both the Vite dev server (:5173) and the
+Worker (`wrangler dev`, :8787, local Durable Objects and rate limits — no Cloudflare
+account) and the dev server proxies `/api` to it (`scripts/dev.mjs`, `vite.config.ts`).
+`npm run dev:web` starts only the app: it then works normally, "Share live location"
+explains that the server is missing, and driver reports show as "unavailable" in the
+Data panel. `npm run preview:worker` serves the production build through the Worker
+on :8787, as Cloudflare would (headers, SPA fallback, service worker).
 
 ## Worker variables and bindings (Long Trip Mode)
 

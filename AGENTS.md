@@ -60,12 +60,13 @@ weather. It is not "a map site" or "a weather site" — keep that direction.
 
 ## Commands
 ```
-npm run dev          # app on :5173
-npm run dev:api      # Worker (live share, reports, whereami) on :8787 — the dev server proxies /api
+npm run dev          # app on :5173 + Worker on :8787 (one command; the dev server proxies /api)
+npm run dev:web      # only the app        npm run dev:api   # only the Worker (live share, reports, whereami, trips)
+npm run preview:worker   # production build served by the Worker on :8787 (as deployed)
 npm test             # vitest (unit + scenarios)
 npm run typecheck    # app + Worker
 npm run build        # production build
-npm run test:share   # Worker smoke (needs dev:api); API=/api for legacy paths
+npm run test:share   # Worker smoke (needs the Worker on :8787); API=/api for legacy paths
 npm run test:reports
 ```
 
