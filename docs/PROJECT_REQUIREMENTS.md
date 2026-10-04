@@ -445,7 +445,7 @@ iOS, CarPlay, Android Auto and Google Play are BLOCKED by store fees (ADR-015).
 | DEBT-011 | `forecasts` map in the app store is never pruned (B-11) | memory in long sessions | DP-1.9 |
 | DEBT-012 | `derive` throttle never applies during real navigation (B-10) | CPU/battery per GPS fix | DP-1.9 |
 | DEBT-013 | Dev dependency `undici` (via `wrangler` 4.142) has a high advisory (B-16) | local/CI tooling | update `wrangler` (DP-11.6) |
-| DEBT-014 | 17 duplicate files `* 2.*` committed (iCloud sync) and superseded documents still in the tree | confusion | DP-0.2, DP-0.8 |
+| DEBT-014 | The repository lives in an iCloud-synced folder, which created 17 duplicate files `* 2.*` (removed 2026-10-04) | duplicates may reappear | move the repo out of iCloud sync (DP-0.2) |
 
 ## 34. External dependencies
 
