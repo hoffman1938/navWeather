@@ -32,6 +32,7 @@ import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQ
 import { NoIncidentProvider, type IncidentProvider } from './traffic/IncidentProvider';
 import { ReportsIncidentProvider } from './traffic/ReportsIncidentProvider';
 import { NoTrafficProvider, type TrafficProvider } from './traffic/TrafficProvider';
+import { ApiWeatherProvider } from './weather/ApiWeatherProvider';
 import { OpenMeteoProvider } from './weather/OpenMeteoProvider';
 import type { WeatherProvider } from './weather/WeatherProvider';
 import { WeatherService } from './weather/WeatherService';
@@ -120,15 +121,16 @@ export function createProviders(cfg: AppConfig = config): Providers {
 
   const autocomplete: AutocompleteProvider = p.autocomplete === 'api' ? ours : p.autocomplete === 'photon' ? photon : unknown('autocomplete', p.autocomplete);
 
+  const openMeteo = () => new OpenMeteoProvider(e.openMeteo, cfg.weather.batchSize, cfg.weather.requestTimeoutMs, cfg.weather.openMeteoUpdateModels);
+  // The public Open-Meteo API only where our forecast isn't there, while VITE_WEATHER_FALLBACK allows it (DP-6.6).
+  const weatherFallback =
+    p.weatherFallback === 'open-meteo' ? openMeteo() : p.weatherFallback === 'none' ? null : unknown('weather fallback', p.weatherFallback);
   const weatherProvider: WeatherProvider =
-    p.weather === 'open-meteo'
-      ? new OpenMeteoProvider(
-          e.openMeteo,
-          cfg.weather.batchSize,
-          cfg.weather.requestTimeoutMs,
-          cfg.weather.openMeteoUpdateModels,
-        )
-      : unknown('weather', p.weather);
+    p.weather === 'api'
+      ? new ApiWeatherProvider(e.weather, weatherFallback, cfg.weather.batchSize, cfg.weather.requestTimeoutMs)
+      : p.weather === 'open-meteo'
+        ? openMeteo()
+        : unknown('weather', p.weather);
 
   // Overpass only outside the region our tiles cover, while VITE_PLACES_FALLBACK allows it (DP-6.5).
   const fallback = p.placesFallback === 'overpass' ? true : p.placesFallback === 'none' ? false : unknown('places fallback', p.placesFallback);

@@ -23,6 +23,8 @@
     "../src/share/protocol.ts",
     "../src/types/geo.ts",
     "../src/api/geocode.ts",
-    "../src/api/route.ts"
+    "../src/api/route.ts",
+    "../src/api/weather.ts",
+    "../src/utils/timezone.ts"
   ]
 }

@@ -22,8 +22,29 @@ const HOURLY_VARS = [
 
 type HourlyVar = (typeof HOURLY_VARS)[number];
 
-// Raw response (never leaves this file).
-interface OpenMeteoLocation {
+/**
+ * The forecast query (Open-Meteo's, which our `/api/v1/weather/forecast` answers too). A point's height, when the
+ * route knows it, makes the temperature that of the point rather than of the model's grid cell (lapse rate).
+ */
+export function forecastParams(req: ForecastRequest): URLSearchParams {
+  const params = new URLSearchParams({
+    latitude: req.locations.map((l) => l.latitude.toFixed(4)).join(','),
+    longitude: req.locations.map((l) => l.longitude.toFixed(4)).join(','),
+    hourly: HOURLY_VARS.join(','),
+    timezone: 'auto',
+    timeformat: 'unixtime',
+    wind_speed_unit: 'kmh',
+    past_hours: String(Math.max(0, Math.round(req.pastHours))),
+    forecast_hours: String(Math.max(1, Math.round(req.forecastHours))),
+  });
+  if (req.locations.some((l) => l.elevationM !== undefined)) {
+    params.set('elevation', req.locations.map((l) => (l.elevationM === undefined ? 'nan' : String(Math.round(l.elevationM)))).join(','));
+  }
+  return params;
+}
+
+/** Raw response of one location (Open-Meteo's shape; also our Worker's). */
+export interface OpenMeteoLocation {
   latitude: number;
   longitude: number;
   elevation?: number;
@@ -68,17 +89,7 @@ export class OpenMeteoProvider implements WeatherProvider {
     if (req.locations.length > this.maxLocationsPerRequest) {
       throw new Error(`Open-Meteo batch too large (${req.locations.length})`);
     }
-    const params = new URLSearchParams({
-      latitude: req.locations.map((l) => l.latitude.toFixed(4)).join(','),
-      longitude: req.locations.map((l) => l.longitude.toFixed(4)).join(','),
-      hourly: HOURLY_VARS.join(','),
-      timezone: 'auto',
-      timeformat: 'unixtime',
-      wind_speed_unit: 'kmh',
-      past_hours: String(Math.max(0, Math.round(req.pastHours))),
-      forecast_hours: String(Math.max(1, Math.round(req.forecastHours))),
-    });
-    const url = `${this.baseUrl.replace(/\/$/, '')}/v1/forecast?${params}`;
+    const url = `${this.baseUrl.replace(/\/$/, '')}/v1/forecast?${forecastParams(req)}`;
     const data = await fetchJson<OpenMeteoLocation | OpenMeteoLocation[]>(url, {
       provider: 'Weather service',
       signal: req.signal,

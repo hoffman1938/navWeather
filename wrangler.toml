@@ -71,6 +71,19 @@ simple = { limit = 60, period = 60 }
 binding = "GEO"
 database_name = "navweather-geo"
 
+# Abuse guard for weather (per client IP): a route asks for its points in batches, refreshed every ~20 minutes.
+[[ratelimits]]
+name = "WEATHER_LIMITER"
+namespace_id = "1007"
+simple = { limit = 120, period = 60 }
+
+# Our forecast, worldwide (DEVELOPMENT_PLAN DP-4.6): weather tiles built from open model data by
+# `npm run data:weather` (pipelines/weather/build.mjs) — locally into this bucket's local state; on Cloudflare the
+# first `wrangler deploy` creates the bucket and the scheduled pipeline fills it.
+[[r2_buckets]]
+binding = "WEATHER"
+bucket_name = "navweather-weather"
+
 # Long-trip planner: Overpass endpoints and the User-Agent sent to them (name a
 # contact before production — Overpass asks apps to identify themselves).
 [vars]

@@ -34,7 +34,10 @@ export const config = {
     routing: str('VITE_ROUTING_PROVIDER', 'valhalla'),
     /** When our engine isn't running or a point is outside its region: `osrm` (public servers) or `none`. */
     routingFallback: str('VITE_ROUTING_FALLBACK', 'osrm'),
-    weather: str('VITE_WEATHER_PROVIDER', 'open-meteo'),
+    /** Forecasts: ours, worldwide (`/api/v1/weather`, DP-6.6); `open-meteo` = the public API only. */
+    weather: str('VITE_WEATHER_PROVIDER', 'api'),
+    /** Where our forecast isn't there (not built, too old, far out at sea): `open-meteo` (public API) or `none`. */
+    weatherFallback: str('VITE_WEATHER_FALLBACK', 'open-meteo'),
     /** Search, suggestions and reverse naming: our geocoder (`/api/v1/geocode` + settlement tiles, DP-6.4). */
     geocoding: str('VITE_GEOCODING_PROVIDER', 'api'),
     autocomplete: str('VITE_AUTOCOMPLETE_PROVIDER', 'api'),
@@ -62,6 +65,8 @@ export const config = {
     osrmBike: str('VITE_OSRM_BIKE_URL', 'https://routing.openstreetmap.de/routed-bike'),
     /** Public transport: Transitous (MOTIS) over operators' open timetables. Empty turns public transport off. */
     transit: env.VITE_TRANSIT_URL === '' ? '' : str('VITE_TRANSIT_URL', 'https://api.transitous.org'),
+    /** Our forecast (the Worker's `/api/v1/weather`, same origin). */
+    weather: str('VITE_WEATHER_URL', '/api/v1/weather'),
     openMeteo: str('VITE_OPEN_METEO_BASE_URL', 'https://api.open-meteo.com'),
     openMeteoAir: str('VITE_OPEN_METEO_AIR_URL', 'https://air-quality-api.open-meteo.com'),
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),

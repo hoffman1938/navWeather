@@ -398,7 +398,7 @@ export function fetchSampleForecasts(
   options: { force?: boolean; signal?: AbortSignal } = {},
 ): Promise<ForecastLookup> {
   return providers.weather.getForecasts(
-    samples.map((s) => ({ latitude: s.coordinate[1], longitude: s.coordinate[0] })),
+    samples.map((s) => ({ latitude: s.coordinate[1], longitude: s.coordinate[0], elevationM: s.elevationM })),
     { needUntilMs: latestArrivalMs + 3600_000, force: options.force, signal: options.signal },
   );
 }

@@ -23,7 +23,35 @@ Route (geometry + per-edge durations)                         services/routing/*
 
 While driving, position updates **re-match cached forecasts to new ETAs** and
 make no network requests. Forecasts refresh when ≥20 min old or when a newer
-model run is published (Open-Meteo `meta.json` checks every 10 min).
+build of our forecast is published (`/api/v1/weather/meta`, checked every 10 min).
+
+### 1a. Where the forecast comes from (DP-4.6, DP-6.6)
+
+```
+ECMWF IFS 0.25° (newest run; a short 06Z/18Z run continued by the previous long one, 15 days)
+NOAA GFS 0.25° visibility                         ← Open-Meteo open-data archive on AWS (.om files, range reads)
+  ↓ pipelines/weather/build.mjs (npm run data:weather): land + coasts, 5°×5° tiles, int16 per step   → R2
+  ↓ worker/weather.ts: nearest 0.25° cell, steps → hours, derived values                → /api/v1/weather/forecast
+  ↓ ApiWeatherProvider → the same normaliser as Open-Meteo                               → WeatherService
+```
+
+From model steps (3-hourly to 6 days, then 6-hourly) to hours (`src/api/weather.ts`):
+- values at a step (temperature, humidity, clouds, wind components, CAPE, visibility) — linear in time; the
+  precipitation type — the nearer step;
+- sums and maxima over an interval (precipitation, snowfall, gusts) — a sum is spread evenly over its hours (6 mm in
+  6 h → 1 mm each hour), a maximum holds for each hour of its interval; the hour before the run starts has none;
+- derived: wind speed and direction from its components; rain = precipitation − snowfall water; snowfall cm =
+  water mm × 0.7; apparent temperature (Steadman, without sunshine); gusts never below the wind;
+- **weather code — a derived estimate**: thunderstorm when CAPE ≥ 3000 J/kg with precipitation, or ≥ 1500 with
+  ≥ 2.5 mm/h; freezing rain/drizzle and ice pellets from the model's precipitation type; snow when snowfall is at
+  least half the precipitation (light < 0.2 cm/h, heavy ≥ 0.8); rain by intensity (2.5 and 7.6 mm/h); fog when
+  visibility < 1 km (freezing below 0 °C); otherwise clouds (15/50/85 %);
+- temperature for the point's height: route samples send their height; the forecast moves the temperature by
+  6.5 °C/km from the grid cell's height (and says which height it is for).
+
+Not available from one deterministic run: **precipitation probability** (`null`; the alert engine then treats rain
+as likely when it is forecast). Open sea far from any coast has no tiles: those points are "missing" and the app
+asks its fallback.
 
 ## 2. Adaptive sampling (not a fixed spacing)
 
@@ -136,4 +164,7 @@ source verified); official warnings (REQ-WX-006).
 - Typical-speed ETAs (no traffic) widen with trip length; shown as "Estimated".
 - Grid snapping at 0.02° (~2 km) can blur sharp coastal/mountain gradients;
   passes are sampled explicitly to compensate.
-- Open-Meteo "best match" blends models; model choice per region is not exposed.
+- One global model (ECMWF IFS, ~25 km) everywhere, not regional high-resolution models; mountains and coasts are
+  smoother than reality. The height correction helps temperature only (not rain vs snow at a pass).
+- No precipitation probability (needs an ensemble — DEVELOPMENT_PLAN stage 11).
+- Visibility comes from another model (GFS) than everything else.

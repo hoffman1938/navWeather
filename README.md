@@ -48,7 +48,14 @@ Our routing engine (Valhalla) runs in Docker — [Colima](https://github.com/abi
 npm run engines:up   # starts Valhalla and builds Georgia's road graph on first run (~1 min); then restart npm run dev
 ```
 
-Without them the app still works and asks the public Overpass, Photon and OSRM servers instead.
+Our forecast, for the whole world (ECMWF IFS and NOAA GFS open data, twice a day — run it again for a fresh one):
+
+```bash
+npm run data:weather # reads the newest model runs from the Open-Meteo open-data archive (~270 MB, land and coasts
+                     # only) into the local R2 bucket of `npm run dev` (~30 min); `-- --bbox 39,40,47,44` for one area
+```
+
+Without them the app still works and asks the public Overpass, Photon, OSRM and Open-Meteo servers instead.
 
 Use Node 22+ (required by the Cloudflare tooling; the tests need 20+).
 Location only works on `https://` or `localhost` — opening the dev server from

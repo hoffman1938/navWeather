@@ -12,6 +12,7 @@ npm run test:reports  # end-to-end checks of the driver-reports relay
 npm run test:trips    # Long Trip planner, places and borders on the Worker
 npm run test:geocode  # our geocoder on the Worker (skips the search checks when the index isn't loaded)
 npm run test:route    # our routing engine through the Worker (skips without an engine: npm run engines:up)
+npm run test:weather  # our forecast through the Worker (skips the forecast checks without tiles: npm run data:weather)
 ```
 
 ## What is covered

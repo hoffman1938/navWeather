@@ -76,6 +76,30 @@ clients may use another router), `422 too-far`, `429` (`ROUTE_LIMITER`, 60/min p
 `{ mode, sources: [lon,lat][], destinations: [lon,lat][] }` (≤50 each) → `{ durations: (s|null)[][], distances:
 (m|null)[][] }`.
 
+### `GET /weather/forecast` (DP-4.6, DP-6.6)
+Our forecast for up to 100 points **anywhere on Earth**, in Open-Meteo's query and JSON shape (one reader in the app
+serves both): `?latitude=a,b&longitude=c,d&hourly=<list>&timezone=auto&timeformat=unixtime&wind_speed_unit=kmh|ms
+&past_hours=0–2208&forecast_hours=1–384&elevation=<m|nan,…>`. Hourly variables: `temperature_2m`, `apparent_temperature`,
+`precipitation_probability` (always `null`: one model run gives no probability), `precipitation`, `rain`, `showers` (0),
+`snowfall` (cm), `weather_code` (WMO, derived — `src/api/weather.ts`), `cloud_cover`, `wind_speed_10m`,
+`wind_gusts_10m`, `wind_direction_10m`, `visibility`, `relative_humidity_2m`. Per location: `{ latitude, longitude`
+(the 0.25° grid cell)`, elevation` (the height the forecast is for: `elevation` asked, else the cell's)`, timezone,
+utc_offset_seconds, generationtime_ms, hourly_units, hourly: { time: unix s[], <variable>: (number|null)[] } }`; one
+location → an object, several → an array. A point with no data (open sea far from any coast) →
+`{ latitude, longitude, timezone, utc_offset_seconds, missing: true }`. Times are whole UTC hours from `past_hours`
+before the current hour, never beyond the model's last step (15 days). A given `elevation` corrects temperature by
+6.5 °C/km from the cell's height. Errors: `400 { error: "bad-request", reason }` (unsupported option, >100 points),
+405, 429 (`WEATHER_LIMITER`, 120/min per IP), `503 unavailable` (no tiles here) / `503 { reason: "stale" }` (newest
+run older than 36 h — clients use their fallback). Data: weather tiles in R2 (binding `WEATHER`) built by
+`npm run data:weather` from ECMWF IFS 0.25° (CC BY 4.0) and NOAA GFS 0.25° visibility (public domain) via the Open-Meteo
+open-data archive (CC BY 4.0); format in `src/api/weather.ts`. Coordinates are neither stored nor logged; a point's
+record is kept in the edge cache until the next build.
+
+### `GET /weather/meta`
+`200 { run, reference_time, last_run_availability_time, until, models: { ecmwf_ifs025: [ISO…], ncep_gfs025: [ISO] },
+source, fresh }` (unix s) — the app compares `last_run_availability_time` with its forecasts' to refresh when a new
+build arrives; `503 unavailable` without tiles.
+
 ### Long-trip planner ([LONG_TRIP_MODE](../features/LONG_TRIP_MODE.md), ADR-013)
 
 Stateless: requests are validated (`src/trip/protocol.ts`, `src/trip/borders.ts`),
@@ -120,9 +144,8 @@ Replaces up to 24 bbox requests per refresh. Body: `{ "corridor": <encoded polyl
 `GET /places/tile/:z/:x/:y?cat=` (cacheable), `POST /places/corridor` (polyline + width + categories; also speed
 limits, cameras, level crossings), `GET /places/:id` → normalised places with source and licence per record.
 
-### `GET /weather/*` — PLANNED (DP-4.6)
-`GET /weather/cells?ids=` (forecast cells: grid cell + model run, hourly variables), `GET /weather/meta` (latest model
-runs) → shapes compatible with `WeatherService`. Cells are files in R2 produced by our pipeline; air quality the same way.
+### `GET /air/*`, `GET /elevation` — PLANNED (DP-4.6 air quality from CAMS, DP-4.7 Copernicus DEM)
+The same way as `/weather/forecast`: open data files → our tiles in R2 → an Open-Meteo-compatible answer.
 
 ### `POST /transit` — PLANNED (DP-5.3)
 MOTIS `plan` request shape (`fromPlace`, `toPlace`, `time`, `arriveBy`) → itineraries, as consumed by `MotisProvider`.

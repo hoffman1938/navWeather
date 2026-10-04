@@ -19,7 +19,18 @@ export interface WeatherServiceOptions {
 export interface ForecastQuery {
   latitude: number;
   longitude: number;
+  /** Height of the point (m) when known (route samples): the forecast is asked for this height. */
+  elevationM?: number;
 }
+
+/**
+ * A forecast made for another height than the one now known (a forecast for the model's grid cell, or one asked
+ * before the route's heights arrived) is asked again: a few hundred metres are a few degrees. A forecast that
+ * states no height can't be judged and is kept.
+ */
+const ELEVATION_TOLERANCE_M = 100;
+const forHeight = (f: LocationForecast, elevationM: number | undefined) =>
+  elevationM === undefined || f.elevationM === undefined || Math.abs(f.elevationM - elevationM) <= ELEVATION_TOLERANCE_M;
 
 export interface ForecastLookup {
   /** Forecast per spatial key (fresh or, on failure, stale). */
@@ -130,7 +141,9 @@ export class WeatherService {
     const unique = new Map<string, ForecastLocation>();
     for (const p of points) {
       const key = this.keyFor(p.latitude, p.longitude);
-      if (!unique.has(key)) unique.set(key, { key, latitude: p.latitude, longitude: p.longitude });
+      const known = unique.get(key);
+      if (!known) unique.set(key, { key, latitude: p.latitude, longitude: p.longitude, ...(p.elevationM !== undefined ? { elevationM: p.elevationM } : {}) });
+      else if (known.elevationM === undefined && p.elevationM !== undefined) known.elevationM = p.elevationM;
     }
 
     const forecasts = new Map<string, LocationForecast>();
@@ -144,7 +157,7 @@ export class WeatherService {
     // 2. Cache + in-flight dedupe.
     for (const loc of unique.values()) {
       const cached = options.force ? undefined : this.cache.get(loc.key);
-      if (cached && covers(cached, needUntil)) {
+      if (cached && covers(cached, needUntil) && forHeight(cached, loc.elevationM)) {
         forecasts.set(loc.key, cached);
         this.stats.cacheHits++;
         continue;

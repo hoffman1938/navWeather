@@ -4,6 +4,15 @@
 > for accounts but also for regional places and the FTS5 geocoder index (one database per region/country, ≤10 GB
 > each — REQ-CF-015, DP-4.2/DP-4.4); places tiles, weather cells and map tiles live in R2.
 
+## Files in R2 (in use)
+
+| Bucket / prefix | Content | Written by | Read by |
+| --- | --- | --- | --- |
+| `navweather-weather` `weather/latest.json` | index of the current build (`WeatherIndex`, `src/api/weather.ts`): run, model runs, steps (unix s), per-variable interval/presence, scales, tiles present | `pipelines/weather/build.mjs` (last, so a build appears whole) | Worker, cached 60 s per isolate |
+| `weather/runs/<run>/t/<ty>/<tx>.bin` | one 5° × 5° tile of the 0.25° grid (land and coasts, 1 030 tiles): 400 points × [height, 11 variables × ~85 steps] int16 (−32768 = no value) — ~1.6 KB per point at a fixed offset (range reads) | the pipeline (twice a day with new model runs; the two newest builds are kept) | `/api/v1/weather/forecast` (+ edge cache per point) |
+
+No personal data: model fields per grid cell. Locally the same bucket lives in `.wrangler/state` (`npm run data:weather`).
+
 Decision: [ADR-007](../architecture/decisions/ADR-007-data-storage.md).
 **Status: D1 is not in use.** The schema below is PROPOSED for Phase 3
 (optional accounts); the SQL lives in

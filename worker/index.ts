@@ -7,10 +7,11 @@ import { Reports } from './reports';
 import { tripBorders, tripPlaces, tripPlan, type TripEnv } from './trips';
 import { geocode, type GeocodeEnv } from './geocode';
 import { route, routeMatrix, type RouteEnv } from './route';
+import { weatherForecast, weatherMeta, type WeatherEnv } from './weather';
 
 export { LiveShare, Reports };
 
-export interface Env extends TripEnv, GeocodeEnv, RouteEnv {
+export interface Env extends TripEnv, GeocodeEnv, RouteEnv, WeatherEnv {
   ASSETS: Fetcher;
   LIVE_SHARE: DurableObjectNamespace<LiveShare>;
   /** Workers rate-limiting binding (wrangler.toml [[ratelimits]]); optional so the relay still runs without it. */
@@ -46,13 +47,15 @@ export interface Env extends TripEnv, GeocodeEnv, RouteEnv {
  *   GET    /api/geocode?q=…        search and suggestions from our index (D1 FTS5; worker/geocode.ts)
  *   POST   /api/route              our routing engine (Valhalla; OSRM-format answer; worker/route.ts)
  *   POST   /api/route/matrix       travel times between points (detours)
+ *   GET    /api/weather/forecast?latitude=…&longitude=…   our forecast anywhere (Open-Meteo-compatible; worker/weather.ts)
+ *   GET    /api/weather/meta       which model runs the forecast is built from
  *
  *   POST   /api/trips/plan         long-trip plan for a route (stateless; worker/trips.ts)
  *   POST   /api/trips/places       places around one planned stop (Overpass, edge-cached)
  *   POST   /api/trips/borders      countries along the route and where they change (Overpass, edge-cached)
  */
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     const path = normalizeApiPath(url.pathname);
     if (path === null) return env.ASSETS.fetch(request);
@@ -69,6 +72,8 @@ export default {
     if (path === '/api/geocode') return geocode(request, url, env);
     if (path === '/api/route') return route(request, env);
     if (path === '/api/route/matrix') return routeMatrix(request, env);
+    if (path === '/api/weather/forecast') return weatherForecast(request, url, env, ctx);
+    if (path === '/api/weather/meta') return weatherMeta(request, env);
 
     if (path === '/api/trips/plan') return tripPlan(request, env);
     if (path === '/api/trips/places') return tripPlaces(request, env);

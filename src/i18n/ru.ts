@@ -460,7 +460,7 @@ export const ru: Messages = {
     findAlongRoute: 'Найти по маршруту',
     clear: 'Очистить',
     attribution:
-      'Погода: Open-Meteo (CC BY 4.0) · Маршруты: OSRM (авто: project-osrm.org; пешком, велосипед: серверы FOSSGIS) · Поиск: Nominatim, Photon · Общественный транспорт: Transitous · Данные карты © участники OpenStreetMap. Без аккаунта, история поездок не хранится.',
+      'Погода: прогнозы ECMWF IFS (CC BY 4.0) и NOAA GFS из открытого архива Open-Meteo (CC BY 4.0), обработанные navWeather; где нашего прогноза нет — Open-Meteo · Маршруты: Valhalla на данных OpenStreetMap; вне нашего региона OSRM (авто: project-osrm.org; пешком, велосипед: серверы FOSSGIS) · Поиск: наш индекс данных OpenStreetMap; в остальных местах Photon · Общественный транспорт: Transitous · Данные карты © участники OpenStreetMap. Без аккаунта, история поездок не хранится.',
     fixMap: 'Сообщить об ошибке на карте',
   },
 
@@ -898,7 +898,7 @@ export const ru: Messages = {
     light: 'Слабые',
     heavy: 'Сильные',
     partial: 'Часть области недоступна',
-    forecastNote: 'Приблизительно: прогноз в 49 точках (Open-Meteo), не радар.',
+    forecastNote: 'Приблизительно: прогноз в 49 точках (модели ECMWF и GFS), не радар.',
   },
   hazard: {
     curve: 'Крутой поворот',

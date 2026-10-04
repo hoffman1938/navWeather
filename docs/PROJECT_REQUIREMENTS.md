@@ -190,7 +190,7 @@ Details: [WEATHER_ENGINE](architecture/WEATHER_ENGINE.md).
 | REQ-WX-008 | The forecast horizon requested covers the whole trip including planned stops, from the first load | P1 | VERIFIED (B-06 fixed 2026-10-04) | `state/store.ts` (`loadWeather`, `setTripEndProvider`), `state/trip.ts` (`tripEndMs`, `reloadWeatherIfShort`); `trip.test.tsx` |
 | REQ-WX-009 | One set of weather hazard thresholds, configurable in one module, documented with their rationale and used by alerts, trip risks, road comparison, departure advice and the road-surface estimate | P1 | DEFECT (B-08; DP-11.1) | `intelligence/weatherAlerts.ts`, `trip/weather/hazards.ts`, `state/derive.ts`, `algorithms/departurePlanner.ts`, `algorithms/roadHazards.ts` |
 | REQ-WX-010 | Extreme temperature alerts (heat, severe cold) with configurable thresholds | P2 | PLANNED (DP-11.2) | `intelligence/weatherAlerts.ts` |
-| REQ-WX-013 | Weather from our own pipeline: open model files (ECMWF, DWD, NOAA; CAMS for air quality) → forecast cells (grid + model run) in R2 → Worker `/api/v1/weather/*`, compatible with `WeatherService`; no third-party weather API | P1 | PLANNED (DP-4.6, DP-6.6) | ADR-016 |
+| REQ-WX-013 | Weather from our own pipeline: open model files (ECMWF, DWD, NOAA; CAMS for air quality) → forecast cells (grid + model run) in R2 → Worker `/api/v1/weather/*`, compatible with `WeatherService`; no third-party weather API; **worldwide** (owner, 2026-10-04: wherever the user drives) | P1 | PARTIALLY (2026-10-05: forecast worldwide from ECMWF IFS + NOAA GFS, local R2, `/api/v1/weather/forecast` + `/meta`, default provider; public Open-Meteo only where ours is missing; air quality, cloud schedule and precipitation probability open — DP-4.6, DP-6.6) | `pipelines/weather/`, `src/api/weather.ts`, `worker/weather.ts`, `ApiWeatherProvider.ts`; ADR-016 |
 
 ## 10. Authentication architecture
 
@@ -265,7 +265,7 @@ attribution, caching, limits and a verdict, with source and verification date.
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-LEGAL-001 | Attribution for every data source and engine actually used (today: OSM, OpenMapTiles, OpenFreeMap, Open-Meteo, routing servers, Transitous) | P0 | IMPLEMENTED (today) / PLANNED (target list, DP-6.9) |
+| REQ-LEGAL-001 | Attribution for every data source and engine actually used (today: OSM, OpenMapTiles, OpenFreeMap, ECMWF, NOAA GFS, the Open-Meteo archive and API, Valhalla, routing servers, Photon, Transitous) | P0 | IMPLEMENTED (today) / PLANNED (target list, DP-6.9) |
 | REQ-LEGAL-002 | Non-commercial licences (e.g. EOX Sentinel-2 cloudless 2018+) are used only while REQ-COST-006 holds | P1 | IMPLEMENTED (policy) |
 | REQ-LEGAL-003 | Repository public under an OSI licence (AGPL services, open feeds, F-Droid, free CI) | P1 | IN PROGRESS (owner decision D1 2026-10-04: open, MIT; `LICENSE` added — the owner switches the GitHub repository to public) |
 | REQ-LEGAL-004 | Speed-camera alerts: legality varies by country; **on by default (owner decision D4, 2026-10-04)**, one switch in Settings with the user's responsibility shown there | P1 | IMPLEMENTED |
@@ -459,7 +459,7 @@ iOS, CarPlay, Android Auto and Google Play are BLOCKED by store fees (ADR-015).
 | OSRM public demo + FOSSGIS routing servers | car/walk/bike routing | NOT ALLOWED in the target (limits) → Valhalla |
 | Nominatim (OSMF), Photon (komoot) | search, autocomplete, reverse | NOT ALLOWED in the target (limits) → own geocoder |
 | Overpass public instances | places, POIs, speed limits, cameras; trip places and borders | NOT ALLOWED in the target (limits) → Places API, Natural Earth |
-| Open-Meteo (free API) | forecasts, elevation, air quality | NOT ALLOWED in the target (limits) → own weather pipeline |
+| Open-Meteo (free API) | forecasts (fallback only since 2026-10-05), elevation, air quality | NOT ALLOWED in the target (limits) → own weather pipeline (forecast done, DP-4.6) |
 | Transitous | public transport | NOT ALLOWED in the target (terms) → own MOTIS |
 | Browser speech (Google voices in Chrome) | TTS, push-to-talk | allowed (browser capability); on-device voices planned (DP-9.12) |
 

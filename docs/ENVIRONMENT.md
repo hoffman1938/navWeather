@@ -18,7 +18,8 @@ Worker route instead (see `worker/`).
 | --- | --- | --- |
 | `VITE_ROUTING_PROVIDER` | `valhalla` | `valhalla` (our engine via `/api/v1/route`), `osrm` (public servers) |
 | `VITE_ROUTING_FALLBACK` | `osrm` | when our engine isn't running or a point is outside its region: `osrm` (public servers) or `none` |
-| `VITE_WEATHER_PROVIDER` | `open-meteo` | `open-meteo` |
+| `VITE_WEATHER_PROVIDER` | `api` | `api` (our forecast, worldwide, `/api/v1/weather`; `npm run data:weather`), `open-meteo` (public API) |
+| `VITE_WEATHER_FALLBACK` | `open-meteo` | where our forecast isn't there (not built here, older than 36 h, far out at sea): `open-meteo` (public API) or `none` |
 | `VITE_GEOCODING_PROVIDER` | `api` | `api` (our geocoder + settlement tiles), `nominatim`, `photon` |
 | `VITE_AUTOCOMPLETE_PROVIDER` | `api` | `api`, `photon` |
 | `VITE_GEOCODING_FALLBACK` | `photon` | when our index has nothing (a town abroad) or isn't loaded: `photon` or `none` |
@@ -42,7 +43,8 @@ Worker route instead (see `worker/`).
 | `VITE_OSRM_MIN_INTERVAL_MS` | `1000` — least time between requests to one OSRM server (the public servers allow 1 request/s); `0` for a self-hosted router |
 | `VITE_OSRM_FOOT_URL` / `VITE_OSRM_BIKE_URL` | `https://routing.openstreetmap.de/routed-foot` / `…/routed-bike` (walking and cycling; the demo server above only does cars) |
 | `VITE_TRANSIT_URL` | `https://api.transitous.org` (public transport, MOTIS `plan` API; set empty to switch public transport off) |
-| `VITE_OPEN_METEO_BASE_URL` | `https://api.open-meteo.com` |
+| `VITE_WEATHER_URL` | `/api/v1/weather` — our forecast (same origin) |
+| `VITE_OPEN_METEO_BASE_URL` | `https://api.open-meteo.com` (weather fallback; elevation until DP-4.7) |
 | `VITE_OPEN_METEO_AIR_URL` | `https://air-quality-api.open-meteo.com` |
 | `VITE_NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` |
 | `VITE_PHOTON_BASE_URL` | `https://photon.komoot.io` |
@@ -112,6 +114,8 @@ on :8787, as Cloudflare would (headers, SPA fallback, service worker).
 | `GEOCODE_LIMITER` | rate-limit binding | 120 requests / 60 s per IP | `/api/v1/geocode` |
 | `VALHALLA_URL` | var (`.dev.vars` locally, written by `npm run engines:up`) | unset → 503 | where our Valhalla answers; in the cloud the container (DP-5.2) |
 | `ROUTE_LIMITER` | rate-limit binding | 60 requests / 60 s per IP | `/api/v1/route`, `/route/matrix` |
+| `WEATHER` | R2 bucket `navweather-weather` | — | our weather tiles (`/api/v1/weather/*`); locally `npm run data:weather` fills the local bucket (no account; ~270 MB downloaded from the Open-Meteo open-data archive, ~1.6 GB of tiles, ~15–40 min; `-- --bbox w,s,e,n` for a quick area); on Cloudflare the first deploy creates the bucket and the scheduled pipeline fills it (DP-4.6, stage 5) |
+| `WEATHER_LIMITER` | rate-limit binding | 120 requests / 60 s per IP | `/api/v1/weather/forecast` |
 | `ASSETS` (read by the Worker) | static assets | — | our places tiles for Long Trip stops (`/data/places/v1`) |
 | `OVERPASS_URLS` | `[vars]` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` | Overpass endpoints for trip stop places and borders (server-side) |
 | `TRIP_USER_AGENT` | `[vars]` | `navWeather/0.1 (trip planner; Cloudflare Worker)` | identifies the app to Overpass — **add a contact before production** |

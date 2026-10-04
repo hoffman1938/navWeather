@@ -3,7 +3,7 @@
   "private": true,
   "license": "MIT",
   "version": "0.1.0",
-  "description": "Know the weather before you reach it \u2014 forecast along your driving route at your estimated arrival time.",
+  "description": "Know the weather before you reach it — forecast along your driving route at your estimated arrival time.",
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -22,9 +22,11 @@
     "test:trips": "node scripts/trip-smoke.mjs",
     "test:geocode": "node scripts/geocode-smoke.mjs",
     "test:route": "node scripts/route-smoke.mjs",
+    "test:weather": "node scripts/weather-smoke.mjs",
     "data:borders": "node pipelines/borders/build.mjs",
     "data:download": "node pipelines/osm/download.mjs",
     "data:osm": "node --experimental-strip-types --no-warnings pipelines/osm/build.mjs",
+    "data:weather": "node --experimental-strip-types --no-warnings pipelines/weather/build.mjs",
     "db:geo:local": "wrangler d1 execute navweather-geo --local --file data/build/ge/geocode.sql",
     "seed:local": "npm run data:download && npm run data:osm && npm run db:geo:local",
     "engines:up": "node scripts/engines.mjs up",
@@ -32,6 +34,7 @@
     "engines:status": "node scripts/engines.mjs status"
   },
   "dependencies": {
+    "@photostructure/tz-lookup": "11.7.0",
     "maplibre-gl": "^6.11.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -39,6 +42,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260927.1",
+    "@openmeteo/file-reader": "^0.0.20",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.2",

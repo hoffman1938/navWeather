@@ -5,6 +5,8 @@ export interface ForecastLocation {
   key: string;
   latitude: number;
   longitude: number;
+  /** Height of the point (m), when known: the forecast is then for this height (temperature). */
+  elevationM?: number;
 }
 
 export interface ForecastRequest {

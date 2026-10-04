@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FakeWeatherProvider } from '../../test/helpers';
+import { FakeWeatherProvider, makeForecast } from '../../test/helpers';
+import type { WeatherProvider } from './WeatherProvider';
 import { WeatherService } from './WeatherService';
 
 const BASE = Date.UTC(2026, 8, 26, 4, 0);
@@ -155,5 +156,46 @@ describe('new forecast detection (model runs)', () => {
     const r = await service.getForecasts(pts);
     expect(await service.hasNewerForecast(r.forecasts.values())).toBe(false);
     expect(provider.updateChecks).toBeGreaterThan(0);
+  });
+});
+
+describe('WeatherService and heights (DP-6.6)', () => {
+  /** A provider that, like ours, answers for the height asked — or for its grid cell (700 m) without one. */
+  function heightAware() {
+    const asked: (number | undefined)[][] = [];
+    const provider: WeatherProvider = {
+      name: 'height-aware',
+      maxLocationsPerRequest: 50,
+      async getForecasts(req) {
+        asked.push(req.locations.map((l) => l.elevationM));
+        return req.locations.map((l) => ({
+          ...makeForecast({ key: l.key, latitude: l.latitude, longitude: l.longitude, startMs: BASE - 3 * 3600_000, hours: 60, hourFn: () => ({}) }),
+          elevationM: l.elevationM ?? 700,
+        }));
+      },
+    };
+    const service = new WeatherService(provider, { ttlMs: 20 * 60000, batchSize: 50, resolutionDeg: 0.02, maxEntries: 100, minForecastHours: 48, now: () => BASE });
+    return { asked, service };
+  }
+
+  it('asks again when the route’s heights arrive and the forecast was for another height; not for a few metres', async () => {
+    const { asked, service } = heightAware();
+    await service.getForecasts([{ latitude: 41.69, longitude: 44.8 }]);
+    // Same cell, same height known now (the route's profile arrived): within 100 m → the cached forecast serves.
+    await service.getForecasts([{ latitude: 41.69, longitude: 44.8, elevationM: 650 }]);
+    expect(asked).toEqual([[undefined]]);
+    // 300 m lower: asked again, for that height; then served from the cache.
+    await service.getForecasts([{ latitude: 41.69, longitude: 44.8, elevationM: 400 }]);
+    await service.getForecasts([{ latitude: 41.69, longitude: 44.8, elevationM: 420 }]);
+    expect(asked).toEqual([[undefined], [400]]);
+  });
+
+  it('a cell takes the first known height of its points', async () => {
+    const { asked, service } = heightAware();
+    await service.getForecasts([
+      { latitude: 41.6935, longitude: 44.8015 },
+      { latitude: 41.69352, longitude: 44.80153, elevationM: 450 },
+    ]);
+    expect(asked).toEqual([[450]]);
   });
 });

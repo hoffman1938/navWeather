@@ -467,7 +467,7 @@ export const en = {
     findAlongRoute: 'Find along route',
     clear: 'Clear',
     attribution:
-      'Weather: Open-Meteo (CC BY 4.0) · Routing: OSRM (cars: project-osrm.org; walking, cycling: FOSSGIS servers) · Search: Nominatim, Photon · Public transport: Transitous · Map data © OpenStreetMap contributors. No account, no stored location history.',
+      'Weather: ECMWF IFS (CC BY 4.0) and NOAA GFS forecasts from the Open-Meteo open-data archive (CC BY 4.0), processed by navWeather; where ours is missing, Open-Meteo · Routing: Valhalla on OpenStreetMap data; outside our region OSRM (cars: project-osrm.org; walking, cycling: FOSSGIS servers) · Search: our index of OpenStreetMap data; elsewhere Photon · Public transport: Transitous · Map data © OpenStreetMap contributors. No account, no stored location history.',
     fixMap: 'Report a map error',
   },
 
@@ -904,7 +904,7 @@ export const en = {
     light: 'Light',
     heavy: 'Heavy',
     partial: 'Part of the area unavailable',
-    forecastNote: 'Approximate: forecast at 49 points (Open-Meteo), not radar.',
+    forecastNote: 'Approximate: forecast at 49 points (ECMWF and GFS models), not radar.',
   },
   hazard: {
     curve: 'Sharp curve',

@@ -44,5 +44,6 @@ jobs:
           npm run test:trips
           npm run test:geocode
           npm run test:route
+          npm run test:weather
           API=/api npm run test:share
           API=/api npm run test:reports

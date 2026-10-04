@@ -66,6 +66,8 @@ npm run preview:worker   # production build served by the Worker on :8787 (as de
 npm test             # vitest (unit + scenarios)
 npm run typecheck    # app + Worker
 npm run build        # production build
+npm run seed:local   # our places tiles + search index (Georgia)   npm run engines:up   # Valhalla in Docker
+npm run data:weather # our worldwide forecast into the local R2 bucket (newest ECMWF/GFS runs)
 npm run test:share   # Worker smoke (needs the Worker on :8787); API=/api for legacy paths
 npm run test:reports
 ```
