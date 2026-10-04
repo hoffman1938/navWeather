@@ -80,11 +80,17 @@ export const STOP_DEFAULTS = {
   mergeWindowS: 25 * 60,
   /** Finish the trip today if no more than this much driving is left past the daily limit (s). */
   finishToleranceS: 75 * 60,
-  /** Look this much driving before the daily target for a better overnight area (s). */
+  /** Look this much driving before the daily target for a better overnight area (s)… */
   overnightSearchBeforeS: 90 * 60,
+  /** …but never more than this share of that day's driving: a short evening drive isn't cut to an hour (B-04). */
+  overnightSearchBeforeShare: 0.25,
   overnightSearchAfterS: 20 * 60,
   /** Most overnight stays planned (longer trips: the rest is planned on the way). */
   maxOvernights: 6,
+  /** Local hours counted as night driving [start, end) — flagged, with a morning start to consider (B-04). */
+  nightDriving: [0, 6] as [number, number],
+  /** Flag a plan that drives at least this long at night (s). */
+  nightDrivingAdviceS: 3600,
 } as const;
 
 /** Search radii around a stop (km) per place category. */

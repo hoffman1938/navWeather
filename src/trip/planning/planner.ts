@@ -21,7 +21,7 @@ import type {
 } from '../types';
 import { forecastEndsAt, nearestPlace, stopEarlierAdvice, weatherRisks } from '../weather/risks';
 import { overnightCandidates } from './overnight';
-import { buildSchedule, wallAtAlong, type Schedule, type ScheduledStop } from './schedule';
+import { buildSchedule, nextLocalHour, nightDrivingS, wallAtAlong, type Schedule, type ScheduledStop } from './schedule';
 
 /**
  * TRIP PLANNER — route + vehicle + departure + preferences (+ the client's
@@ -120,7 +120,7 @@ export async function createTripPlan(req: TripPlanRequest, deps: PlannerDeps): P
     const free = schedule.stops.find((s) => s.kinds.includes('overnight') && !forced.some((f) => Math.abs(f - s.alongM) < 1));
     if (!free) break;
     const after = forced.at(-1) ?? base.startAlongM;
-    const candidates = overnightCandidates(profile, free, req.places, after);
+    const candidates = overnightCandidates(profile, free, req.places, after, 3, forced.length ? 0 : base.drivenTodayS);
     // A town an hour earlier is worth it only if it doesn't add a whole extra night to the trip.
     const nights = (sched: Schedule) => sched.stops.filter((s) => s.kinds.includes('overnight')).length;
     const baseline = nights(schedule);
@@ -189,6 +189,15 @@ export async function createTripPlan(req: TripPlanRequest, deps: PlannerDeps): P
     : [];
   const classification = classifyFromSchedule(profile, schedule, { timeZoneChanges: countTimeZoneChanges(samples.map((s) => s.tz)) });
   if (req.vehicle.rangeKm === undefined && progress?.rangeKm === undefined && atLeast(classification.category, 'EXTENDED')) advice.push({ kind: 'enter-range' });
+  // Driving through the night (B-04): flagged with a morning start to consider — never applied silently. Only before
+  // the trip starts; a replan from the car is about the road ahead, not when to leave.
+  if (!progress) {
+    const nightS = nightDrivingS(schedule, profile, tzAt);
+    if (nightS >= STOP_DEFAULTS.nightDrivingAdviceS) {
+      const tz = tzAt(base.startAlongM);
+      advice.push({ kind: 'night-driving', hours: Math.round(nightS / 1800) / 2, suggestMs: nextLocalHour(req.departAtMs, tz, pace.morningStartHour), tz });
+    }
+  }
   // A range without the tank size: after a fill the range is unknown, so later fills can't be planned (B-20). A full
   // tank reaches at least as far as the range entered, so say so only when the road after the fill is longer.
   if (req.vehicle.rangeKm !== undefined && req.vehicle.fullRangeKm === undefined) {

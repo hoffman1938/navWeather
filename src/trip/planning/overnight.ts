@@ -6,7 +6,8 @@ import type { ScheduledStop } from './schedule';
 /**
  * OVERNIGHT AREA — not the geographic midpoint and not just "where the daily
  * driving runs out": towns and cities within a window around that point
- * (up to 1.5 h of driving earlier, 20 min later), scored by size (where
+ * (up to 1.5 h of driving earlier — at most a quarter of that day's driving —
+ * and 20 min later), scored by size (where
  * accommodation and services are likely) and by how much driving they move
  * to the next day. The planner then checks accommodation around the best few
  * and prefers an area that has some.
@@ -25,9 +26,15 @@ export function overnightCandidates(
   places: TripPlaceRef[] | undefined,
   afterAlongM: number,
   limit = 3,
+  /** Driving already done today before `afterAlongM` (s) — when replanning from the car. */
+  drivenBeforeS = 0,
 ): OvernightCandidate[] {
   const Tt = target.driveTimeS;
-  const Tmin = Math.max(timeAtAlong(profile, afterAlongM) + 3600, Tt - STOP_DEFAULTS.overnightSearchBeforeS);
+  const Tafter = timeAtAlong(profile, afterAlongM);
+  // Earlier by at most a share of the day's driving: leaving at 18:45, the night isn't an hour out (B-04).
+  const dayDriveS = Math.max(0, Tt - Tafter + drivenBeforeS);
+  const beforeS = Math.min(STOP_DEFAULTS.overnightSearchBeforeS, dayDriveS * STOP_DEFAULTS.overnightSearchBeforeShare);
+  const Tmin = Math.max(Tafter + 3600, Tt - beforeS);
   const Tmax = Math.min(profile.totalTimeS - 1800, Tt + STOP_DEFAULTS.overnightSearchAfterS);
   const out: OvernightCandidate[] = [];
   for (const p of places ?? []) {

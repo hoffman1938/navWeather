@@ -241,6 +241,43 @@ function overnightIn(wall: number, tz: string, pace: PacePreset, drivenToday: nu
 }
 
 /**
+ * Driving (s) that falls in the local night window (`STOP_DEFAULTS.nightDriving`, 00:00–06:00), stops excluded.
+ * Each stretch between stops is read in the time zone where it starts.
+ */
+export function nightDrivingS(schedule: Schedule, profile: RouteProfile, tzAt: (alongM: number) => string): number {
+  const [fromH, toH] = STOP_DEFAULTS.nightDriving;
+  const stretches: [number, number, number][] = []; // [wall start, wall end, along at start]
+  let T = timeAtAlong(profile, schedule.startAlongM);
+  let wall = schedule.startMs;
+  let along = schedule.startAlongM;
+  for (const s of schedule.stops) {
+    stretches.push([wall, wall + (s.driveTimeS - T) * 1000, along]);
+    T = s.driveTimeS;
+    wall = s.departMs;
+    along = s.alongM;
+  }
+  stretches.push([wall, wall + Math.max(0, profile.totalTimeS - T) * 1000, along]);
+  let total = 0;
+  for (const [w0, w1, at] of stretches) {
+    if (w1 <= w0) continue;
+    const tz = tzAt(at);
+    for (let d = -1; ; d++) {
+      const n0 = atLocalHour(w0, tz, fromH, d);
+      if (n0 >= w1) break;
+      const n1 = atLocalHour(w0, tz, toH, d);
+      total += Math.max(0, Math.min(w1, n1) - Math.max(w0, n0)) / 1000;
+    }
+  }
+  return total;
+}
+
+/** The next local `hour` o'clock at or after `ms` (UTC ms), in `tz`. */
+export function nextLocalHour(ms: number, tz: string, hour: number): number {
+  const today = atLocalHour(ms, tz, hour);
+  return today >= ms ? today : atLocalHour(ms, tz, hour, 1);
+}
+
+/**
  * Planned wall-clock time (UTC ms) at an along-route position: driving time
  * from the start plus every stop reached before it. Positions before the
  * schedule's start get its start time.

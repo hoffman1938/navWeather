@@ -194,6 +194,13 @@ function TripAdvice({ plan }: { plan: TripPlan }) {
         }
         if (a.kind === 'enter-range') return <p key={i} className="ltrip__note">{m.trip.enterRange}</p>;
         if (a.kind === 'enter-tank') return <p key={i} className="ltrip__note">{m.trip.enterTank}</p>;
+        if (a.kind === 'night-driving') {
+          return (
+            <div key={i} className="ltrip-advice" role="note">
+              <p>{m.trip.nightDriving(formatDuration(a.hours * 3600, m), when(a.suggestMs, a.tz, m))}</p>
+            </div>
+          );
+        }
         return null;
       })}
     </>

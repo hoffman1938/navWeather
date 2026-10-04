@@ -681,6 +681,8 @@ export const en = {
     stopEarlierAction: (area: string, eta: string) =>
       `Staying in ${area} (arrive ${eta}) means driving that stretch in the morning, when the forecast is better.`,
     enterRange: 'Add your range (and tank size) in Settings to plan fuel stops.',
+    nightDriving: (hours: string, leave: string) =>
+      `This plan drives about ${hours} at night (00:00–06:00), when tiredness is most dangerous. Consider leaving at ${leave} instead.`,
     enterTank: 'Only the first refuel or charge can be planned: add your tank or battery size and consumption in Settings for the rest.',
     nextStop: 'Next planned stop',
     settings: {

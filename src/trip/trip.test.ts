@@ -312,6 +312,31 @@ describe('trip planner', () => {
     expect(plan.timeline.some((e) => e.kind === 'weather' && e.hazard === 'snow')).toBe(true);
   });
 
+  it('leaving in the evening: the night is not moved to a big town an hour after setting off (B-04)', async () => {
+    // 18:45 at 80 km/h: dinner, then the 22:00 latest arrival around km 200. A city 1 h out must not win.
+    const req = routeRequest(1580, 80, {
+      departAtMs: tbilisi(5, 18, 45),
+      places: [town('Big City', 85, 'city', 50_000), town('Small Town', 190), town('Other Town', 215)],
+    });
+    const plan = await createTripPlan(req, { nowMs: NOW });
+    const night = plan.recommendedStops.find((s) => s.kinds.includes('overnight'))!;
+    expect(night.alongM).toBeGreaterThan(150_000);
+    expect(night.placeName).not.toBe('Big City');
+    // A full day still looks up to 1.5 h before its target for a better town.
+    const day = await createTripPlan(routeRequest(1580, 80, { departAtMs: tbilisi(5, 8), places: [town('Early City', 650, 'city', 80_000)] }), { nowMs: NOW });
+    expect(day.recommendedStops.find((s) => s.kinds.includes('overnight'))!.placeName).toBe('Early City');
+  });
+
+  it('driving through the night is flagged with a morning start to consider — the plan is not changed (B-04)', async () => {
+    const night = await createTripPlan(routeRequest(1580, 80, { departAtMs: tbilisi(5, 0, 30) }), { nowMs: NOW });
+    const advice = night.advice.find((a) => a.kind === 'night-driving');
+    expect(advice).toMatchObject({ kind: 'night-driving', suggestMs: tbilisi(5, 8) });
+    expect((advice as { hours: number }).hours).toBeGreaterThanOrEqual(5);
+    expect(night.departAtMs).toBe(tbilisi(5, 0, 30)); // a suggestion only
+    const day = await createTripPlan(routeRequest(1580, 80, { departAtMs: tbilisi(5, 8) }), { nowMs: NOW });
+    expect(day.advice.some((a) => a.kind === 'night-driving')).toBe(false);
+  });
+
   it('forecasts that end before the trip does: later risks are unknown, not absent (B-21)', async () => {
     const req = routeRequest(1580, 80);
     const t0 = req.departAtMs - 3_600_000;

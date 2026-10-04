@@ -264,6 +264,8 @@ export type TripAdvice =
   | { kind: 'enter-range' }
   /** A range is known but not the tank/battery size: stops after the first fill can't be planned (B-20). */
   | { kind: 'enter-tank' }
+  /** The plan drives `hours` at night (00:00–06:00 local); leaving at `suggestMs` (local morning) is worth considering (B-04). */
+  | { kind: 'night-driving'; hours: number; suggestMs: number; tz: string }
   | { kind: 'no-places'; category: PlaceCategory; stopId: string };
 
 /** 'border' entries are added by the client from the borders lookup. */
