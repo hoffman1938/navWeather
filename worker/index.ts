@@ -5,10 +5,11 @@ import { json, randomToken, readJson, sha256Hex } from './http';
 import { LiveShare } from './liveShare';
 import { Reports } from './reports';
 import { tripBorders, tripPlaces, tripPlan, type TripEnv } from './trips';
+import { geocode, type GeocodeEnv } from './geocode';
 
 export { LiveShare, Reports };
 
-export interface Env extends TripEnv {
+export interface Env extends TripEnv, GeocodeEnv {
   ASSETS: Fetcher;
   LIVE_SHARE: DurableObjectNamespace<LiveShare>;
   /** Workers rate-limiting binding (wrangler.toml [[ratelimits]]); optional so the relay still runs without it. */
@@ -41,6 +42,7 @@ export interface Env extends TripEnv {
  *   POST   /api/reports/:id/vote           { vote: 'still' | 'gone' }
  *
  *   GET    /api/whereami           approximate location of the connection (city level)
+ *   GET    /api/geocode?q=…        search and suggestions from our index (D1 FTS5; worker/geocode.ts)
  *
  *   POST   /api/trips/plan         long-trip plan for a route (stateless; worker/trips.ts)
  *   POST   /api/trips/places       places around one planned stop (Overpass, edge-cached)
@@ -60,6 +62,8 @@ export default {
     if (path === '/api/health') return request.method === 'GET' ? json({ ok: true, api: API_VERSION }) : json({ error: 'method-not-allowed' }, 405);
 
     if (path === '/api/reports' || path.startsWith('/api/reports/')) return reports(request, path, url, env);
+
+    if (path === '/api/geocode') return geocode(request, url, env);
 
     if (path === '/api/trips/plan') return tripPlan(request, env);
     if (path === '/api/trips/places') return tripPlaces(request, env);

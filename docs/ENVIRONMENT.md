@@ -18,8 +18,9 @@ Worker route instead (see `worker/`).
 | --- | --- | --- |
 | `VITE_ROUTING_PROVIDER` | `osrm` | `osrm` |
 | `VITE_WEATHER_PROVIDER` | `open-meteo` | `open-meteo` |
-| `VITE_GEOCODING_PROVIDER` | `nominatim` | `nominatim`, `photon` |
-| `VITE_AUTOCOMPLETE_PROVIDER` | `photon` | `photon` |
+| `VITE_GEOCODING_PROVIDER` | `api` | `api` (our geocoder + settlement tiles), `nominatim`, `photon` |
+| `VITE_AUTOCOMPLETE_PROVIDER` | `api` | `api`, `photon` |
+| `VITE_GEOCODING_FALLBACK` | `photon` | when our index has nothing (a town abroad) or isn't loaded: `photon` or `none` |
 | `VITE_PLACES_PROVIDER` | `tiles` | `tiles` (our places tiles, `npm run data:osm`), `overpass`, `none` |
 | `VITE_POI_PROVIDER` | `tiles` | `tiles`, `overpass`, `none` |
 | `VITE_SPEED_LIMIT_PROVIDER` | `tiles` | `tiles`, `overpass`, `none` |
@@ -45,6 +46,7 @@ Worker route instead (see `worker/`).
 | `VITE_PHOTON_BASE_URL` | `https://photon.komoot.io` |
 | `VITE_REPORTS_URL` | `/api/v1/reports` (same origin — no CSP change needed; the unversioned `/api/reports` still works) |
 | `VITE_WHEREAMI_URL` | `/api/v1/whereami` (approximate area of the connection, when the device can't give a position; same origin) |
+| `VITE_GEOCODE_URL` | `/api/v1/geocode` — our geocoder (same origin) |
 | `VITE_PLACES_TILES_URL` | `/data/places/v1` — our places tiles (static assets, same origin) |
 | `VITE_OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` |
 | `VITE_MAP_STYLE_LIGHT` / `VITE_MAP_STYLE_DARK` | OpenFreeMap Positron / Dark |
@@ -104,6 +106,9 @@ on :8787, as Cloudflare would (headers, SPA fallback, service worker).
 | Name | Kind | Default | Purpose |
 | --- | --- | --- | --- |
 | `TRIP_LIMITER` | rate-limit binding (`wrangler.toml`) | 20 requests / 60 s per IP | `/api/v1/trips/*` |
+| `GEO` | D1 database `navweather-geo` | — | our geocoder index; locally `npm run seed:local` loads it (no account); on Cloudflare the first deploy creates it, then `wrangler d1 execute navweather-geo --remote --file data/build/ge/geocode.sql` |
+| `GEOCODE_LIMITER` | rate-limit binding | 120 requests / 60 s per IP | `/api/v1/geocode` |
+| `ASSETS` (read by the Worker) | static assets | — | our places tiles for Long Trip stops (`/data/places/v1`) |
 | `OVERPASS_URLS` | `[vars]` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` | Overpass endpoints for trip stop places and borders (server-side) |
 | `TRIP_USER_AGENT` | `[vars]` | `navWeather/0.1 (trip planner; Cloudflare Worker)` | identifies the app to Overpass — **add a contact before production** |
 

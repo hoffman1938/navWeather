@@ -32,8 +32,11 @@ export const config = {
   providers: {
     routing: str('VITE_ROUTING_PROVIDER', 'osrm'),
     weather: str('VITE_WEATHER_PROVIDER', 'open-meteo'),
-    geocoding: str('VITE_GEOCODING_PROVIDER', 'nominatim'),
-    autocomplete: str('VITE_AUTOCOMPLETE_PROVIDER', 'photon'),
+    /** Search, suggestions and reverse naming: our geocoder (`/api/v1/geocode` + settlement tiles, DP-6.4). */
+    geocoding: str('VITE_GEOCODING_PROVIDER', 'api'),
+    autocomplete: str('VITE_AUTOCOMPLETE_PROVIDER', 'api'),
+    /** When our index has nothing (a town abroad) or isn't loaded: `photon` (until more regions) or `none`. */
+    geocodingFallback: str('VITE_GEOCODING_FALLBACK', 'photon'),
     /** Settlements, places and road data: our tiles (DP-6.5); `overpass` (public servers) only to compare. */
     places: str('VITE_PLACES_PROVIDER', 'tiles'),
     /** Outside the region our tiles cover: `overpass` (until that region is built) or `none`. */
@@ -62,6 +65,8 @@ export const config = {
     reports: str('VITE_REPORTS_URL', '/api/v1/reports'),
     /** Rough area of the connection, when the device can't give a position (same Worker). */
     whereami: str('VITE_WHEREAMI_URL', '/api/v1/whereami'),
+    /** Our geocoder (the Worker's `/api/v1/geocode`, same origin). */
+    geocode: str('VITE_GEOCODE_URL', '/api/v1/geocode'),
     /** Our places tiles (static assets built by `npm run data:osm`). */
     placesTiles: str('VITE_PLACES_TILES_URL', '/data/places/v1'),
     overpass: list('VITE_OVERPASS_URLS', [

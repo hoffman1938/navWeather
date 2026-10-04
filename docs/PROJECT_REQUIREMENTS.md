@@ -147,7 +147,7 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-CF-012 | Per-feature request budgets, spend alerts, back-off on 429 and rate limits on every endpoint incl. `/whereami` — protect the hosting bill | P1 | PLANNED (DP-3.4, DP-5.1) | `worker/*`, `share/liveShare.ts`, `ReportsIncidentProvider.ts` |
 | REQ-CF-013 | **All hosting on Cloudflare Workers (not Pages)** — one Worker project with static assets and `/api/v1/*`; custom domain attached to it when bought | P0 | IMPLEMENTED (Worker with assets) / PLANNED (domain, DP-12.1) | `wrangler.toml`, ADR-016 |
 | REQ-CF-014 | `wrangler.toml` environments `dev` / `preview` / `production` with separate Durable Object namespaces, D1 databases and R2 buckets; preview never touches production data | P1 | PLANNED (DP-2.2, DP-3.2) | `wrangler.toml`, [DELIVERY](operations/DELIVERY.md) |
-| REQ-CF-015 | D1 per region/country for places and the FTS5 geocoder index (≤10 GB per database), plus accounts | P1 | PLANNED (DP-4.2, DP-4.4, DP-7.6) | ADR-016, [DATA_MODEL](database/DATA_MODEL.md) |
+| REQ-CF-015 | D1 per region/country for places and the FTS5 geocoder index (≤10 GB per database), plus accounts | P1 | IN PROGRESS (2026-10-04: geocoder `navweather-geo` for Georgia, binding `GEO`; places as static tiles while a region fits) | ADR-016, [DATA_MODEL](database/DATA_MODEL.md), `worker/geocode.ts`, `pipelines/osm/geocode.mjs` |
 | REQ-CF-016 | R2 for map PMTiles, places tiles, weather cells, terrain, imagery and data snapshots, served by the Worker with range requests | P1 | PLANNED (DP-4.x, DP-5.5) | ADR-016 |
 | REQ-CF-017 | Cloudflare Containers (Workers Paid) for Valhalla, MOTIS, LibreWXR (and Photon if needed), one instance group per region, behind Worker routes with rate limits; engine data baked into images or pulled from R2 (ephemeral disk) | P1 | PLANNED (DP-5.2…DP-5.7) | ADR-016 |
 | REQ-CF-018 | Cron Triggers + Queues for data pipelines, weather refresh, push fan-out and traffic ingestion; every scheduled job can be triggered by hand on localhost | P1 | PLANNED (DP-4.x, DP-7.5, DP-10.3) | ADR-016 |
@@ -253,7 +253,7 @@ with no account.
 | --- | --- | --- | --- |
 | REQ-PRIV-001 | No location history; positions/routes never stored server-side | P0 | IMPLEMENTED |
 | REQ-PRIV-002 | Route history, if ever offered, is OFF by default and opt-in, device-first | P0 | IMPLEMENTED (not offered) |
-| REQ-PRIV-003 | Third parties receive only what each request needs; target: no third party receives coordinates (own engines on Cloudflare) | P0 | IMPLEMENTED (documented) / PLANNED (stage 6) |
+| REQ-PRIV-003 | Third parties receive only what each request needs; target: no third party receives coordinates (own engines on Cloudflare) | P0 | IMPLEMENTED (documented) / IN PROGRESS (2026-10-04: places, borders, search and naming inside Georgia stay on our domain; routing and weather — stage 5–6) |
 | REQ-PRIV-004 | Logs and analytics never contain precise coordinates or bbox/route query strings | P0 | IMPLEMENTED (observability off); must hold when logs are enabled |
 | REQ-PRIV-005 | Privacy Policy, Terms, data-deletion page published before public beta (free templates + self-review; not legal advice) | P1 | PLANNED (DP-12.3) |
 | REQ-PRIV-006 | Consent banner not needed while only strictly-necessary device storage is used; re-assess with analytics | P1 | IMPLEMENTED (no cookies/trackers) |

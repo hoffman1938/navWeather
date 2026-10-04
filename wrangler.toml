@@ -52,6 +52,19 @@ name = "TRIP_LIMITER"
 namespace_id = "1004"
 simple = { limit = 20, period = 60 }
 
+# Abuse guard for search and suggestions (per client IP): typing makes a request every ~300 ms.
+[[ratelimits]]
+name = "GEOCODE_LIMITER"
+namespace_id = "1005"
+simple = { limit = 120, period = 60 }
+
+# Our geocoder index (DEVELOPMENT_PLAN DP-4.4): the region's places, streets and addresses with FTS5.
+# Locally: `npm run seed:local` loads it (no account needed). On Cloudflare the first `wrangler deploy` creates
+# the database; load it with `wrangler d1 execute navweather-geo --remote --file data/build/ge/geocode.sql`.
+[[d1_databases]]
+binding = "GEO"
+database_name = "navweather-geo"
+
 # Long-trip planner: Overpass endpoints and the User-Agent sent to them (name a
 # contact before production — Overpass asks apps to identify themselves).
 [vars]

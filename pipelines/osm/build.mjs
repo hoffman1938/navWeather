@@ -17,10 +17,17 @@
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { readPbf } from './pbf.mjs';
+import { createGeocodeCollector } from './geocode.mjs';
 import { LAYERS, POINT_LAYERS, keepTags, layersOf, ROAD_LIMIT_HIGHWAY, tileOf, tilesOfBbox } from './layers.mjs';
 
 const SRC = process.argv[2] ?? 'data/raw/georgia-latest.osm.pbf';
 const OUT = process.env.PLACES_OUT ?? 'public/data/places/v1';
+const GEO_OUT = process.env.GEO_OUT ?? 'data/build/ge/geocode.sql';
+const geo = createGeocodeCollector();
+const hasTags = (t) => {
+  for (const _ in t) return true;
+  return false;
+};
 const COVERAGE_Z = 9;
 
 const t0 = Date.now();
@@ -85,12 +92,15 @@ for (const block of readPbf(buf)) {
       addNode(e.id, e.lat, e.lon);
       const [cx, cy] = tileOf(e.lon, e.lat, COVERAGE_Z);
       coverage.add(`${cx}/${cy}`);
+      if (!hasTags(e.tags)) continue;
       addPoint('n', e.id, e.lon, e.lat, e.tags);
+      geo.add('n', e.id, e.tags, e.lon, e.lat);
     } else if (e.type === 'way') {
       const t = e.tags;
       const pointLayers = layersOf(t, POINT_LAYERS, 'w');
       const limit = t.maxspeed && ROAD_LIMIT_HIGHWAY.test(t.highway ?? '');
-      if (!pointLayers.length && !limit) continue;
+      const forGeo = !!(t.name || t['addr:housenumber']);
+      if (!pointLayers.length && !limit && !forGeo) continue;
       const coords = [];
       for (const ref of e.refs) {
         const c = nodeAt(ref);
@@ -101,6 +111,7 @@ for (const block of readPbf(buf)) {
       for (const [x, y] of coords) [w, s, ea, n] = [Math.min(w, x), Math.min(s, y), Math.max(ea, x), Math.max(n, y)];
       // Like Overpass `out center`: the centre of the way's bounding box.
       if (pointLayers.length) addPoint('w', e.id, (w + ea) / 2, (s + n) / 2, t);
+      if (forGeo) geo.add('w', e.id, t, (w + ea) / 2, (s + n) / 2, coords);
       if (limit && coords.length >= 2) {
         const layer = LAYERS.find((l) => l.id === 'maxspeed');
         const q = coords.map(([x, y]) => [round6(x), round6(y)]);
@@ -137,9 +148,12 @@ for (const layer of LAYERS) {
   }
 }
 writeFileSync(join(OUT, 'index.json'), JSON.stringify(index));
+const geoStats = geo.write(GEO_OUT, { source: index.source, license: index.license, dataDate: index.dataDate, region: index.region, builtAt: index.builtAt });
 console.log(
   `${count.toLocaleString('en')} nodes read; ${Object.entries(stats)
     .map(([k, v]) => `${k} ${v}`)
     .join(', ')}`,
 );
-console.log(`${files} tiles, ${(bytes / 1e6).toFixed(1)} MB → ${OUT} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+console.log(`${files} tiles, ${(bytes / 1e6).toFixed(1)} MB → ${OUT}`);
+console.log(`geocoder: ${geoStats.rows} rows (${Object.entries(geoStats.kinds).map(([k, v]) => `${k} ${v}`).join(', ')}) → ${GEO_OUT}`);
+console.log(`done in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

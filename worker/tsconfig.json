@@ -21,6 +21,7 @@
     "./*.ts",
     "../src/api/v1.ts",
     "../src/share/protocol.ts",
-    "../src/types/geo.ts"
+    "../src/types/geo.ts",
+    "../src/api/geocode.ts"
   ]
 }

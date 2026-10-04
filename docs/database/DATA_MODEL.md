@@ -16,6 +16,7 @@ and is **not applied** (no D1 binding in `wrangler.toml`).
 | --- | --- | --- |
 | Country borders (Natural Earth, public domain) | `src/trip/data/countries-v1.json` (in the app and the Worker bundle) | `npm run data:borders` |
 | Places, cameras, crossings, speed limits per layer and tile (OSM, ODbL) | static assets `/data/places/v1/…` (not in git) | `npm run seed:local` (download + `data:osm`) |
+| Geocoder index (OSM, ODbL): `geo` (id, kind, rank, lat, lon, name, name_en, name_ru, ctx_en, ctx_ru) + FTS5 `geo_fts(names, ctx)` (unicode61, prefixes 2–4) + `geo_meta` | D1 `navweather-geo` (binding `GEO`) | `npm run data:osm` → `data/build/ge/geocode.sql` → `npm run db:geo:local` |
 
 ## 1. What lives where today
 

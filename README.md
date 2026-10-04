@@ -37,11 +37,12 @@ npm run preview:worker   # the production build served by the Worker, as on Clou
 Our own data (instead of public services with limits): once, and again to refresh —
 
 ```bash
-npm run seed:local   # downloads Georgia's OpenStreetMap extract (~100 MB, Geofabrik, MD5-checked) and builds
-                     # the places tiles (places, speed limits, cameras, level crossings) into public/data/places
+npm run seed:local   # downloads Georgia's OpenStreetMap extract (~100 MB, Geofabrik, MD5-checked), builds the
+                     # places tiles (places, speed limits, cameras, level crossings) into public/data/places and
+                     # loads the search index (188 000 places, streets, addresses) into the local D1 database
 ```
 
-Without it the app still works and asks the public Overpass servers instead.
+Without it the app still works and asks the public Overpass and Photon servers instead.
 
 Use Node 22+ (required by the Cloudflare tooling; the tests need 20+).
 Location only works on `https://` or `localhost` — opening the dev server from

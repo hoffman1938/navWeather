@@ -4,6 +4,7 @@ import { OpenMeteoElevationProvider } from './elevation/OpenMeteoElevationProvid
 import type { AutocompleteProvider, GeocodingProvider } from './geocoding/GeocodingProvider';
 import { NominatimProvider } from './geocoding/NominatimProvider';
 import { PhotonProvider } from './geocoding/PhotonProvider';
+import { ApiGeocodingProvider, TileReverseGeocoder } from './geocoding/ApiGeocodingProvider';
 import { StyleUrlMapProvider, type MapProvider } from './map/MapProvider';
 import { OverpassPlacesProvider } from './places/OverpassPlacesProvider';
 import type { PlacesProvider } from './places/PlacesProvider';
@@ -89,15 +90,23 @@ export function createProviders(cfg: AppConfig = config): Providers {
   // Public transport: timetables operators publish, through Transitous (no key). Off when the URL is set empty.
   if (e.transit) routingByMode.transit = new TransitousProvider(e.transit, cfg.geocoding.language);
 
-  const geocoding: GeocodingProvider =
-    p.geocoding === 'nominatim'
-      ? new NominatimProvider(e.nominatim, cfg.geocoding.language, cfg.geocoding.nominatimMinIntervalMs)
-      : p.geocoding === 'photon'
-        ? photon
-        : unknown('geocoding', p.geocoding);
+  // Our tiles (places, settlements) and our geocoder first; public servers only where our data has nothing.
+  const tiles = new PlacesTiles(e.placesTiles);
+  const lang = cfg.geocoding.language;
+  const geoFallback = p.geocodingFallback === 'photon' ? photon : p.geocodingFallback === 'none' ? null : unknown('geocoding fallback', p.geocodingFallback);
+  const reverser = new TileReverseGeocoder(tiles, lang, geoFallback);
+  const ours = new ApiGeocodingProvider(e.geocode, lang, geoFallback, reverser);
 
-  const autocomplete: AutocompleteProvider =
-    p.autocomplete === 'photon' ? photon : unknown('autocomplete', p.autocomplete);
+  const geocoding: GeocodingProvider =
+    p.geocoding === 'api'
+      ? ours
+      : p.geocoding === 'nominatim'
+        ? new NominatimProvider(e.nominatim, lang, cfg.geocoding.nominatimMinIntervalMs)
+        : p.geocoding === 'photon'
+          ? photon
+          : unknown('geocoding', p.geocoding);
+
+  const autocomplete: AutocompleteProvider = p.autocomplete === 'api' ? ours : p.autocomplete === 'photon' ? photon : unknown('autocomplete', p.autocomplete);
 
   const weatherProvider: WeatherProvider =
     p.weather === 'open-meteo'
@@ -109,10 +118,8 @@ export function createProviders(cfg: AppConfig = config): Providers {
         )
       : unknown('weather', p.weather);
 
-  // Our tiles first (DP-6.5); Overpass only outside the region they cover, while VITE_PLACES_FALLBACK allows it.
-  const tiles = new PlacesTiles(e.placesTiles);
+  // Overpass only outside the region our tiles cover, while VITE_PLACES_FALLBACK allows it (DP-6.5).
   const fallback = p.placesFallback === 'overpass' ? true : p.placesFallback === 'none' ? false : unknown('places fallback', p.placesFallback);
-  const lang = cfg.geocoding.language;
   const places: PlacesProvider | null =
     p.places === 'tiles'
       ? new TilePlacesProvider(tiles, lang, fallback ? new OverpassPlacesProvider(e.overpass, lang) : null)
@@ -168,7 +175,7 @@ export function createProviders(cfg: AppConfig = config): Providers {
     routingByMode,
     geocoding,
     autocomplete,
-    reverseGeocoding: photon,
+    reverseGeocoding: p.geocoding === 'api' ? reverser : photon,
     places,
     poi,
     speedLimits,

@@ -105,7 +105,7 @@ that names implementations, chosen by `VITE_*` variables.
 | `RoutingProvider` per travel mode | car: OSRM demo; walk/bike: OSM community OSRM instances (`routing.openstreetmap.de/routed-foot|bike`); flight: `FlightEstimateProvider`; transit: `TransitousProvider` (MOTIS `plan` at `api.transitous.org`) | `providersForMode(base, mode)` gives the mode's router (a flight has no places/elevation/road data; transit no POIs or speed limits); `travelMode` lives in the app store |
 | `RoutingProvider` | OSRM demo server | declares capabilities; `avoid` is empty because the demo server rejects `exclude`; asks for `alternatives=3` (plain `true` returns at most one), retrying with `true` if an older server answers 400 |
 | `WeatherProvider` (+ `WeatherService`) | Open-Meteo | batching, cache, stale fallback, model-run checks |
-| `GeocodingProvider` / `AutocompleteProvider` | Nominatim (1 req/s) / Photon | Nominatim forbids autocomplete |
+| `GeocodingProvider` / `AutocompleteProvider` | our geocoder: `ApiGeocodingProvider` (`/api/v1/geocode`, D1 FTS5) and `TileReverseGeocoder` (nearest settlement from our tiles) | Photon only when our index has nothing (a town abroad) — `VITE_GEOCODING_FALLBACK`; Nominatim selectable |
 | `PlacesProvider`, `PoiProvider`, `SpeedLimitProvider` | our places tiles (`services/places/tiles.ts`, `TileProviders.ts`): static JSON per layer and z9/z11 tile, built from OSM by `pipelines/osm/` | inside the region the tiles cover no third-party request; outside it Overpass (one shared sequential queue) until that region is built (`VITE_PLACES_FALLBACK`) |
 | `ElevationProvider` | Open-Meteo | pass detection |
 | `TrafficProvider` | none | hook for live traffic (sets segment durations) |

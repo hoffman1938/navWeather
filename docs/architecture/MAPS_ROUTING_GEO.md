@@ -12,7 +12,7 @@
 | **Map data** | the world's roads, places, POIs | OpenStreetMap | — | ODbL, attribution | stale edits (weekly builds) |
 | **Map rendering** | drawing vector tiles in WebGL | MapLibre GL JS | `RouteMap.tsx` | BSD-3-Clause | WebGL unavailable → error card; app still usable |
 | **Tiles / styles** | pre-cut vector tiles + style JSON | OpenFreeMap (OpenMapTiles schema) | `MapProvider` | free, commercial OK, no SLA | blank map |
-| **Geocoding** | text ↔ place | Nominatim (typed search, 1 req/s), Photon (autocomplete, reverse) | `GeocodingProvider`, `AutocompleteProvider` | fair use, no autocomplete on Nominatim | search fails, coordinates still work |
+| **Geocoding** | text ↔ place | our index (D1 FTS5 over OSM, `/api/v1/geocode`) and settlement tiles for names; Photon only when our index has nothing | `GeocodingProvider`, `AutocompleteProvider` | ODbL (our data); fair use (Photon fallback) | search fails, coordinates still work |
 | **Routing** | road graph search, ETA, steps | OSRM public (car), FOSSGIS OSRM (walk/bike), Transitous (transit), estimate (flight) | `RoutingProvider` per mode | non-commercial, ≤1 req/s | no new route; loaded route continues |
 | **Traffic** | live speeds/incidents | none (driver reports for incidents) | `TrafficProvider`, `IncidentProvider` | — | "not available" |
 | **Weather** | forecasts along the route | Open-Meteo | `WeatherProvider` | CC BY 4.0, non-commercial free | stale label, last forecast kept |
@@ -91,9 +91,8 @@ push-to-talk and the Settings screen says so.
   in one country; road refs and Georgian script transliterated for en/ru.
 
 ## 6. Geocoding quality notes
-- Same-named places: "Tavisupleba Square" resolves to Kobuleti before Tbilisi's
-  Freedom Square (Photon ranking; Tbilisi's square is named "Freedom Square" in
-  English OSM). Mitigation: show the town in suggestions (done), bias by
-  location (done), and name the destination town in error messages (planned).
+- Same-named places: with Photon, "Tavisupleba Square" resolved to Kobuleti before Tbilisi's Freedom Square. Our
+  index (2026-10-04) ranks a street or place by its town's size and by closeness: "Freedom Square" → Tbilisi first;
+  suggestions show the town; naming the destination town in error messages is still planned.
 - Nominatim policy: no autocomplete, cache results, ≤1 req/s, identify the app
   (browser Referer satisfies this), heavy users run their own instance.

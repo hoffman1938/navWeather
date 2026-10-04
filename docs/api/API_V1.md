@@ -56,6 +56,13 @@ device can't give a position. `200 { lat, lon, city, country }` or
 `PublicReport = { id, kind, lat, lon, createdAt, expiresAt, confirms, denies }`.
 Reports are **unverified** by definition; clients must label them "reported".
 
+### `GET /geocode` (DP-4.4)
+`?q=<text ≤100>&lang=en|ru&near=lon,lat&limit=1–10` → `200 { places: Place[] }` with `Place = { id, name, label,
+coordinate: [lon, lat], kind }` (`kind`: a settlement type, `street`, `address` or `poi`). Our FTS5 index in D1 (binding
+`GEO`, the region's OpenStreetMap places, streets and addresses; `pipelines/osm/geocode.mjs`). Fewer than 2 letters →
+`{ places: [] }`. `503 unavailable` when the index isn't loaded; 405 for non-GET; 429 (`GEOCODE_LIMITER`, 120/min per
+IP). The search text is neither stored nor logged. Reverse naming is done on the device from the settlement tiles.
+
 ### Long-trip planner ([LONG_TRIP_MODE](../features/LONG_TRIP_MODE.md), ADR-013)
 
 Stateless: requests are validated (`src/trip/protocol.ts`, `src/trip/borders.ts`),
@@ -100,9 +107,6 @@ avoid?: [tolls|highways|ferries], vehicle?: {heightM, weightT…}, bearingDeg?, 
 briefly; never logged with coordinates. Related: `POST /route/matrix`, `POST /route/optimize`, `POST /route/isochrone`
 (DP-9.4, DP-9.5).
 
-### `GET /geocode` — PLANNED (DP-4.4)
-`?q=&lang=&near=lon,lat` (search and autocomplete) and `?reverse=lon,lat&lang=` → `{ places: Place[] }`. FTS5 index in
-D1 per country (Photon in Containers only if decision D10 says so).
 
 ### `/places/*` — PLANNED (DP-4.3)
 `GET /places/tile/:z/:x/:y?cat=` (cacheable), `POST /places/corridor` (polyline + width + categories; also speed

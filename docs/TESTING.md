@@ -9,6 +9,8 @@ npm run test:live     # opt-in smoke test against the real public APIs (Tbilisi 
 npm run dev           # app + local relay (or `npm run dev:api` for the relay only), then in another terminal:
 npm run test:share    # end-to-end checks of the live-sharing relay
 npm run test:reports  # end-to-end checks of the driver-reports relay
+npm run test:trips    # Long Trip planner, places and borders on the Worker
+npm run test:geocode  # our geocoder on the Worker (skips the search checks when the index isn't loaded)
 ```
 
 ## What is covered
