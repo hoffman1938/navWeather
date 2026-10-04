@@ -1,0 +1,46 @@
+# Checks for every push and pull request (docs/operations/DELIVERY.md §2).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (app + Worker)
+        run: npm run typecheck
+      - name: Unit and scenario tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Worker smoke tests (local wrangler, /api/v1 and legacy /api)
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          npx wrangler dev --port 8787 --ip 127.0.0.1 > wrangler.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8787/api/v1/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8787/api/v1/health || (cat wrangler.log; exit 1)
+          npm run test:share
+          npm run test:reports
+          npm run test:trips
+          API=/api npm run test:share
+          API=/api npm run test:reports

@@ -163,3 +163,42 @@ describe('routing through silent via points', () => {
     expect(urls[1].pathname.split(';')).toHaveLength(2);
   });
 });
+
+describe("the public servers' 1 request per second", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('spaces requests to one server, across profiles on the same host, and never runs two at once', async () => {
+    const starts: number[] = [];
+    let inFlight = 0;
+    let overlap = false;
+    vi.stubGlobal('fetch', async () => {
+      starts.push(Date.now());
+      overlap ||= ++inFlight > 1;
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return Response.json({ code: 'Ok', routes: [rawTbilisiBatumi()], durations: [[60]], distances: [[900]] });
+    });
+    // Walking and cycling live on one host (routing.openstreetmap.de): one queue for both.
+    const foot = new OSRMProvider('https://limited.test/routed-foot', 'driving', 5000, undefined, 3, 120);
+    const bike = new OSRMProvider('https://limited.test/routed-bike', 'driving', 5000, undefined, 3, 120);
+    await Promise.all([
+      foot.calculateRoutes({ origin: TBILISI, destination: BATUMI }),
+      bike.calculateRoutes({ origin: TBILISI, destination: BATUMI }),
+      foot.travelMatrix!([TBILISI.coordinate], [BATUMI.coordinate]),
+    ]);
+    expect(starts).toHaveLength(3);
+    expect(overlap).toBe(false);
+    for (let i = 1; i < starts.length; i++) expect(starts[i] - starts[i - 1]).toBeGreaterThanOrEqual(115);
+  });
+
+  it('a self-hosted router (interval 0) is not slowed down', async () => {
+    const starts: number[] = [];
+    vi.stubGlobal('fetch', async () => {
+      starts.push(Date.now());
+      return Response.json({ code: 'Ok', routes: [rawTbilisiBatumi()] });
+    });
+    const own = new OSRMProvider('https://own.test', 'driving', 5000, undefined, 3, 0);
+    await Promise.all([own.calculateRoutes({ origin: TBILISI, destination: BATUMI }), own.calculateRoutes({ origin: TBILISI, destination: BATUMI })]);
+    expect(starts[1] - starts[0]).toBeLessThan(50);
+  });
+});

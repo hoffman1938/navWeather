@@ -1,5 +1,12 @@
 # Product audit, status and gap analysis
 
+> **Latest:** the master audit of 2026-10-03 — [AUDIT/MASTER_AUDIT.md](AUDIT/MASTER_AUDIT.md)
+> (status of every requirement, confirmed defects, roadmap). Before it, the full platform audit of 2026-10-02 —
+> [AUDIT/2026-10-02-platform-audit.md](AUDIT/2026-10-02-platform-audit.md) —
+> supersedes the gap analysis below; requirements now live in
+> [PROJECT_REQUIREMENTS.md](PROJECT_REQUIREMENTS.md). This file keeps the
+> history of rounds 1–5.
+
 Three rounds of role-based review (product, UX/UI, GIS, weather, navigation,
 voice, mobile, QA, performance, security, Cloudflare) were run against the
 code. Round 1–2 findings were fixed earlier (progress tracking on dual

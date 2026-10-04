@@ -23,6 +23,7 @@ export type RouteEventType =
   | 'FUEL_STOP'
   | 'CHARGE_STOP'
   | 'REST_BREAK'
+  | 'TRIP_STOP'
   | 'SUN_GLARE'
   | 'TIMEZONE_CHANGE'
   | 'SPEED_CAMERA'

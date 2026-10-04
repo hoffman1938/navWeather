@@ -12,6 +12,7 @@ import type { TimedRoute } from '../types/route';
 import type { RouteWeatherPoint } from '../types/weather';
 import type { RouteEvent } from './types';
 import { buildWeatherEvents, type WeatherAlertPrefs } from './weatherAlerts';
+import type { TripStop } from '../trip/types';
 
 /**
  * ROUTE INTELLIGENCE ENGINE
@@ -24,9 +25,13 @@ import { buildWeatherEvents, type WeatherAlertPrefs } from './weatherAlerts';
  * `extraEvents` when a provider exists (see services/traffic).
  */
 
-export type RouteClock =
+export type RouteClock = (
   | { mode: 'planning'; departureMs: number }
-  | { mode: 'navigating'; nowMs: number; modelTimeS: number };
+  | { mode: 'navigating'; nowMs: number; modelTimeS: number }
+) & {
+  /** Planned stop time (s) between the reference position and a position ahead (Long Trip Mode). */
+  dwellBeforeS?: (alongM: number) => number;
+};
 
 export interface IntelligenceInput {
   timed: TimedRoute;
@@ -47,6 +52,8 @@ export interface IntelligenceInput {
   breakReminders?: boolean;
   /** Events from other providers (traffic, incidents…), already normalized. */
   extraEvents?: RouteEvent[];
+  /** Long Trip Mode's planned stops: they replace the generic break and fuel reminders. */
+  tripStops?: TripStop[];
   m: Messages;
   units: UnitPrefs;
 }
@@ -70,7 +77,8 @@ export function referenceTime(clock: RouteClock): number {
 /** ETA (UTC ms) at an along-route distance under the given clock. */
 export function arrivalAt(timed: TimedRoute, distanceM: number, clock: RouteClock): number {
   const t = timeAtDistance(timed, distanceM);
-  return clock.mode === 'planning' ? clock.departureMs + t * 1000 : clock.nowMs + (t - clock.modelTimeS) * 1000;
+  const dwell = (clock.dwellBeforeS?.(distanceM) ?? 0) * 1000;
+  return (clock.mode === 'planning' ? clock.departureMs + t * 1000 : clock.nowMs + (t - clock.modelTimeS) * 1000) + dwell;
 }
 
 function routeEvent(
@@ -166,8 +174,42 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
     );
   }
 
+  // Long Trip Mode: the planned stops (rest, meal, fuel/charge, overnight) replace the generic reminders below.
+  if (input.tripStops?.length) {
+    for (const st of input.tripStops) {
+      if (st.alongM < progressM) continue;
+      const night = st.kinds.includes('overnight');
+      const fuel = st.kinds.includes('fuel') || st.kinds.includes('charge');
+      const kind = night ? 'overnight' : st.kinds.includes('meal') ? 'meal' : st.kinds.includes('charge') ? 'charge' : st.kinds.includes('fuel') ? 'fuel' : 'rest';
+      const label = m.trip.stopKind[kind];
+      events.push(
+        routeEvent(
+          {
+            id: `TRIP@${Math.round(st.alongM / 1000)}:${kind}`,
+            type: 'TRIP_STOP',
+            category: fuel && !night ? (st.kinds.includes('charge') ? 'charging' : 'fuel') : 'rest',
+            severity: night || fuel ? 'medium' : 'low',
+            title: label,
+            shortMessage: st.placeName ? m.ui.near(st.placeName) : '',
+            voiceMessage: '',
+            icon: fuel && !night ? (st.kinds.includes('charge') ? 'charging' : 'fuel') : 'rest',
+            source: 'trip-plan',
+            confidence: 1,
+          },
+          timed,
+          st.alongM,
+          progressM,
+          clock,
+          { placeName: st.placeName },
+        ),
+      );
+      const e = events[events.length - 1];
+      e.voiceMessage = m.trip.voiceStop(label, spokenDuration(e.estimatedMinutesFromCurrent * 60, m), st.placeName);
+    }
+  }
+
   // Fuel / charging: only from the user's own range — never estimated.
-  if (input.fuelRangeKm !== null && input.fuelRangeKm > 0) {
+  if (!input.tripStops?.length && input.fuelRangeKm !== null && input.fuelRangeKm > 0) {
     const remainingM = timed.totalDistM - progressM;
     const rangeM = input.fuelRangeKm * 1000;
     if (remainingM > rangeM * 0.9) {
@@ -198,7 +240,7 @@ export function buildRouteIntelligence(input: IntelligenceInput): RouteIntellige
   }
 
   // Breaks on long drives: about every 2 h of driving, near a named place when one is close.
-  if (input.breakReminders !== false && timed.totalTimeS > 2.5 * 3600) {
+  if (!input.tripStops?.length && input.breakReminders !== false && timed.totalTimeS > 2.5 * 3600) {
     for (let k = 1; k * BREAK_EVERY_S < timed.totalTimeS - 1800; k++) {
       const d = distanceAtTime(timed, k * BREAK_EVERY_S);
       if (d < progressM) continue;

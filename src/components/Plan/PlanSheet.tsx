@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { Attribution } from '../Common/Attribution';
 import { conditionText, formatAgo, formatDistance, formatDuration, formatSpeed, formatTemp } from '../../i18n/format';
 import { useMessages, useSettings } from '../../state/settings';
 import { useAppStore } from '../../state/store';
-import { deviceTimeZone, formatLocalDate, formatLocalTime, formatUtcOffset } from '../../utils/timezone';
+import { deviceTimeZone, formatLocalDate, formatLocalTime, formatUtcOffset, formatWeekday, localDateKey } from '../../utils/timezone';
+
+/** Arrival later than today (a long trip): name the day. */
+function sameDay(ms: number, tz: string): boolean {
+  return localDateKey(ms, tz) === localDateKey(Date.now(), tz);
+}
 import { BottomSheet } from '../BottomSheet/BottomSheet';
 import { EventIcon } from '../Common/EventIcon';
 import { NavigateIcon, PlayIcon, RefreshIcon } from '../Icons/Icons';
@@ -17,6 +23,10 @@ import { DepartureSelector } from './DepartureSelector';
 import { RouteOptions } from './RouteOptions';
 import { TRANSIT_SOURCES_URL, TransitOptions, TransitSteps } from './TransitTrip';
 import { TravelModeBar } from './TravelModeBar';
+import { LongTripBanner, LongTripDashboard } from '../Trip/LongTrip';
+import { longTripActive, useTripStore } from '../../state/trip';
+
+const LongTripDetails = lazy(() => import('../Trip/LongTripDetails'));
 import { NAVIGABLE_MODES } from '../../types/travel';
 import { ResumeDrive, takeResumableDrive } from './ResumeDrive';
 import './Plan.css';
@@ -34,6 +44,7 @@ export function PlanSheet() {
   const sheet = useAppStore((s) => s.sheet);
   const destination = useAppStore((s) => s.plan?.timed.route.destination.name ?? '');
   const transit = useAppStore((s) => !!s.plan?.timed.route.transit);
+  const longTrip = useTripStore((s) => longTripActive(s) && !!s.plan);
   const m = useMessages();
 
   if (!hasPlan) {
@@ -66,6 +77,7 @@ export function PlanSheet() {
       header={<RouteHeader />}
       body={
         <>
+          <LongTripDashboard />
           {transit ? <TransitOptions /> : <RouteOptions />}
           <WeatherHeadline />
           <DepartureTip />
@@ -75,6 +87,11 @@ export function PlanSheet() {
       extra={
         <div className="plan-extra">
           <TransitSteps />
+          {longTrip ? (
+            <Suspense fallback={null}>
+              <LongTripDetails />
+            </Suspense>
+          ) : null}
           <DepartureChart />
           <HeadsUp />
           <ElevationProfile />
@@ -83,7 +100,7 @@ export function PlanSheet() {
           <AlongTheWay />
           <PlacesPanel />
           <DataSources />
-          <p className="attribution">{m.ui.attribution}</p>
+          <Attribution />
         </div>
       }
     />
@@ -134,7 +151,7 @@ function RouteHeader() {
           <h2 className="rhead__title">{route.destination.name}</h2>
           <p className="rhead__meta tabular">
             {formatDistance(plan.timed.totalDistM, units, m)} · ~{formatDuration(plan.timed.totalTimeS, m)}
-            {arrivalMs ? ` · ${m.ui.arrive(formatLocalTime(arrivalMs, destTz))}` : ''}
+            {arrivalMs ? ` · ${m.ui.arrive(sameDay(arrivalMs, destTz) ? formatLocalTime(arrivalMs, destTz) : `${formatWeekday(arrivalMs, destTz, m.locale)} ${formatLocalTime(arrivalMs, destTz)}`)}` : ''}
           </p>
           {travelMode === 'flight' ? <p className="rhead__note">{m.travel.flightNote}</p> : null}
           {route.transit ? (
@@ -145,6 +162,7 @@ function RouteHeader() {
             </p>
           ) : null}
           <DepartureSelector />
+          <LongTripBanner />
         </div>
         {navigable ? (
           <div className="rhead__actions">

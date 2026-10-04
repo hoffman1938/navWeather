@@ -68,11 +68,20 @@ export function createProviders(cfg: AppConfig = config): Providers {
 
   const routing: RoutingProvider =
     // Ask for as many alternatives as roads we show: the distinct-road filter then has spares to drop.
-    p.routing === 'osrm' ? new OSRMProvider(e.osrm, 'driving', 20000, undefined, cfg.routing.maxRoutes) : unknown('routing', p.routing);
+    p.routing === 'osrm'
+      ? new OSRMProvider(e.osrm, 'driving', 20000, undefined, cfg.routing.maxRoutes, cfg.routing.osrmMinIntervalMs)
+      : unknown('routing', p.routing);
 
   // Walking and cycling: OSM community instances of the same router (no per-edge lane data, no table service assumed).
   const onFoot = (base: string): RoutingProvider =>
-    new OSRMProvider(base, 'driving', 20000, { alternatives: true, avoid: [], laneGuidance: false, matrix: false, multiStop: true, via: true }, cfg.routing.maxRoutes);
+    new OSRMProvider(
+      base,
+      'driving',
+      20000,
+      { alternatives: true, avoid: [], laneGuidance: false, matrix: false, multiStop: true, via: true },
+      cfg.routing.maxRoutes,
+      cfg.routing.osrmMinIntervalMs,
+    );
   const routingByMode: NonNullable<Providers['routingByMode']> =
     p.routing === 'osrm' ? { walk: onFoot(e.osrmFoot), bike: onFoot(e.osrmBike), flight: new FlightEstimateProvider() } : { flight: new FlightEstimateProvider() };
   // Public transport: timetables operators publish, through Transitous (no key). Off when the URL is set empty.

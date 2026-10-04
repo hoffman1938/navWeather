@@ -23,6 +23,7 @@ import {
 import { dueManeuverPrompt, markSpoken, spokenPrompt } from '../navigation/instructions';
 import { computeGuidance, type Guidance } from '../navigation/maneuvers';
 import { isAbortError, mapWithConcurrency, ProviderError } from '../services/http';
+import type { TripStop } from '../trip/types';
 import type { IncidentKind } from '../services/traffic/IncidentProvider';
 import { reportFailure, reportToIncident } from '../services/traffic/ReportsIncidentProvider';
 import type { ReportKind, Vote } from '../reports/protocol';
@@ -412,6 +413,12 @@ export function getVoiceQueue(): VoiceQueue {
   return voiceQueue;
 }
 
+/** Long Trip Mode's planned stops for the route on screen (state/trip.ts registers it; none by default). */
+let tripStopsProvider: () => TripStop[] | undefined = () => undefined;
+export function setTripStopsProvider(fn: () => TripStop[] | undefined): void {
+  tripStopsProvider = fn;
+}
+
 function departureMsOf(s: Pick<AppState, 'departure' | 'clockMs'>): number {
   return s.departure.mode === 'now' ? s.clockMs : s.departure.utcMs;
 }
@@ -462,6 +469,7 @@ function derive(s: AppState): Derived {
     breakReminders: settings.breakReminders && s.travelMode === 'drive',
     speedCameras: settings.speedCameras ? s.speedCameras : [],
     extraEvents: [],
+    tripStops: tripStopsProvider(),
     previous: s.derived,
   });
 }

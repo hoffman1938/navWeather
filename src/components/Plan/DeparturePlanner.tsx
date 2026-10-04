@@ -5,6 +5,7 @@ import { getProviders } from '../../services/providers';
 import { forecastLookupFn } from '../../services/routePlanner';
 import { useMessages } from '../../state/settings';
 import { useAppStore } from '../../state/store';
+import { longTripActive, useTripStore } from '../../state/trip';
 import { deviceTimeZone, formatLocalTime } from '../../utils/timezone';
 
 const SLOT = 30 * 60_000;
@@ -15,14 +16,16 @@ function useDeparturePlan(): { plan: DeparturePlan | null; tz: string } {
   const forecasts = useAppStore((s) => s.forecasts);
   const departure = useAppStore((s) => s.departure);
   const slot = useAppStore((s) => Math.floor(s.clockMs / SLOT));
+  // A multi-day trip isn't "the same drive, an hour later": its nights move with the start.
+  const multiDay = useTripStore((s) => longTripActive(s) && (s.plan?.summary.overnights ?? 0) > 0);
   const tz = useAppStore((s) => s.derived.points[0]?.timezone ?? deviceTimeZone());
   const plan = useMemo(() => {
     // Public transport keeps to a timetable: leaving later is another trip, not this one shifted — no comparison.
-    if (!route || forecasts.size === 0 || route.timed.route.transit) return null;
+    if (!route || forecasts.size === 0 || route.timed.route.transit || multiDay) return null;
     const now = slot * SLOT;
     const chosen = departure.mode === 'at' ? departure.utcMs : Date.now();
     return planDepartures(route.samples, route.timed.totalTimeS, forecastLookupFn(getProviders(), forecasts), chosen, now);
-  }, [route, forecasts, departure, slot]);
+  }, [route, forecasts, departure, slot, multiDay]);
   return { plan, tz };
 }
 

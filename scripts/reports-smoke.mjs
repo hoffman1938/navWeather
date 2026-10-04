@@ -1,15 +1,18 @@
 // End-to-end check of the driver-reports relay against a running Worker:
 //   npm run dev:api          (terminal 1)
-//   npm run test:reports     (terminal 2)   [REPORTS_BASE=https://… to test a deployment]
+//   npm run test:reports     (terminal 2)   [REPORTS_BASE=https://… to test a deployment; API=/api for the unversioned legacy paths]
 // Each run uses its own coordinates, so it can be repeated against the same relay.
 import assert from 'node:assert/strict';
 
 const BASE = process.env.REPORTS_BASE ?? 'http://127.0.0.1:8787';
+// The versioned API by default; the Worker also answers the original unversioned paths.
+const API = process.env.API ?? '/api/v1';
+const api = (path) => path.replace(/^\/api\//, `${API}/`);
 let passed = 0;
 const ok = (name) => console.log(`  ✓ ${name}`, ++passed);
 /** A different client per `ip` (local wrangler trusts CF-Connecting-IP; a deployment ignores it). */
 const call = (path, init = {}, ip = '10.0.0.1') =>
-  fetch(BASE + path, { ...init, headers: { 'content-type': 'application/json', 'CF-Connecting-IP': ip, ...init.headers } });
+  fetch(BASE + api(path), { ...init, headers: { 'content-type': 'application/json', 'CF-Connecting-IP': ip, ...init.headers } });
 const post = (path, body, ip) => call(path, { method: 'POST', body: JSON.stringify(body) }, ip);
 
 // A random spot in the Caucasus for this run.
@@ -17,13 +20,13 @@ const lat = 41 + Math.random();
 const lon = 43 + Math.random();
 const bbox = `${(lon - 0.05).toFixed(4)},${(lat - 0.05).toFixed(4)},${(lon + 0.05).toFixed(4)},${(lat + 0.05).toFixed(4)}`;
 
-console.log(`Driver reports relay @ ${BASE}`);
+console.log(`Driver reports relay @ ${BASE}${API}`);
 
 // 1. Validation.
 assert.equal((await post('/api/reports', { kind: 'aliens', lat, lon })).status, 400);
 assert.equal((await post('/api/reports', { kind: 'accident', lat: 95, lon })).status, 400);
 assert.equal((await call('/api/reports', { method: 'POST', body: '{}', headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
-assert.equal((await fetch(`${BASE}/api/reports`, { method: 'POST', body: '{}', headers: { 'content-type': 'text/plain' } })).status, 415);
+assert.equal((await fetch(`${BASE}${api('/api/reports')}`, { method: 'POST', body: '{}', headers: { 'content-type': 'text/plain' } })).status, 415);
 assert.equal((await call('/api/reports?bbox=0,0,50,50')).status, 400);
 ok('rejects bad kinds, coordinates, cross-site and oversized areas');
 

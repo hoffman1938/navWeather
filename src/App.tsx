@@ -18,7 +18,6 @@ import { LiveShareDialog, SharePlaceDialog, ShareStatus } from './components/Sha
 import { LocationPrimer, NavPrompt, Notice } from './components/Notice/Notice';
 import { PlanSheet } from './components/Plan/PlanSheet';
 import { SearchPanel } from './components/Search/SearchPanel';
-import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { VoiceControls } from './components/Voice/VoiceControls';
 import { useAppTimers } from './hooks/useAppTimers';
 import { useApplyTheme } from './hooks/useEffectiveTheme';
@@ -28,6 +27,7 @@ import { useSimulationLoop } from './hooks/useSimulationLoop';
 import { useWakeLock } from './hooks/useWakeLock';
 import { parseLiveUrl, parsePlaceUrl } from './share/links';
 import { resumeLiveShare, useLiveShare } from './share/liveShare';
+import { initTrip } from './state/trip';
 import { useViewer } from './share/viewer';
 import { locationWatcher, useExplore } from './state/explore';
 import { useLayoutStore } from './state/layout';
@@ -38,6 +38,8 @@ import './App.css';
 
 // MapLibre is the heaviest dependency — load it after the shell paints.
 const RouteMap = lazy(() => import('./components/Map/RouteMap'));
+// Settings and its sections load the first time they are opened.
+const SettingsDialog = lazy(() => import('./components/Settings/SettingsDialog').then((mod) => ({ default: mod.SettingsDialog })));
 // Development diagnostics; the import is dropped from production builds.
 const DevPanel = import.meta.env.DEV ? lazy(() => import('./dev/DevPanel')) : null;
 
@@ -63,6 +65,7 @@ function CrashScreen() {
 }
 
 function MainApp() {
+  useEffect(() => initTrip(), []);
   useAppTimers();
   useLocationSync();
   useOnLoad();
@@ -78,6 +81,7 @@ function MainApp() {
   const hasNearby = useExplore((s) => s.nearby !== null);
   const arrived = useAppStore((s) => s.arrival !== null);
   const hasPlan = useAppStore((s) => s.plan !== null);
+  const settingsOpen = useAppStore((s) => s.settingsOpen);
   const m = useMessages();
 
   return (
@@ -100,7 +104,11 @@ function MainApp() {
       <ShareStatus />
       <Notice />
       {arrived ? <ArrivalSheet /> : driving ? <DriveSheet /> : hasCard ? <PlaceSheet /> : hasNearby && !hasPlan ? <NearbySheet /> : <PlanSheet />}
-      <SettingsDialog />
+      {settingsOpen ? (
+        <Suspense fallback={null}>
+          <SettingsDialog />
+        </Suspense>
+      ) : null}
       <LocationPrimer />
       <NavPrompt />
       <SharePlaceDialog />

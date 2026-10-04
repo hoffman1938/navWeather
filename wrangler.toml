@@ -44,6 +44,19 @@ name = "REPORT_LIST_LIMITER"
 namespace_id = "1003"
 simple = { limit = 120, period = 60 }
 
+# Abuse guard for the long-trip planner (per client IP). Each plan may make up
+# to 12 Overpass queries (edge-cached by area), so keep this modest.
+[[ratelimits]]
+name = "TRIP_LIMITER"
+namespace_id = "1004"
+simple = { limit = 20, period = 60 }
+
+# Long-trip planner: Overpass endpoints and the User-Agent sent to them (name a
+# contact before production — Overpass asks apps to identify themselves).
+[vars]
+OVERPASS_URLS = "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter"
+TRIP_USER_AGENT = "navWeather/0.1 (trip planner; Cloudflare Worker)"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["LiveShare"]

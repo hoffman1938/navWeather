@@ -60,6 +60,17 @@ Georgian intercity trains and marshrutkas are not — then the app says "no publ
 transport found" (and links to Google Maps timetables, opened only if you tap it)
 instead of inventing anything. It is a plan only, like a flight.
 
+**Long Trip Mode** — trips of 800 km+, 10 h+ of driving, or that need a night
+switch it on by themselves (thresholds in one config file; you can turn it off or
+on for any trip). The planner (a stateless Cloudflare Worker endpoint) lays out
+breaks, meals, fuel/charging (only from the range you enter), overnight areas in
+real towns, days, a timeline and the weather at the times you'll really be there
+— stops included — and suggests stopping earlier when heavy weather falls late
+in the day. Hotels, fuel, food and rest areas come from OpenStreetMap with the
+reason each was picked (availability, prices and ratings are not claimed), plus
+border crossings. While driving, it replans when you fall well behind.
+Details: [docs/features/LONG_TRIP_MODE.md](docs/features/LONG_TRIP_MODE.md).
+
 **Plan** — up to three genuinely different **roads** to the destination (near-copies
 of the best route are dropped; when the router offers none, the app asks it for
 routes *through* points off the main road and keeps the believable ones), each with its own forecast: the road numbers it
@@ -128,16 +139,19 @@ Every part runs on free services or free tiers, with no API keys and no card:
 | --- | --- | --- |
 | App + live sharing + driver reports | Cloudflare Workers **Free plan** (static assets, 2 SQLite Durable Objects, rate limits) | 100 000 Worker requests/day (static files don't count); plenty for personal use |
 | Map tiles | OpenFreeMap | free, no key |
-| Routing | OSRM public demo server | fair use, no uptime guarantee |
+| Routing | OSRM public demo server | non-commercial, at most 1 request/s (the app queues requests), no uptime guarantee |
 | Public transport | Transitous | open-source, **non-commercial** projects; link to its sources (shown with every trip); ask them before heavy use |
 | Weather, air quality, elevation | Open-Meteo | free for **non-commercial** use (≈10 000 calls/day) |
 | Search | Nominatim (1 request/s) and Photon | fair use |
 | Places, speed limits, cameras | Overpass (OpenStreetMap) | fair use, often slow |
 | Device voices, speech recognition | built into the browser | free |
 
-If you ever make it a paid/commercial product, Open-Meteo needs a paid plan
-(or self-hosting) and the public OSRM/Nominatim servers should be replaced by
-your own — the provider interfaces make that a configuration change.
+**It stays that way:** the app is free for everyone and non-commercial — no ads,
+no subscriptions, no paid features — and it runs on free tiers only, at $0 a
+month ([ADR-014](docs/architecture/decisions/ADR-014-zero-cost.md)). Free
+services have limits, so the app uses free fallbacks (another router, another
+tile source, another weather service) and says so when a free limit is reached.
+The path to production: [docs/PRODUCTION_READINESS_PLAN.md](docs/PRODUCTION_READINESS_PLAN.md).
 
 ## Honest limits
 
@@ -187,6 +201,15 @@ unavailable).
 
 ## Docs
 
+Start with **[Project requirements](docs/PROJECT_REQUIREMENTS.md)** (single
+source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
+
+- **[Production readiness plan](docs/PRODUCTION_READINESS_PLAN.md)** — the exact, zero-cost path to production (stages, tasks, gates)
+- [Master audit 2026-10-03](docs/AUDIT/MASTER_AUDIT.md) — status of every requirement, confirmed defects, cost, roadmap ([gap analysis](docs/AUDIT/FEATURE_GAP_ANALYSIS.md), [implementation roadmap](docs/AUDIT/IMPLEMENTATION_ROADMAP.md))
+- [Platform audit 2026-10-02](docs/AUDIT/2026-10-02-platform-audit.md) — findings, fixes, sources
+- [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md) · [Roadmap & MVP](docs/ROADMAP.md)
+- [API v1](docs/api/API_V1.md) · [Data model](docs/database/DATA_MODEL.md) · [Security](docs/security/SECURITY.md) · [Privacy](docs/legal/PRIVACY.md) · [Licensing matrix](docs/legal/LICENSING_MATRIX.md)
+- [Weather engine](docs/architecture/WEATHER_ENGINE.md) · [Maps, routing, GIS](docs/architecture/MAPS_ROUTING_GEO.md) · [Mobile strategy](docs/mobile/MOBILE_STRATEGY.md) · [Cost & scale](docs/operations/COST_AND_SCALE.md) · [Delivery](docs/operations/DELIVERY.md)
 - [Architecture](docs/ARCHITECTURE.md) — engines, data flow, providers, state, relay
 - [Environment](docs/ENVIRONMENT.md) — every variable and binding
 - [Testing](docs/TESTING.md) — what is covered, dev tools, what isn't tested

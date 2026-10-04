@@ -30,14 +30,15 @@ Worker route instead (see `worker/`).
 | Variable | Default |
 | --- | --- |
 | `VITE_OSRM_BASE_URL` | `https://router.project-osrm.org` |
+| `VITE_OSRM_MIN_INTERVAL_MS` | `1000` — least time between requests to one OSRM server (the public servers allow 1 request/s); `0` for a self-hosted router |
 | `VITE_OSRM_FOOT_URL` / `VITE_OSRM_BIKE_URL` | `https://routing.openstreetmap.de/routed-foot` / `…/routed-bike` (walking and cycling; the demo server above only does cars) |
 | `VITE_TRANSIT_URL` | `https://api.transitous.org` (public transport, MOTIS `plan` API; set empty to switch public transport off) |
 | `VITE_OPEN_METEO_BASE_URL` | `https://api.open-meteo.com` |
 | `VITE_OPEN_METEO_AIR_URL` | `https://air-quality-api.open-meteo.com` |
 | `VITE_NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` |
 | `VITE_PHOTON_BASE_URL` | `https://photon.komoot.io` |
-| `VITE_REPORTS_URL` | `/api/reports` (same origin — no CSP change needed) |
-| `VITE_WHEREAMI_URL` | `/api/whereami` (approximate area of the connection, when the device can't give a position; same origin) |
+| `VITE_REPORTS_URL` | `/api/v1/reports` (same origin — no CSP change needed; the unversioned `/api/reports` still works) |
+| `VITE_WHEREAMI_URL` | `/api/v1/whereami` (approximate area of the connection, when the device can't give a position; same origin) |
 | `VITE_OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` |
 | `VITE_MAP_STYLE_LIGHT` / `VITE_MAP_STYLE_DARK` | OpenFreeMap Positron / Dark |
 
@@ -87,3 +88,14 @@ Local development: `npm run dev:api` starts the Worker on port 8787, and the
 Vite dev server proxies `/api` to it (`vite.config.ts`). Without it, the app
 works normally, "Share live location" explains that the server is missing,
 and driver reports show as "unavailable" in the Data panel.
+
+## Worker variables and bindings (Long Trip Mode)
+
+| Name | Kind | Default | Purpose |
+| --- | --- | --- | --- |
+| `TRIP_LIMITER` | rate-limit binding (`wrangler.toml`) | 20 requests / 60 s per IP | `/api/v1/trips/*` |
+| `OVERPASS_URLS` | `[vars]` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` | Overpass endpoints for trip stop places and borders (server-side) |
+| `TRIP_USER_AGENT` | `[vars]` | `navWeather/0.1 (trip planner; Cloudflare Worker)` | identifies the app to Overpass — **add a contact before production** |
+
+Trip thresholds and presets are code, not environment: `src/trip/config.ts`
+(`TRIP_THRESHOLDS`, `PACE_PRESETS`, `STOP_DEFAULTS`, `REPLAN`).

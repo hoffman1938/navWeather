@@ -31,6 +31,16 @@ export interface Settings {
   vehicle: 'fuel' | 'ev';
   /** User-entered remaining range (km). Nothing is ever estimated for them. */
   fuelRangeKm: number | null;
+  /** Long trips (docs/features/LONG_TRIP_MODE.md): vehicle type, tank/battery and consumption (for the full-tank range), and preferences. */
+  vehicleKind: 'car' | 'van' | 'truck' | 'motorcycle';
+  /** Tank (L) or battery (kWh) size, and consumption per 100 km (L or kWh). Both needed for a full-tank range. */
+  tankSize: number | null;
+  consumptionPer100Km: number | null;
+  tripPace: 'relaxed' | 'balanced' | 'fast';
+  hotelMinStars: 0 | 3 | 4;
+  hotelMaxDetourKm: 5 | 10 | 20;
+  tripFood: 'any' | 'restaurant' | 'fast_food' | 'cafe';
+  fuelBrand: string | null;
 }
 
 const KEY = 'navweather.settings.v1';
@@ -54,7 +64,22 @@ export function defaultSettings(): Settings {
     batterySaver: false,
     vehicle: 'fuel',
     fuelRangeKm: null,
+    vehicleKind: 'car',
+    tankSize: null,
+    consumptionPer100Km: null,
+    tripPace: 'balanced',
+    hotelMinStars: 0,
+    hotelMaxDetourKm: 10,
+    tripFood: 'any',
+    fuelBrand: null,
   };
+}
+
+/** Range on a full tank/battery (km), when the user gave size and consumption. */
+export function fullRangeKm(s: Pick<Settings, 'tankSize' | 'consumptionPer100Km'>): number | null {
+  if (!s.tankSize || !s.consumptionPer100Km) return null;
+  const km = (s.tankSize / s.consumptionPer100Km) * 100;
+  return Number.isFinite(km) && km >= 10 && km <= 5000 ? Math.round(km) : null;
 }
 
 /** A stored value if it is one of `allowed`, else the default (old or hand-edited storage). */
@@ -64,6 +89,10 @@ function oneOf<T>(value: unknown, allowed: readonly T[], fallback: T): T {
 
 function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function positive(value: unknown, max: number): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= max ? value : null;
 }
 
 function voiceChoices(value: unknown): Partial<Record<Locale, string>> {
@@ -118,6 +147,14 @@ export function parseSettings(raw: string | null, base = defaultSettings()): Set
       batterySaver: bool(s.batterySaver, base.batterySaver),
       vehicle: s.vehicle === 'ev' ? 'ev' : 'fuel',
       fuelRangeKm: typeof range === 'number' && Number.isFinite(range) && range > 0 && range <= 5000 ? range : null,
+      vehicleKind: oneOf(s.vehicleKind, ['car', 'van', 'truck', 'motorcycle'] as const, base.vehicleKind),
+      tankSize: positive(s.tankSize, 1000),
+      consumptionPer100Km: positive(s.consumptionPer100Km, 100),
+      tripPace: oneOf(s.tripPace, ['relaxed', 'balanced', 'fast'] as const, base.tripPace),
+      hotelMinStars: oneOf(s.hotelMinStars, [0, 3, 4] as const, base.hotelMinStars),
+      hotelMaxDetourKm: oneOf(s.hotelMaxDetourKm, [5, 10, 20] as const, base.hotelMaxDetourKm),
+      tripFood: oneOf(s.tripFood, ['any', 'restaurant', 'fast_food', 'cafe'] as const, base.tripFood),
+      fuelBrand: typeof s.fuelBrand === 'string' && s.fuelBrand.trim() ? s.fuelBrand.trim().slice(0, 40) : null,
     };
   } catch {
     return base;

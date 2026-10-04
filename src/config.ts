@@ -56,9 +56,9 @@ export const config = {
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),
     photon: str('VITE_PHOTON_BASE_URL', 'https://photon.komoot.io'),
     /** Driver reports relay (same origin as the app: the Worker in worker/). */
-    reports: str('VITE_REPORTS_URL', '/api/reports'),
+    reports: str('VITE_REPORTS_URL', '/api/v1/reports'),
     /** Rough area of the connection, when the device can't give a position (same Worker). */
-    whereami: str('VITE_WHEREAMI_URL', '/api/whereami'),
+    whereami: str('VITE_WHEREAMI_URL', '/api/v1/whereami'),
     overpass: list('VITE_OVERPASS_URLS', [
       'https://overpass-api.de/api/interpreter',
       'https://overpass.kumi.systems/api/interpreter',
@@ -89,6 +89,11 @@ export const config = {
   routing: {
     /** Roads offered to choose from (the best one included), each with its own forecast. */
     maxRoutes: Math.max(1, Math.min(4, Math.round(num('VITE_ROUTE_OPTIONS_MAX', 3)))),
+    /**
+     * Least time between requests to one OSRM server (ms). The public servers' usage policy is at most
+     * 1 request per second; set 0 for a self-hosted router.
+     */
+    osrmMinIntervalMs: Math.max(0, num('VITE_OSRM_MIN_INTERVAL_MS', 1000)),
   },
   sampling: {
     maxIntervalMinutes: num('VITE_SAMPLE_MAX_INTERVAL_MINUTES', 45),

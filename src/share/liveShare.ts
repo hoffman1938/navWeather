@@ -1,3 +1,4 @@
+import { apiPaths } from '../api/v1';
 import { create } from 'zustand';
 import { latestFix } from '../services/location';
 import { currentMessages } from '../state/settings';
@@ -59,7 +60,7 @@ let failures = 0;
 let retryAt = 0;
 
 function deleteShare(id: string, k: string) {
-  return fetch(`/api/share/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${k}` }, keepalive: true }).catch(() => undefined);
+  return fetch(apiPaths.shareItem(id), { method: 'DELETE', headers: { Authorization: `Bearer ${k}` }, keepalive: true }).catch(() => undefined);
 }
 
 function save(v: Stored | null) {
@@ -93,7 +94,7 @@ export const useLiveShare = create<LiveShareState>()((set, get) => ({
     const m = currentMessages();
     const timeout = setTimeout(() => ctrl.abort(), 15_000);
     try {
-      const res = await fetch('/api/share', {
+      const res = await fetch(apiPaths.share, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ minutes, name: name || undefined }),
@@ -266,7 +267,7 @@ async function tick() {
   }
   inFlight = true;
   try {
-    const res = await fetch(`/api/share/${s.id}`, {
+    const res = await fetch(apiPaths.shareItem(s.id), {
       method: 'PUT',
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify(update),
