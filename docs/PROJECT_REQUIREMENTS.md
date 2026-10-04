@@ -171,10 +171,10 @@ OpenFreeMap as fallback.
 | ID | Requirement | Priority | Status | Traceability |
 | --- | --- | --- | --- | --- |
 | REQ-ROUTE-001 | While the current code still calls the public OSRM servers: ≤1 request/s per server, light non-commercial use (removed in DP-6.1…6.3) | P0 | IMPLEMENTED | per-server queue in `OSRMProvider.ts` (`VITE_OSRM_MIN_INTERVAL_MS`); `OSRMProvider.test.ts` |
-| REQ-ROUTE-003 | Avoid tolls/highways/ferries; truck, motorcycle and wheelchair profiles | P2 | PLANNED (Valhalla; DP-9.1, DP-9.2) | ADR-004 |
+| REQ-ROUTE-003 | Avoid tolls/highways/ferries; truck, motorcycle and wheelchair profiles | P2 | IN PROGRESS (avoid options in the engine and API since 2026-10-04; UI switch DP-9.1; profiles DP-9.2) | ADR-004, `src/api/route.ts` |
 | REQ-ROUTE-004 | Live traffic only from real data — our users' anonymised segment speeds (opt-in) or open official feeds; "not available" otherwise | P2 | IMPLEMENTED (none) / PLANNED (stage 10) | `services/traffic/TrafficProvider.ts` |
 | REQ-ROUTE-005 | Public transport from open timetables, labelled; today Transitous, target our own MOTIS with open feeds | P2 | IMPLEMENTED (Transitous) / PLANNED (DP-5.3, DP-6.7) | `TransitousProvider.ts`; [ADR-011](architecture/decisions/ADR-011-public-transport.md) |
-| REQ-ROUTE-007 | Self-hosted Valhalla in Cloudflare Containers for car, walking, cycling (and later truck/motorcycle), behind `/api/v1/route` with rate limits and a short cache | P0 | PLANNED (DP-5.2, DP-6.2, DP-6.3) | [ADR-004](architecture/decisions/ADR-004-routing-engine.md) |
+| REQ-ROUTE-007 | Self-hosted Valhalla in Cloudflare Containers for car, walking, cycling (and later truck/motorcycle), behind `/api/v1/route` with rate limits and a short cache | P0 | IN PROGRESS (2026-10-04: `/api/v1/route`, `/route/matrix` + `ValhallaProvider` default for car, walk, bike; Valhalla in Docker on localhost (`npm run engines:up`); Containers with Workers Paid (DP-5.1/5.2); short cache with the domain) | [ADR-004](architecture/decisions/ADR-004-routing-engine.md), `worker/route.ts`, `src/api/route.ts`, `services/routing/ValhallaProvider.ts`; `ValhallaProvider.test.ts`, `scripts/route-smoke.mjs` |
 
 ## 9. Weather architecture
 

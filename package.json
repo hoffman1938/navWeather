@@ -21,11 +21,15 @@
     "deploy": "npm run build && wrangler deploy",
     "test:trips": "node scripts/trip-smoke.mjs",
     "test:geocode": "node scripts/geocode-smoke.mjs",
+    "test:route": "node scripts/route-smoke.mjs",
     "data:borders": "node pipelines/borders/build.mjs",
     "data:download": "node pipelines/osm/download.mjs",
     "data:osm": "node --experimental-strip-types --no-warnings pipelines/osm/build.mjs",
     "db:geo:local": "wrangler d1 execute navweather-geo --local --file data/build/ge/geocode.sql",
-    "seed:local": "npm run data:download && npm run data:osm && npm run db:geo:local"
+    "seed:local": "npm run data:download && npm run data:osm && npm run db:geo:local",
+    "engines:up": "node scripts/engines.mjs up",
+    "engines:down": "node scripts/engines.mjs down",
+    "engines:status": "node scripts/engines.mjs status"
   },
   "dependencies": {
     "maplibre-gl": "^6.11.2",

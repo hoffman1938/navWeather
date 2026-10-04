@@ -13,7 +13,7 @@
 | **Map rendering** | drawing vector tiles in WebGL | MapLibre GL JS | `RouteMap.tsx` | BSD-3-Clause | WebGL unavailable → error card; app still usable |
 | **Tiles / styles** | pre-cut vector tiles + style JSON | OpenFreeMap (OpenMapTiles schema) | `MapProvider` | free, commercial OK, no SLA | blank map |
 | **Geocoding** | text ↔ place | our index (D1 FTS5 over OSM, `/api/v1/geocode`) and settlement tiles for names; Photon only when our index has nothing | `GeocodingProvider`, `AutocompleteProvider` | ODbL (our data); fair use (Photon fallback) | search fails, coordinates still work |
-| **Routing** | road graph search, ETA, steps | OSRM public (car), FOSSGIS OSRM (walk/bike), Transitous (transit), estimate (flight) | `RoutingProvider` per mode | non-commercial, ≤1 req/s | no new route; loaded route continues |
+| **Routing** | road graph search, ETA, steps | our Valhalla (car, walk, bike; Docker locally, Containers in the cloud); public OSRM/FOSSGIS only outside its region or without it; Transitous (transit), estimate (flight) | `RoutingProvider` per mode | MIT (Valhalla) / non-commercial, ≤1 req/s (fallbacks) | no new route; loaded route continues |
 | **Traffic** | live speeds/incidents | none (driver reports for incidents) | `TrafficProvider`, `IncidentProvider` | — | "not available" |
 | **Weather** | forecasts along the route | Open-Meteo | `WeatherProvider` | CC BY 4.0, non-commercial free | stale label, last forecast kept |
 

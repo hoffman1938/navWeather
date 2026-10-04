@@ -25,6 +25,7 @@ import { useSettings } from '../state/settings';
 import type { TravelMode } from '../types/travel';
 import { FlightEstimateProvider } from './routing/FlightEstimateProvider';
 import { OSRMProvider } from './routing/OSRMProvider';
+import { ValhallaProvider } from './routing/ValhallaProvider';
 import { TransitousProvider } from './routing/TransitousProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
 import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
@@ -69,13 +70,9 @@ export function createProviders(cfg: AppConfig = config): Providers {
 
   const photon = new PhotonProvider(e.photon, cfg.geocoding.language);
 
-  const routing: RoutingProvider =
-    // Ask for as many alternatives as roads we show: the distinct-road filter then has spares to drop.
-    p.routing === 'osrm'
-      ? new OSRMProvider(e.osrm, 'driving', 20000, undefined, cfg.routing.maxRoutes, cfg.routing.osrmMinIntervalMs)
-      : unknown('routing', p.routing);
-
-  // Walking and cycling: OSM community instances of the same router (no per-edge lane data, no table service assumed).
+  // The public OSRM servers (car: the demo server; walking and cycling: OSM community instances, no lane data,
+  // no table service assumed). Ask for as many alternatives as roads we show: the distinct-road filter drops spares.
+  const osrmCar = () => new OSRMProvider(e.osrm, 'driving', 20000, undefined, cfg.routing.maxRoutes, cfg.routing.osrmMinIntervalMs);
   const onFoot = (base: string): RoutingProvider =>
     new OSRMProvider(
       base,
@@ -85,8 +82,23 @@ export function createProviders(cfg: AppConfig = config): Providers {
       cfg.routing.maxRoutes,
       cfg.routing.osrmMinIntervalMs,
     );
+  // Our Valhalla first (DP-6.2, DP-6.3); the public servers only where it can't answer, while VITE_ROUTING_FALLBACK allows.
+  const osrmFallback = p.routingFallback === 'osrm' ? true : p.routingFallback === 'none' ? false : unknown('routing fallback', p.routingFallback);
+  const alternates = Math.min(2, cfg.routing.maxRoutes - 1);
+  const routing: RoutingProvider =
+    p.routing === 'valhalla'
+      ? new ValhallaProvider(e.route, 'drive', osrmFallback ? osrmCar() : null, alternates)
+      : p.routing === 'osrm'
+        ? osrmCar()
+        : unknown('routing', p.routing);
   const routingByMode: NonNullable<Providers['routingByMode']> =
-    p.routing === 'osrm' ? { walk: onFoot(e.osrmFoot), bike: onFoot(e.osrmBike), flight: new FlightEstimateProvider() } : { flight: new FlightEstimateProvider() };
+    p.routing === 'valhalla'
+      ? {
+          walk: new ValhallaProvider(e.route, 'walk', osrmFallback ? onFoot(e.osrmFoot) : null, alternates),
+          bike: new ValhallaProvider(e.route, 'bike', osrmFallback ? onFoot(e.osrmBike) : null, alternates),
+          flight: new FlightEstimateProvider(),
+        }
+      : { walk: onFoot(e.osrmFoot), bike: onFoot(e.osrmBike), flight: new FlightEstimateProvider() };
   // Public transport: timetables operators publish, through Transitous (no key). Off when the URL is set empty.
   if (e.transit) routingByMode.transit = new TransitousProvider(e.transit, cfg.geocoding.language);
 

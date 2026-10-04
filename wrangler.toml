@@ -58,6 +58,12 @@ name = "GEOCODE_LIMITER"
 namespace_id = "1005"
 simple = { limit = 120, period = 60 }
 
+# Abuse guard for routing (per client IP): a plan asks for a road and a few via probes; re-routes add more.
+[[ratelimits]]
+name = "ROUTE_LIMITER"
+namespace_id = "1006"
+simple = { limit = 60, period = 60 }
+
 # Our geocoder index (DEVELOPMENT_PLAN DP-4.4): the region's places, streets and addresses with FTS5.
 # Locally: `npm run seed:local` loads it (no account needed). On Cloudflare the first `wrangler deploy` creates
 # the database; load it with `wrangler d1 execute navweather-geo --remote --file data/build/ge/geocode.sql`.

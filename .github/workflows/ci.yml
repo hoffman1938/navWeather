@@ -43,5 +43,6 @@ jobs:
           npm run test:reports
           npm run test:trips
           npm run test:geocode
+          npm run test:route
           API=/api npm run test:share
           API=/api npm run test:reports

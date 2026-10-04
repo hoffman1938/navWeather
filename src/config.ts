@@ -30,7 +30,10 @@ function list(key: string, fallback: string[]): string[] {
 
 export const config = {
   providers: {
-    routing: str('VITE_ROUTING_PROVIDER', 'osrm'),
+    /** Roads: our Valhalla behind the Worker (DP-6.2); `osrm` = the public servers only. */
+    routing: str('VITE_ROUTING_PROVIDER', 'valhalla'),
+    /** When our engine isn't running or a point is outside its region: `osrm` (public servers) or `none`. */
+    routingFallback: str('VITE_ROUTING_FALLBACK', 'osrm'),
     weather: str('VITE_WEATHER_PROVIDER', 'open-meteo'),
     /** Search, suggestions and reverse naming: our geocoder (`/api/v1/geocode` + settlement tiles, DP-6.4). */
     geocoding: str('VITE_GEOCODING_PROVIDER', 'api'),
@@ -51,6 +54,8 @@ export const config = {
     speech: str('VITE_SPEECH_PROVIDER', 'browser'),
   },
   endpoints: {
+    /** Our routing API (the Worker's `/api/v1/route`, same origin). */
+    route: str('VITE_ROUTE_URL', '/api/v1/route'),
     osrm: str('VITE_OSRM_BASE_URL', 'https://router.project-osrm.org'),
     /** OpenStreetMap community routing instances for walking and cycling (the demo server above only does cars). */
     osrmFoot: str('VITE_OSRM_FOOT_URL', 'https://routing.openstreetmap.de/routed-foot'),

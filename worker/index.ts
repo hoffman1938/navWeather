@@ -6,10 +6,11 @@ import { LiveShare } from './liveShare';
 import { Reports } from './reports';
 import { tripBorders, tripPlaces, tripPlan, type TripEnv } from './trips';
 import { geocode, type GeocodeEnv } from './geocode';
+import { route, routeMatrix, type RouteEnv } from './route';
 
 export { LiveShare, Reports };
 
-export interface Env extends TripEnv, GeocodeEnv {
+export interface Env extends TripEnv, GeocodeEnv, RouteEnv {
   ASSETS: Fetcher;
   LIVE_SHARE: DurableObjectNamespace<LiveShare>;
   /** Workers rate-limiting binding (wrangler.toml [[ratelimits]]); optional so the relay still runs without it. */
@@ -43,6 +44,8 @@ export interface Env extends TripEnv, GeocodeEnv {
  *
  *   GET    /api/whereami           approximate location of the connection (city level)
  *   GET    /api/geocode?q=…        search and suggestions from our index (D1 FTS5; worker/geocode.ts)
+ *   POST   /api/route              our routing engine (Valhalla; OSRM-format answer; worker/route.ts)
+ *   POST   /api/route/matrix       travel times between points (detours)
  *
  *   POST   /api/trips/plan         long-trip plan for a route (stateless; worker/trips.ts)
  *   POST   /api/trips/places       places around one planned stop (Overpass, edge-cached)
@@ -64,6 +67,8 @@ export default {
     if (path === '/api/reports' || path.startsWith('/api/reports/')) return reports(request, path, url, env);
 
     if (path === '/api/geocode') return geocode(request, url, env);
+    if (path === '/api/route') return route(request, env);
+    if (path === '/api/route/matrix') return routeMatrix(request, env);
 
     if (path === '/api/trips/plan') return tripPlan(request, env);
     if (path === '/api/trips/places') return tripPlaces(request, env);

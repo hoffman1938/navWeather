@@ -63,6 +63,19 @@ coordinate: [lon, lat], kind }` (`kind`: a settlement type, `street`, `address` 
 `{ places: [] }`. `503 unavailable` when the index isn't loaded; 405 for non-GET; 429 (`GEOCODE_LIMITER`, 120/min per
 IP). The search text is neither stored nor logged. Reverse naming is done on the device from the settlement tiles.
 
+### `POST /route` (DP-5.2, ADR-004)
+Body (`src/api/route.ts`): `{ mode: "drive"|"walk"|"bike", points: [{ lon, lat, via?: true }] (2–20; `via` = a silent point
+the road passes through), alternatives?: 0–2 (two points only), avoid?: ["tolls"|"highways"|"ferries"], bearingDeg?,
+language?: "en"|"ru" }` → `200` **OSRM v5 route JSON** (`{ code: "Ok", routes: [{ distance, duration, geometry: GeoJSON
+LineString, legs: [{ steps: [{ maneuver, name, ref, geometry, intersections (lanes) … }] }] }] }` — Valhalla's
+`format: "osrm"`). Errors: `400 bad-request`, `404 no-route`, `422 outside-region` (a point beyond the engine's region:
+clients may use another router), `422 too-far`, `429` (`ROUTE_LIMITER`, 60/min per IP), `502 engine-error`,
+`503 unavailable` (no engine here). Nothing stored or logged.
+
+### `POST /route/matrix`
+`{ mode, sources: [lon,lat][], destinations: [lon,lat][] }` (≤50 each) → `{ durations: (s|null)[][], distances:
+(m|null)[][] }`.
+
 ### Long-trip planner ([LONG_TRIP_MODE](../features/LONG_TRIP_MODE.md), ADR-013)
 
 Stateless: requests are validated (`src/trip/protocol.ts`, `src/trip/borders.ts`),
@@ -100,12 +113,7 @@ third-party service with usage limits (ADR-015).
 Replaces up to 24 bbox requests per refresh. Body: `{ "corridor": <encoded polyline, precision 5, ≤500 points>,
 "widthM": 300 }` → same response as the bbox list. Server-side: decode, bbox prefilter, distance-to-line filter.
 
-### `POST /route` — PLANNED (DP-5.2, ADR-004)
-Body: `{ mode: drive|walk|bike|truck|motorcycle, points: [[lon,lat]…] ≤5, alternatives?: bool,
-avoid?: [tolls|highways|ferries], vehicle?: {heightM, weightT…}, bearingDeg?, departAtMs?|arriveByMs? }` →
-`{ routes: Route[] }` (normalised, same type as `src/types/route.ts`). Valhalla in Containers; identical requests cached
-briefly; never logged with coordinates. Related: `POST /route/matrix`, `POST /route/optimize`, `POST /route/isochrone`
-(DP-9.4, DP-9.5).
+### Later: `POST /route/optimize`, `POST /route/isochrone` (DP-9.4, DP-9.5); truck/motorcycle profiles (DP-9.2)
 
 
 ### `/places/*` — PLANNED (DP-4.3)

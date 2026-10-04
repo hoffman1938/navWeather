@@ -102,7 +102,7 @@ that names implementations, chosen by `VITE_*` variables.
 
 | Interface | Default | Notes |
 | --- | --- | --- |
-| `RoutingProvider` per travel mode | car: OSRM demo; walk/bike: OSM community OSRM instances (`routing.openstreetmap.de/routed-foot|bike`); flight: `FlightEstimateProvider`; transit: `TransitousProvider` (MOTIS `plan` at `api.transitous.org`) | `providersForMode(base, mode)` gives the mode's router (a flight has no places/elevation/road data; transit no POIs or speed limits); `travelMode` lives in the app store |
+| `RoutingProvider` per travel mode | car, walk, bike: our Valhalla (`ValhallaProvider` → `/api/v1/route`, OSRM-format answer read by the OSRM normaliser); the public OSRM servers (car: demo, walk/bike: `routing.openstreetmap.de`) only when our engine isn't running or a point is outside its region; flight: `FlightEstimateProvider`; transit: `TransitousProvider` (MOTIS `plan` at `api.transitous.org`) | `providersForMode(base, mode)` gives the mode's router (a flight has no places/elevation/road data; transit no POIs or speed limits); `travelMode` lives in the app store |
 | `RoutingProvider` | OSRM demo server | declares capabilities; `avoid` is empty because the demo server rejects `exclude`; asks for `alternatives=3` (plain `true` returns at most one), retrying with `true` if an older server answers 400 |
 | `WeatherProvider` (+ `WeatherService`) | Open-Meteo | batching, cache, stale fallback, model-run checks |
 | `GeocodingProvider` / `AutocompleteProvider` | our geocoder: `ApiGeocodingProvider` (`/api/v1/geocode`, D1 FTS5) and `TileReverseGeocoder` (nearest settlement from our tiles) | Photon only when our index has nothing (a town abroad) — `VITE_GEOCODING_FALLBACK`; Nominatim selectable |

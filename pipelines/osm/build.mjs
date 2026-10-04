@@ -17,7 +17,7 @@
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { readPbf } from './pbf.mjs';
-import { createGeocodeCollector } from './geocode.mjs';
+import { createGeocodeCollector, worldCities } from './geocode.mjs';
 import { LAYERS, POINT_LAYERS, keepTags, layersOf, ROAD_LIMIT_HIGHWAY, tileOf, tilesOfBbox } from './layers.mjs';
 
 const SRC = process.argv[2] ?? 'data/raw/georgia-latest.osm.pbf';
@@ -148,6 +148,8 @@ for (const layer of LAYERS) {
   }
 }
 writeFileSync(join(OUT, 'index.json'), JSON.stringify(index));
+// The region's countries come from OSM; the rest of the world's cities from Natural Earth (if downloaded).
+geo.addRows(worldCities(process.env.WORLD_CITIES ?? 'data/raw/ne_10m_populated_places.geojson', new Set(['GE'])));
 const geoStats = geo.write(GEO_OUT, { source: index.source, license: index.license, dataDate: index.dataDate, region: index.region, builtAt: index.builtAt });
 console.log(
   `${count.toLocaleString('en')} nodes read; ${Object.entries(stats)

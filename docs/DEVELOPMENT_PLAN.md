@@ -148,7 +148,7 @@
 | DP-2.1 | ◐ (2026-10-04: один `npm run dev` поднимает приложение и Worker с локальными DO — `scripts/dev.mjs`, без новых зависимостей; Cloudflare Vite plugin — после решения владельца Workers/Pages) Cloudflare Vite plugin: один `npm run dev` поднимает приложение + Worker + DO (+ D1/R2) вместо двух процессов и прокси | шаринг и сообщения работают на `localhost:5173` без `dev:api` | тот же бандл деплоится | `vite.config.ts`, `package.json`, `wrangler.toml`; README/ENVIRONMENT обновлены | 2 | DP-0.1 |
 | DP-2.2 | Окружения `wrangler.toml`: `dev`, `preview`, `production` с отдельными DO/D1/R2; `.dev.vars`; комментарий «всё на Workers Free» убран | `wrangler dev` берёт `dev` | `--env preview` не трогает боевые данные | DELIVERY/ENVIRONMENT обновлены | 1 | DP-2.1 |
 | DP-2.3 | Профили клиента: `.env.development` / `.env.preview` / `.env.production`; один базовый адрес API (по умолчанию тот же origin) | сборка `dev` | сборка `preview` | `src/config.ts`, `.env.example`, ENVIRONMENT | 1 | DP-2.1 |
-| DP-2.4 | Docker-окружение: каталог `infra/` с образами движков, одинаковыми для локального запуска и Containers; требования к Docker в README | `docker` + `npm run dev` поднимает пустые заглушки движков | образы собираются в CI | README «Docker нужен для движков» | 1 | DP-2.1 |
+| DP-2.4 | ◐ (2026-10-04: Colima + `npm run engines:up` — Valhalla в Docker, граф Грузии за ~1 мин, `VALHALLA_URL` в `.dev.vars`; осталось — свой образ с запечённым графом в `infra/`, общий для Docker и Containers) Docker-окружение: каталог `infra/` с образами движков, одинаковыми для локального запуска и Containers; требования к Docker в README | `docker` + `npm run dev` поднимает пустые заглушки движков | образы собираются в CI | README «Docker нужен для движков» | 1 | DP-2.1 |
 | DP-2.5 | ◐ (2026-10-04: `npm run seed:local` = загрузка выгрузки + сборка тайлов; `seed:preview` — с этапом 3) Seed-скрипты: `npm run seed:local` / `seed:preview` загружают данные региона в D1/R2 | локальные D1/R2 заполнены | preview D1/R2 заполнены | скрипты идемпотентны; дата данных в ответах API | 1 | DP-2.2 |
 | DP-2.6 | Тест паритета: Playwright smoke (поиск → маршрут → шаринг → сообщение) с `BASE_URL`; в CI — против localhost | `npm run e2e` | `BASE_URL=<preview> npm run e2e` | один и тот же набор зелёный в обоих режимах (ворота G4) | 1 | DP-2.1 |
 
@@ -179,7 +179,7 @@
 | ID | Задача | Локально | Workers | Критерий приёмки | Дни | Зависит |
 | --- | --- | --- | --- | --- | --- | --- |
 | DP-5.1 | Включить Workers Paid ($5/мес + использование); бюджеты и оповещения о расходах | — | план активен | лимит расходов настроен | 0.1 | владелец (D2) |
-| DP-5.2 | **Valhalla**: граф региона собирается в конвейере и запекается в образ; маршрут Worker `/api/v1/route` (лимит на клиента, кэш одинаковых запросов) | Docker | Containers | Тбилиси → Батуми во всех профилях; p95 < 300 мс на пилоте | 5 | DP-4.1 |
+| DP-5.2 | ◐ (2026-10-04: Worker `/api/v1/route` и `/api/v1/route/matrix` (проверка, `ROUTE_LIMITER`, ошибки `outside-region`/`no-route`) → Valhalla; на localhost работает (Тбилиси → Батуми 356 км за 0,13 с); в Cloudflare — Container после включения Workers Paid (D2); кэш одинаковых запросов — с доменом) **Valhalla**: граф региона собирается в конвейере и запекается в образ; маршрут Worker `/api/v1/route` (лимит на клиента, кэш одинаковых запросов) | Docker | Containers | Тбилиси → Батуми во всех профилях; p95 < 300 мс на пилоте | 5 | DP-4.1 |
 | DP-5.3 | **MOTIS**: фиды региона (только открытые, без ключей и квот), улицы из OSM; `/api/v1/transit` | Docker | Containers | ответ совместим с текущим транспортным провайдером; Тбилиси работает | 4 | DP-4.1 |
 | DP-5.4 | **LibreWXR** (AGPL-3.0): осадки/радар; где радара нет — «оценка модели»; `/api/v1/radar/*` | Docker | Containers | слой с подписью источника | 3 | DP-2.4 |
 | DP-5.5 | Тайлы карты: Planetiler → PMTiles в R2 (для малого региона — статикой); стили light/dark, шрифты, спрайты; раздача Worker с range-запросами | локальный R2 | R2 + Worker | карта со своих тайлов; OpenFreeMap — резерв | 5 | DP-4.1 |
@@ -191,8 +191,8 @@
 | ID | Задача | Локально | Workers | Критерий приёмки | Дни | Зависит |
 | --- | --- | --- | --- | --- | --- | --- |
 | DP-6.1 | Удалить из всех сборок адреса сервисов с лимитами; тест на бандл и `.env.example`; CSP | `npm run build` + тест | то же | в dev и prod нет хостов OSRM demo, FOSSGIS, Nominatim, Photon komoot, Overpass, Open-Meteo API, Transitous (ворота G3) | 1 | DP-6.2…6.8 |
-| DP-6.2 | `ValhallaProvider` (маршрут, альтернативы, мультиостановки, манёвры → инструкции и полосы, матрица, возможности) | сценарии на фикстурах Valhalla | preview | `scenarios.test.ts` зелёный на Valhalla; OSRM остаётся опцией | 6 | DP-5.2 |
-| DP-6.3 | Пешком/велосипед через Valhalla | `travelModes.test.ts` | preview | FOSSGIS не используется | 1 | DP-6.2 |
+| DP-6.2 | ◐ (2026-10-04: `ValhallaProvider` по умолчанию — ответ в формате OSRM читает тот же нормализатор: манёвры, полосы, остановки, тихие via-точки, матрица; публичный OSRM — только если нашего движка нет или точка вне региона, `VITE_ROUTING_FALLBACK=none` выключает; сценарии на фикстурах Valhalla — осталось) `ValhallaProvider` (маршрут, альтернативы, мультиостановки, манёвры → инструкции и полосы, матрица, возможности) | сценарии на фикстурах Valhalla | preview | `scenarios.test.ts` зелёный на Valhalla; OSRM остаётся опцией | 6 | DP-5.2 |
+| DP-6.3 | ◐ (2026-10-04: пешком и велосипед — `ValhallaProvider` (`pedestrian`, `bicycle`); FOSSGIS — только запасной) Пешком/велосипед через Valhalla | `travelModes.test.ts` | preview | FOSSGIS не используется | 1 | DP-6.2 |
 | DP-6.4 | ◐ (2026-10-04: `ApiGeocodingProvider` и `TileReverseGeocoder` по умолчанию; Photon — только когда в нашем индексе ничего нет (город за рубежом), `VITE_GEOCODING_FALLBACK=none` выключает) Геокодинг через `/api/v1/geocode` (поиск, подсказки, обратный) | тесты | preview | нет запросов к Nominatim/Photon komoot | 1 | DP-4.4 |
 | DP-6.5 | ◐ (2026-10-04: `TilePlacesProvider`, `TilePoiProvider`, `TileSpeedLimitProvider`, `TileTripPlaces` — в Грузии 0 запросов к Overpass (проверено живьём); за пределами региона пока Overpass, выключается `VITE_PLACES_FALLBACK=none`) `PlacesApiProvider` вместо Overpass (места, места по пути, лимиты, камеры, переезды, места Long Trip; убрать Overpass из `worker/trips.ts`) | Тбилиси → Батуми: 0 запросов к Overpass | то же | тесты на фикстурах API | 3 | DP-4.3 |
 | DP-6.6 | Погода, AQI, высоты через свои API | тесты | preview | нет запросов к api.open-meteo.com | 1.5 | DP-4.6, DP-4.7 |
@@ -232,7 +232,7 @@
 
 | ID | Задача | Локально | Workers | Критерий приёмки | Дни | Зависит |
 | --- | --- | --- | --- | --- | --- | --- |
-| DP-9.1 | Объезд платных дорог, трасс, паромов | фикстуры | preview | опции видны только при поддержке провайдера | 2 | DP-6.2 |
+| DP-9.1 | (2026-10-04: движок и API уже умеют — `avoid: tolls/highways/ferries`; нужен переключатель в интерфейсе) Объезд платных дорог, трасс, паромов | фикстуры | preview | опции видны только при поддержке провайдера | 2 | DP-6.2 |
 | DP-9.2 | Профили ТС: грузовик/кемпер, мотоцикл; коляска для пешехода | фикстуры | preview | грузовик объезжает низкий мост | 4 | DP-6.2 |
 | DP-9.3 | «Прибыть к» (авто и транспорт) | тесты | preview | прибытие не позже заданного | 2 | DP-6.2, DP-6.7 |
 | DP-9.4 | Оптимизация порядка остановок + перетаскивание | тесты | preview | ETA пересчитаны | 3 | DP-6.2 |

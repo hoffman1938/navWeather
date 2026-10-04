@@ -8,7 +8,7 @@
  * app's own transliteration of Georgian — the same as on screen), and the settlement it belongs to for labels
  * ("Rustavelis Ave, Tbilisi").
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { hasGeorgian, localizeScript } from '../../src/i18n/script.ts';
 import { countryAt, decodeCountries } from '../../src/trip/countries.ts';
@@ -29,6 +29,43 @@ function countryOf(lon, lat) {
   if (!en) return null;
   const ru = countryAt(countries, p, 'ru');
   return { en: en.name, ru: ru?.name ?? en.name, local: LOCAL_COUNTRY[en.code] ?? en.name };
+}
+
+/** Country names by ISO code (Natural Earth), for the labels of world cities. */
+const countryNames = new Map(JSON.parse(readFileSync(new URL('../../src/trip/data/countries-v1.json', import.meta.url), 'utf8')).countries.map((c) => [c.c, c]));
+
+/**
+ * World cities (Natural Earth populated places, public domain, `data/raw/ne_10m_populated_places.geojson`) so a
+ * search for a destination abroad ("Istanbul", "Ереван") finds the city — not a café of that name in the region.
+ * The region's own countries are skipped: OpenStreetMap has their places in more detail.
+ */
+export function worldCities(path, skipCountries) {
+  if (!existsSync(path)) return [];
+  const out = [];
+  for (const f of JSON.parse(readFileSync(path, 'utf8')).features) {
+    const p = f.properties;
+    const code = [p.ISO_A2, p.ADM0_A3 && countryNames.has(p.ISO_A2) ? p.ISO_A2 : null].find((c) => typeof c === 'string' && /^[A-Z]{2}$/.test(c));
+    if (code && skipCountries.has(code)) continue;
+    const [lon, lat] = f.geometry.coordinates;
+    const country = code ? countryNames.get(code) : null;
+    const local = clean(p.NAME);
+    const en = clean(p.NAME_EN) || local;
+    const ru = clean(p.NAME_RU) || en;
+    const pop = Number(p.POP_MAX) || 0;
+    out.push({
+      id: `ne${p.NE_ID ?? `${lon},${lat}`}`,
+      kind: pop >= 100_000 ? 'city' : 'town',
+      rank: (pop >= 100_000 ? 30 : 24) + (pop > 0 ? Math.min(7, Math.log10(pop)) : 0),
+      lon,
+      lat,
+      local,
+      en,
+      ru,
+      all: [...new Set([local, en, ru, clean(p.NAMEASCII), clean(p.NAME_DE), clean(p.NAME_TR)].filter(Boolean))].join(' '),
+      ctx: country ? { en: country.en, ru: country.ru, local: country.en } : { en: clean(p.ADM0NAME), ru: clean(p.ADM0NAME), local: clean(p.ADM0NAME) },
+    });
+  }
+  return out;
 }
 
 /** Settlement kinds and their base rank (bigger first). */
@@ -96,6 +133,11 @@ export function createGeocodeCollector() {
       }
     },
 
+    /** Rows with their own label (world cities): no nearest-settlement lookup. */
+    addRows(list) {
+      for (const r of list) rows.push({ ...r, fixedCtx: r.ctx });
+    },
+
     /** Resolve settlements for labels and write the SQL. */
     write(path, meta) {
       // Streets: per name, cluster ways that are within 3 km of each other (one row per town's street).
@@ -153,8 +195,8 @@ export function createGeocodeCollector() {
         sizeFts = 0;
       };
       rows.forEach((r, i) => {
-        const s = r.country ? null : nearest(r.lon, r.lat);
-        const ctx = r.country ? countryOf(r.lon, r.lat) : s ?? (r.city ? namesOf({ name: r.city }) : null);
+        const s = r.country || r.fixedCtx ? null : nearest(r.lon, r.lat);
+        const ctx = r.fixedCtx ?? (r.country ? countryOf(r.lon, r.lat) : s ?? (r.city ? namesOf({ name: r.city }) : null));
         // A street or place counts more in a bigger town: Tbilisi's Rustaveli Avenue before a village's.
         const rank = r.rank + (s ? s.rank * (r.kind === 'street' ? 0.25 : 0.08) : 0);
         const rowid = i + 1;

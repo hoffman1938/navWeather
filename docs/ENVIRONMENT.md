@@ -16,7 +16,8 @@ Worker route instead (see `worker/`).
 
 | Variable | Default | Values |
 | --- | --- | --- |
-| `VITE_ROUTING_PROVIDER` | `osrm` | `osrm` |
+| `VITE_ROUTING_PROVIDER` | `valhalla` | `valhalla` (our engine via `/api/v1/route`), `osrm` (public servers) |
+| `VITE_ROUTING_FALLBACK` | `osrm` | when our engine isn't running or a point is outside its region: `osrm` (public servers) or `none` |
 | `VITE_WEATHER_PROVIDER` | `open-meteo` | `open-meteo` |
 | `VITE_GEOCODING_PROVIDER` | `api` | `api` (our geocoder + settlement tiles), `nominatim`, `photon` |
 | `VITE_AUTOCOMPLETE_PROVIDER` | `api` | `api`, `photon` |
@@ -36,6 +37,7 @@ Worker route instead (see `worker/`).
 
 | Variable | Default |
 | --- | --- |
+| `VITE_ROUTE_URL` | `/api/v1/route` — our routing API (same origin) |
 | `VITE_OSRM_BASE_URL` | `https://router.project-osrm.org` |
 | `VITE_OSRM_MIN_INTERVAL_MS` | `1000` — least time between requests to one OSRM server (the public servers allow 1 request/s); `0` for a self-hosted router |
 | `VITE_OSRM_FOOT_URL` / `VITE_OSRM_BIKE_URL` | `https://routing.openstreetmap.de/routed-foot` / `…/routed-bike` (walking and cycling; the demo server above only does cars) |
@@ -108,6 +110,8 @@ on :8787, as Cloudflare would (headers, SPA fallback, service worker).
 | `TRIP_LIMITER` | rate-limit binding (`wrangler.toml`) | 20 requests / 60 s per IP | `/api/v1/trips/*` |
 | `GEO` | D1 database `navweather-geo` | — | our geocoder index; locally `npm run seed:local` loads it (no account); on Cloudflare the first deploy creates it, then `wrangler d1 execute navweather-geo --remote --file data/build/ge/geocode.sql` |
 | `GEOCODE_LIMITER` | rate-limit binding | 120 requests / 60 s per IP | `/api/v1/geocode` |
+| `VALHALLA_URL` | var (`.dev.vars` locally, written by `npm run engines:up`) | unset → 503 | where our Valhalla answers; in the cloud the container (DP-5.2) |
+| `ROUTE_LIMITER` | rate-limit binding | 60 requests / 60 s per IP | `/api/v1/route`, `/route/matrix` |
 | `ASSETS` (read by the Worker) | static assets | — | our places tiles for Long Trip stops (`/data/places/v1`) |
 | `OVERPASS_URLS` | `[vars]` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter` | Overpass endpoints for trip stop places and borders (server-side) |
 | `TRIP_USER_AGENT` | `[vars]` | `navWeather/0.1 (trip planner; Cloudflare Worker)` | identifies the app to Overpass — **add a contact before production** |

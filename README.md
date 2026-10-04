@@ -42,7 +42,13 @@ npm run seed:local   # downloads Georgia's OpenStreetMap extract (~100 MB, Geofa
                      # loads the search index (188 000 places, streets, addresses) into the local D1 database
 ```
 
-Without it the app still works and asks the public Overpass and Photon servers instead.
+Our routing engine (Valhalla) runs in Docker — [Colima](https://github.com/abiosoft/colima) (free) or Docker Desktop:
+
+```bash
+npm run engines:up   # starts Valhalla and builds Georgia's road graph on first run (~1 min); then restart npm run dev
+```
+
+Without them the app still works and asks the public Overpass, Photon and OSRM servers instead.
 
 Use Node 22+ (required by the Cloudflare tooling; the tests need 20+).
 Location only works on `https://` or `localhost` — opening the dev server from

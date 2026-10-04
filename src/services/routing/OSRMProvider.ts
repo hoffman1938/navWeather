@@ -36,7 +36,7 @@ interface OsrmLeg {
   steps: OsrmStep[];
   annotation?: { duration?: number[]; distance?: number[]; speed?: number[] };
 }
-interface OsrmRoute {
+export interface OsrmRoute {
   distance: number;
   duration: number;
   geometry: { coordinates: LngLat[] };
