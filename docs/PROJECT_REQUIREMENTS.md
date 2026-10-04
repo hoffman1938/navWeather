@@ -267,8 +267,8 @@ attribution, caching, limits and a verdict, with source and verification date.
 | --- | --- | --- | --- |
 | REQ-LEGAL-001 | Attribution for every data source and engine actually used (today: OSM, OpenMapTiles, OpenFreeMap, Open-Meteo, routing servers, Transitous) | P0 | IMPLEMENTED (today) / PLANNED (target list, DP-6.9) |
 | REQ-LEGAL-002 | Non-commercial licences (e.g. EOX Sentinel-2 cloudless 2018+) are used only while REQ-COST-006 holds | P1 | IMPLEMENTED (policy) |
-| REQ-LEGAL-003 | Repository public under an OSI licence (AGPL services, open feeds, F-Droid, free CI) | P1 | PLANNED (owner decision D1, DP-0.3) |
-| REQ-LEGAL-004 | Speed-camera alerts: legality varies by country; off by default, user responsibility shown in Settings | P1 | IMPLEMENTED (currently on by default — DP-0.4 switches it off) |
+| REQ-LEGAL-003 | Repository public under an OSI licence (AGPL services, open feeds, F-Droid, free CI) | P1 | IN PROGRESS (owner decision D1 2026-10-04: open, MIT; `LICENSE` added — the owner switches the GitHub repository to public) |
+| REQ-LEGAL-004 | Speed-camera alerts: legality varies by country; **on by default (owner decision D4, 2026-10-04)**, one switch in Settings with the user's responsibility shown there | P1 | IMPLEMENTED |
 
 ## 16. UX principles
 
@@ -467,7 +467,7 @@ iOS, CarPlay, Android Auto and Google Play are BLOCKED by store fees (ADR-015).
 
 ## 35. Licensing requirements
 
-Code: currently no licence file (all rights reserved by default) — owner decision D1 (recommended: public, MIT).
+Code: MIT (`LICENSE`, owner decision D1 of 2026-10-04); the repository is to be made public by the owner.
 Data/services: per [LICENSING_MATRIX](legal/LICENSING_MATRIX.md) and [FREE_STACK_PLAN §10](FREE_STACK_PLAN.md).
 Attribution strings live in `src/i18n/*` (`ui.attribution`) and the map's attribution control.
 

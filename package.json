@@ -1,6 +1,7 @@
 {
   "name": "navweather",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "description": "Know the weather before you reach it \u2014 forecast along your driving route at your estimated arrival time.",
   "type": "module",

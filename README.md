@@ -207,6 +207,11 @@ npx wrangler deploy      # app + live-sharing and reports relay (Worker + Durabl
 [ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md). Separate `preview` and `production`
 environments and the one-command local stack arrive with DEVELOPMENT_PLAN stage 2.
 
+## Licence
+
+Code: [MIT](LICENSE). Map data © OpenStreetMap contributors (ODbL); other data and services keep their own
+licences — see the [licensing matrix](docs/legal/LICENSING_MATRIX.md).
+
 ## Docs
 
 Start with **[Project requirements](docs/PROJECT_REQUIREMENTS.md)** (single

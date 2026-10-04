@@ -1,6 +1,6 @@
 # ADR-016 — All hosting on Cloudflare: Workers (not Pages) + R2 + D1 + Durable Objects + Queues + Cron + Containers; every part also runs on localhost
 
-**Status:** Accepted · **Date:** 2026-10-04 · **Decision by:** owner
+**Status:** Accepted · **Date:** 2026-10-04 · **Decision by:** owner · **Confirmed:** 2026-10-04 by the owner after the Pages/Workers comparison (DEVELOPMENT_PLAN §9, D11)
 **Extends:** [ADR-001](ADR-001-cloudflare-first.md) (one Worker with static assets, not Pages) ·
 **Implements the hosting part of:** [ADR-015](ADR-015-free-software-own-hosting.md) ·
 **Revised accordingly:** [ADR-004](ADR-004-routing-engine.md), [ADR-006](ADR-006-map-stack.md), [ADR-007](ADR-007-data-storage.md),
