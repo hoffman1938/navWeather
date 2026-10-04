@@ -26,23 +26,26 @@ DEPRECATED · FUTURE.
 
 ## 0. Binding constraints (owner decisions, 2026-10-03 and 2026-10-04)
 
-Decisions: [ADR-015](architecture/decisions/ADR-015-free-software-own-hosting.md) (2026-10-04, newer) and
-[ADR-014](architecture/decisions/ADR-014-zero-cost.md) (2026-10-03, superseded in part). Plans:
-[FREE_STACK_PLAN](FREE_STACK_PLAN.md) (catalogue of free alternatives, Google Maps gaps, tasks `FS-x.y`) and
-[PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md) (stage 1 and stages 3–7 still apply; stage 2 replaced).
-These constraints override any older requirement that assumed a paid step; such requirements are marked DEPRECATED
-or BLOCKED below with the reason and date (never deleted).
+Decisions: [ADR-016](architecture/decisions/ADR-016-all-on-cloudflare-workers.md) (2026-10-04, hosting on Cloudflare
+Workers, localhost parity), [ADR-015](architecture/decisions/ADR-015-free-software-own-hosting.md) (2026-10-04, always
+free, only hosting paid) and [ADR-014](architecture/decisions/ADR-014-zero-cost.md) (2026-10-03, superseded in part).
+**Plan: [DEVELOPMENT_PLAN](DEVELOPMENT_PLAN.md)** (tasks `DP-x.y`; it replaces the task lists of
+[PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md) `PR-x.y` and FREE_STACK_PLAN v1.1 `FS-x.y`, mapped in its
+"Было" column). Catalogue: [FREE_STACK_PLAN](FREE_STACK_PLAN.md). These constraints override any older requirement
+that assumed a paid step; such requirements are marked DEPRECATED or BLOCKED below with the reason and date (never
+deleted).
 
 | ID | Constraint | Priority | Status |
 | --- | --- | --- | --- |
 | REQ-COST-005 | **Zero operating cost:** no paid plan, API key plan, hosting, domain, store account or billing service; Cloudflare Workers Free on `*.workers.dev`; free public services and open data; a service that needs a payment method only as an optional accelerator, never in the critical path | P0 | DEPRECATED — Reason: owner decision ADR-015 (hosting may be paid; scale target Google-Maps-class) · Date: 2026-10-04 → REQ-COST-009…012 |
 | REQ-COST-006 | **Free for users, non-commercial:** no subscriptions, ads, paid features or in-app purchases; stated in the app | P0 | IN PROGRESS (true today; in-app statement planned, PR-0.1/PR-4.1) — kept by ADR-015 |
 | REQ-COST-007 | **Core independent of our Worker quota:** search, routing, weather at ETA, alerts, navigation and Long Trip planning work when `/api/*` is exhausted (429) | P0 | DEPRECATED — Reason: ADR-015 (no free-tier quota in the target) · Date: 2026-10-04 → REQ-COST-012 |
-| REQ-COST-008 | Capacity ceilings of the free stack documented; per-feature budgets, back-off and a degradation ladder; users told when a free limit is reached | P1 | DEPRECATED — Reason: ADR-015 · Date: 2026-10-04 → REQ-SCALE-004 (capacity model of our own hosting, FS-2.11) |
-| REQ-COST-009 | **Only hosting is paid:** the owner pays for compute, storage, bandwidth, CDN in front of our own servers and a domain — nothing else; no paid API plans, keys, per-request/per-user fees or paid data (ADR-015) | P0 | PLANNED (FREE_STACK_PLAN; today the app uses free public services) |
+| REQ-COST-008 | Capacity ceilings of the free stack documented; per-feature budgets, back-off and a degradation ladder; users told when a free limit is reached | P1 | DEPRECATED — Reason: ADR-015 · Date: 2026-10-04 → REQ-SCALE-004 (capacity model of our own hosting, DP-5.6) |
+| REQ-COST-009 | **Only hosting is paid:** the owner pays for hosting — Cloudflare (ADR-016): Workers Paid, R2, D1, Durable Objects, Queues, Containers usage, and a domain — nothing else; no paid API plans, keys, per-request/per-user fees or paid data (ADR-015) | P0 | PLANNED (DEVELOPMENT_PLAN; today the app uses free public services) |
 | REQ-COST-010 | **No sponsors:** no sponsorship programmes, grants or credits in the plan or the critical path (ADR-015) | P0 | VERIFIED (none used) |
-| REQ-COST-011 | **Free software and open data only** for every third-party component; licence recorded in LICENSING_MATRIX before use; attribution shown; AGPL obligations met (ADR-015) | P0 | IN PROGRESS (FREE_STACK_PLAN §10; FS-3.10) |
-| REQ-COST-012 | **Always free, at any scale, in development and in production:** only (A) our own instances of free software, (B) open data files downloaded on a fixed schedule (volume independent of users, no paid tier) and (C) services with no usage limit and no paid tier (OpenFreeMap as tile fallback, browser capabilities). No free tier with a limit, key with a quota, trial or public demo server anywhere — development runs the same stack locally at $0 (FREE_STACK_PLAN §1.1); checked by a bundle test and an E2E test of dev and prod builds (gates G2', G3') | P0 | PLANNED (FS-2.1, FS-3.1…FS-3.8) |
+| REQ-COST-011 | **Free software and open data only** for every third-party component; licence recorded in LICENSING_MATRIX before use; attribution shown; AGPL obligations met (ADR-015) | P0 | IN PROGRESS (FREE_STACK_PLAN §10; DP-6.9) |
+| REQ-COST-012 | **Always free, at any scale, in development and in production:** only (A) our own instances of free software, (B) open data files downloaded on a fixed schedule (volume independent of users, no paid tier) and (C) services with no usage limit and no paid tier (OpenFreeMap as tile fallback, browser capabilities). No free tier with a limit, key with a quota, trial or public demo server anywhere — development runs the same stack locally at $0 (FREE_STACK_PLAN §1.1); checked by a bundle test and an E2E test of dev and prod builds (DEVELOPMENT_PLAN gates G2, G3) | P0 | PLANNED (DP-2.x, DP-6.1…DP-6.8) |
+| REQ-DEV-001 | **Localhost parity:** every feature runs on a developer machine with no Cloudflare account and no money (`npm run dev` = Vite + Cloudflare Vite plugin with local Durable Objects/D1/R2/Queues + Docker for the same container images + local seed data) **and** on the preview Worker; one E2E suite passes against both (ADR-016, owner 2026-10-04) | P0 | PLANNED (DEVELOPMENT_PLAN stage 2, gate G4) |
 
 ## 1. Product vision
 
@@ -152,15 +155,22 @@ decision: [ADR-013](architecture/decisions/ADR-013-trip-planner.md).
 | REQ-CF-001 | One Worker with static assets serves the app and `/api/*` (not Pages; see ADR-001) | P0 | IMPLEMENTED | `wrangler.toml`, `worker/index.ts` |
 | REQ-CF-002 | Durable Objects only where a single coordinated state is needed (live share per link, reports) | P1 | IMPLEMENTED | `worker/liveShare.ts`, `worker/reports.ts` |
 | REQ-CF-003 | Per-client rate limits on every write and on report listing | P0 | IMPLEMENTED | `wrangler.toml [[ratelimits]]`, `worker/index.ts` |
-| REQ-CF-004 | D1 introduced only with optional accounts (Phase 3) | P2 | PLANNED | [DATA_MODEL](database/DATA_MODEL.md), `database/migrations/0001_accounts.sql` (proposed, not applied) |
-| REQ-CF-005 | Shared edge cache for weather (Worker + Cache API/KV) before a beta beyond ~25 daily users | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (Cache API has no effect on `*.workers.dev`; KV Free allows 1,000 writes/day) → replaced by REQ-WX-011 / REQ-WX-012 | [ADR-005](architecture/decisions/ADR-005-weather-provider.md), [COST](operations/COST_AND_SCALE.md) |
-| REQ-CF-006 | Queues, R2, Cron Triggers only when a listed trigger occurs | P2 | PLANNED — only products available on Workers Free (ADR-014) | [TARGET_ARCHITECTURE](architecture/TARGET_ARCHITECTURE.md) §2 |
-| REQ-CF-007 | Workers Paid plan ($5/month minimum) before public beta | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (Workers Free only; budgets and degradation instead, REQ-COST-008) | [COST](operations/COST_AND_SCALE.md) §3 |
+| REQ-CF-004 | D1 introduced only with optional accounts (Phase 3) | P2 | PLANNED — CHANGED by ADR-016 (2026-10-04): D1 also holds regional places and geocoder indexes (REQ-CF-015) | [DATA_MODEL](database/DATA_MODEL.md), `database/migrations/0001_accounts.sql` (proposed, not applied) |
+| REQ-CF-005 | Shared edge cache for weather (Worker + Cache API/KV) before a beta beyond ~25 daily users | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (Cache API has no effect on `*.workers.dev`; KV Free allows 1,000 writes/day) → replaced by REQ-WX-011 / REQ-WX-012. Superseded again by ADR-016 (2026-10-04): weather cells pre-computed into R2 by our pipeline (REQ-CF-016) | [ADR-005](architecture/decisions/ADR-005-weather-provider.md), [COST](operations/COST_AND_SCALE.md) |
+| REQ-CF-006 | Queues, R2, Cron Triggers only when a listed trigger occurs | P2 | CHANGED by ADR-016 (2026-10-04): R2, Queues, Cron Triggers and Containers are part of the target (REQ-CF-013…018) | [TARGET_ARCHITECTURE](architecture/TARGET_ARCHITECTURE.md) §2 |
+| REQ-CF-007 | Workers Paid plan ($5/month minimum) before public beta | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (Workers Free only; budgets and degradation instead, REQ-COST-008). REVIVED by ADR-016 (2026-10-04): Workers Paid from the first engine in Containers — PLANNED (DEVELOPMENT_PLAN DP-5.1) | [COST](operations/COST_AND_SCALE.md) §3 |
 | REQ-CF-008 | Shard the single `Reports` object by region before it nears ~1,000 req/s | P2 | PLANNED | [SCALE](operations/COST_AND_SCALE.md) |
 | REQ-CF-009 | Report listing as one corridor request instead of up to 24 box requests | P1 | PLANNED | `services/traffic/ReportsIncidentProvider.ts`, [API_V1](api/API_V1.md) |
 | REQ-CF-010 | Trip planner endpoints (`/api/v1/trips/plan|places|borders`) stateless, rate-limited (`TRIP_LIMITER`), places/borders edge-cached | P1 | DEFECT (B-22: places/borders 'edge cache' uses the Cache API, which does nothing on `*.workers.dev`); web path moves to static data and client borders (REQ-DATA-006, PR-2.3/2.4) | `worker/trips.ts`, `wrangler.toml` |
-| REQ-CF-011 | No feature relies on the Cache API while the app runs on `*.workers.dev`; shared caches use Durable Object SQLite (Free: 100k rows written/day) or static assets (added 2026-10-03) | P1 | PLANNED (fixes B-22) | `worker/trips.ts` |
-| REQ-CF-012 | Per-feature request budgets on Workers Free (100k requests/day, DO 100k/day): reports corridor, adaptive live-share cadence, back-off on 429, rate limits on every endpoint incl. `/whereami` (added 2026-10-03) | P1 | PLANNED | `worker/*`, `share/liveShare.ts`, `ReportsIncidentProvider.ts` |
+| REQ-CF-011 | No feature relies on the Cache API while the app runs on `*.workers.dev`; shared caches use Durable Object SQLite (Free: 100k rows written/day) or static assets (added 2026-10-03) | P1 | PLANNED (fixes B-22) — until the custom domain is attached (ADR-016, DP-12.1); after that the Cache API is allowed | `worker/trips.ts` |
+| REQ-CF-012 | Per-feature request budgets on Workers Free (100k requests/day, DO 100k/day): reports corridor, adaptive live-share cadence, back-off on 429, rate limits on every endpoint incl. `/whereami` (added 2026-10-03) | P1 | CHANGED by ADR-016 (2026-10-04): budgets now protect the owner's hosting bill on Workers Paid (alerts, back-off, rate limits) — PLANNED (DP-3.4, DP-5.1) | `worker/*`, `share/liveShare.ts`, `ReportsIncidentProvider.ts` |
+
+| REQ-CF-013 | **All hosting on Cloudflare Workers (not Pages)** — one Worker project with static assets and `/api/v1/*`; custom domain attached to it when bought (ADR-016) | P0 | IMPLEMENTED (Worker with assets) / PLANNED (domain, DP-12.1) | `wrangler.toml`, ADR-016 |
+| REQ-CF-014 | `wrangler.toml` environments `dev` / `preview` / `production` with separate Durable Object namespaces, D1 databases and R2 buckets; preview never touches production data (ADR-016) | P1 | PLANNED (DP-2.2, DP-3.2) | `wrangler.toml`, [DELIVERY](operations/DELIVERY.md) |
+| REQ-CF-015 | D1 per region/country for places and the FTS5 geocoder index (≤10 GB per database), plus accounts (ADR-016) | P1 | PLANNED (DP-4.2, DP-4.4, DP-7.6) | ADR-016, [DATA_MODEL](database/DATA_MODEL.md) |
+| REQ-CF-016 | R2 for map PMTiles, places tiles, weather cells, terrain, imagery and data snapshots, served by the Worker with range requests (Cache API once the domain exists) (ADR-016) | P1 | PLANNED (DP-4.x, DP-5.5) | ADR-016 |
+| REQ-CF-017 | Cloudflare Containers (Workers Paid) for Valhalla, MOTIS, LibreWXR (and Photon if needed), one instance group per region, behind Worker routes with rate limits; engine data baked into images or pulled from R2 (ephemeral disk) (ADR-016) | P1 | PLANNED (DP-5.2…DP-5.7) | ADR-016 |
+| REQ-CF-018 | Cron Triggers + Queues for data pipelines, weather refresh, push fan-out and traffic ingestion; every scheduled job can be triggered by hand on localhost (ADR-016) | P1 | PLANNED (DP-4.x, DP-7.5, DP-10.3) | ADR-016 |
 
 ## 7. Map architecture
 
@@ -258,7 +268,7 @@ everything that works today keeps working with no account.
 | REQ-SEC-004 | Capability links with ≥128-bit ids; sharer key stored only as SHA-256 | P0 | VERIFIED |
 | REQ-SEC-005 | Reporter/voter identity only as daily-salted hash; no IP stored | P0 | IMPLEMENTED |
 | REQ-SEC-006 | Turnstile on account creation / email login when accounts ship | P2 | FUTURE — Turnstile is free; only relevant if accounts ship |
-| REQ-SEC-007 | WAF + Cloudflare rate-limiting rules on the zone before public launch | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (WAF/zone rules need a purchased domain) → Workers rate-limit binding + validation (REQ-CF-012); a free domain is optional (plan PR-8.3) |
+| REQ-SEC-007 | WAF + Cloudflare rate-limiting rules on the zone before public launch | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 (WAF/zone rules need a purchased domain) → Workers rate-limit binding + validation (REQ-CF-012); a free domain is optional (plan PR-8.3). REVIVED by ADR-016 (2026-10-04): the owner will attach a domain — PLANNED (DP-12.1) |
 | REQ-SEC-008 | Dependency updates monitored (Dependabot) and CI on every PR | P1 | IMPLEMENTED (`.github/`) |
 
 ## 14. Privacy requirements
@@ -321,11 +331,11 @@ large targets, nothing to read for long ([UX_AND_GROWTH](product/UX_AND_GROWTH.m
 
 | ID | Requirement | Priority | Status |
 | --- | --- | --- | --- |
-| REQ-SCALE-001 | Upstream weather calls bounded by geography × refresh rate, not by user count (shared cache) | P1 | CHANGED by ADR-014 — upstream weather calls are bounded per device (REQ-WX-011); a shared cache only with a free domain. CHANGED again by ADR-015 (2026-10-04): self-hosted Open-Meteo syncs model data per region and run, so upstream volume does not depend on users at all (FS-2.7) |
-| REQ-SCALE-002 | No single Durable Object on the hot path of every user at >1,000 req/s | P2 | PLANNED (shard Reports; FS-4.3) |
+| REQ-SCALE-001 | Upstream weather calls bounded by geography × refresh rate, not by user count (shared cache) | P1 | CHANGED by ADR-014 — upstream weather calls are bounded per device (REQ-WX-011); a shared cache only with a free domain. CHANGED again by ADR-015 (2026-10-04): our weather pipeline downloads model files per run and region (ADR-016: cells in R2), so upstream volume does not depend on users at all (DP-4.6) |
+| REQ-SCALE-002 | No single Durable Object on the hot path of every user at >1,000 req/s | P2 | PLANNED (shard Reports; DP-7.2) |
 | REQ-SCALE-003 | Self-hosted routing/geocoding/POI before public beta | P1 | DEPRECATED — Reason: zero-cost decision, ADR-014 · Date: 2026-10-03 → static OSM data (REQ-DATA-006) and free fallback chains (REQ-ROUTE-006); own services optional (plan §7 Этап 8). Revived by ADR-015 (2026-10-04) as REQ-SCALE-005 |
-| REQ-SCALE-004 | **Google-Maps-class target:** every server role is stateless and horizontally scalable, multi-region, with cache layers (tiles, weather by cell + model run, places by tile, geocoding); a measured capacity model gives hosting cost per 1,000 DAU (ADR-015) | P0 | PLANNED (FS-2.11, FS-8.x) |
-| REQ-SCALE-005 | Self-hosted free engines before public beta: Valhalla (routing, all modes), Photon (geocoding), PostGIS Places API (OSM + Overture + Foursquare OS Places + Open Charge Map), Open-Meteo (weather, air quality, elevation), MOTIS (public transport), own tiles (Planetiler → PMTiles), own real-time backend (ADR-015) | P1 | PLANNED (FREE_STACK_PLAN stages 2–4) |
+| REQ-SCALE-004 | **Google-Maps-class target:** every server role is stateless and horizontally scalable, multi-region, with cache layers (tiles, weather by cell + model run, places by tile, geocoding); a measured capacity model gives hosting cost per 1,000 DAU (ADR-015) | P0 | PLANNED (DP-5.6, DP-13.5, DP-13.6) |
+| REQ-SCALE-005 | Self-hosted free engines before public beta: Valhalla (routing, all modes), geocoder (D1 FTS5 or Photon), Places API (OSM + Overture + Foursquare OS Places + Open Charge Map in D1/R2), weather pipeline (weather and air quality as cells in R2; elevation from Copernicus DEM), MOTIS (public transport), own tiles (Planetiler → PMTiles in R2), real time on Workers + Durable Objects (ADR-015, ADR-016) | P1 | PLANNED (DEVELOPMENT_PLAN stages 4–7; on Cloudflare per ADR-016) |
 
 Models: [COST_AND_SCALE](operations/COST_AND_SCALE.md); free stack and plan: [FREE_STACK_PLAN](FREE_STACK_PLAN.md).
 

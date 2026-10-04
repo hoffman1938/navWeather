@@ -1,5 +1,11 @@
 # Target architecture
 
+> ⚠️ **Outdated (docs audit 2026-10-04).** Written before ADR-014/015/016. The target is now: all hosting on
+> Cloudflare Workers (not Pages) with R2, D1, Durable Objects, Queues, Cron and Containers; every third-party
+> component free forever (own engines and open data); no paid keys, no MET Norway, no public demo servers, and every
+> part also runs on localhost. Current target: [ADR-016](decisions/ADR-016-all-on-cloudflare-workers.md),
+> [FREE_STACK_PLAN §6/§6a](../FREE_STACK_PLAN.md); plan: [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md). Rewrite: DP-0.7.
+
 Current implementation: [ARCHITECTURE.md](../ARCHITECTURE.md). Requirements:
 [PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md). Decisions:
 [decisions/](decisions/README.md). Cloudflare facts verified 2026-10-02 against

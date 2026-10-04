@@ -1,10 +1,11 @@
 # ADR-015 — Free software and open data on our own (paid) hosting; no paid services, no sponsors; Google-Maps-class scale
 
 **Status:** Accepted · **Date:** 2026-10-04 · **Decision by:** owner
+**Update 2026-10-04:** placement of the engines in decision 4 is amended by [ADR-016](ADR-016-all-on-cloudflare-workers.md) — places on D1/R2 instead of PostGIS, a weather pipeline writing cells to R2 instead of a long-running Open-Meteo server, geocoder on D1 FTS5 first (Photon only if needed), real time on Workers + Durable Objects; Valhalla, MOTIS and LibreWXR in Cloudflare Containers.
 **Supersedes in part:** [ADR-014](ADR-014-zero-cost.md) (rule "zero operating cost / free tiers only / Workers Free only")
 **Amends:** [ADR-001](ADR-001-cloudflare-first.md), [ADR-004](ADR-004-routing-engine.md), [ADR-005](ADR-005-weather-provider.md),
 [ADR-006](ADR-006-map-stack.md), [ADR-011](ADR-011-public-transport.md), [ADR-012](ADR-012-offline.md), [ADR-013](ADR-013-trip-planner.md)
-**Catalogue and plan:** [FREE_STACK_PLAN](../../FREE_STACK_PLAN.md)
+**Catalogue:** [FREE_STACK_PLAN](../../FREE_STACK_PLAN.md) · **Plan:** [DEVELOPMENT_PLAN](../../DEVELOPMENT_PLAN.md) · **Hosting:** [ADR-016](ADR-016-all-on-cloudflare-workers.md) (Cloudflare Workers; engines placed per its limits)
 
 ## Context
 On 2026-10-04 the owner set three rules that replace the "zero operating cost" reading of ADR-014:
@@ -17,7 +18,7 @@ On 2026-10-04 the owner set three rules that replace the "zero operating cost" r
 3. **Hosting is the one thing the owner pays for.** Servers, bandwidth and storage the app runs on are paid by the
    owner; load is understood to cost money.
 
-Facts verified 2026-10-03/04 (sources in FREE_STACK_PLAN §11):
+Facts verified 2026-10-03/04 (sources in FREE_STACK_PLAN §12):
 - Every public free service the app uses today is free only below a limit or forbids production use: OSRM demo and
   FOSSGIS (≤1 req/s, non-commercial, "not production"), Nominatim (≤1 req/s **for the whole app**, no autocomplete),
   Photon (throttled), Overpass ("not suitable as an app backend"), Open-Meteo (<10,000 calls/day, non-commercial),
@@ -84,9 +85,8 @@ Transitous and many national navigation products, and every limit we hit today d
 ## Consequences
 - REQ-COST-005 (zero operating cost) and REQ-SCALE-003's deprecation are replaced (PROJECT_REQUIREMENTS §0, §19);
   new binding constraints REQ-COST-009…012 and REQ-SCALE-004.
-- PRODUCTION_READINESS_PLAN stage 2 ("free architecture on Workers Free") is replaced by FREE_STACK_PLAN phases 1–3;
-  stage 1 (driver-safety defects) is unchanged and goes first; stages 3–7 continue with the gates amended
-  (FREE_STACK_PLAN §8).
+- PRODUCTION_READINESS_PLAN is replaced by DEVELOPMENT_PLAN (2026-10-04): its stage 1 (driver-safety defects) stays
+  first; its other tasks are mapped there; release gates are unified in DEVELOPMENT_PLAN §7.
 - Hosting cost grows with users; the largest items are tile/bandwidth and routing compute. Offline region packs,
   CDN caching and cache-friendly APIs (weather by cell + model run, places by tile) are design requirements.
 - New operational burden: data pipelines (weekly OSM, model runs), engine upgrades, monitoring, on-call runbooks.

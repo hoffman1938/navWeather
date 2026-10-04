@@ -1,6 +1,7 @@
 # ADR-013 — Long-trip planner as a stateless Worker endpoint over a shared TS domain module
 
 **Status:** Accepted · **Date:** 2026-10-02 · **Amends:** ADR-003 (for trip planning only)
+**Update 2026-10-04:** amended by [ADR-016](ADR-016-all-on-cloudflare-workers.md): on Workers Paid the 10 ms CPU limit (B-23) no longer applies; stop places come from our Places API on D1/R2 and borders from Natural Earth on the client (B-22; DP-4.5, DP-6.5).
 
 ## Context
 Long Trip Mode ([features/LONG_TRIP_MODE.md](../../features/LONG_TRIP_MODE.md))

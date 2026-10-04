@@ -131,11 +131,19 @@ English and Russian; metric/imperial; appearance **like the device** (a dark pho
 a dark map in the car too), light, dark, or "day and night" (the sun at the car while
 driving); a street-level camera while driving; installable PWA.
 
-## What it costs: nothing
+## What it costs
 
-Every part runs on free services or free tiers, with no API keys and no card:
+**For users: nothing, forever** — no ads, subscriptions or paid features (non-commercial project).
+**For the owner: only hosting, on Cloudflare** — and every third-party API, data source and program must stay free
+forever, at any scale, in development too ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md),
+[ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md)).
 
-| Part | Service | Free terms to keep in mind |
+**Today's code** still calls the public free services below. They have usage limits or forbid production use, so
+they are being replaced by the same free, open-source engines running on our own Cloudflare hosting (Valhalla,
+MOTIS and LibreWXR in Containers; places, geocoder, map tiles and weather cells in D1/R2) — see the
+[development plan](docs/DEVELOPMENT_PLAN.md) and the [catalogue of free replacements](docs/FREE_STACK_PLAN.md):
+
+| Part | Service today | Its limits (why it is replaced) |
 | --- | --- | --- |
 | App + live sharing + driver reports | Cloudflare Workers **Free plan** (static assets, 2 SQLite Durable Objects, rate limits) | 100 000 Worker requests/day (static files don't count); plenty for personal use |
 | Map tiles | OpenFreeMap | free, no key |
@@ -146,17 +154,8 @@ Every part runs on free services or free tiers, with no API keys and no card:
 | Places, speed limits, cameras | Overpass (OpenStreetMap) | fair use, often slow |
 | Device voices, speech recognition | built into the browser | free |
 
-**It stays that way:** the app is free for everyone and non-commercial — no ads,
-no subscriptions, no paid features — and it runs on free tiers only, at $0 a
-month ([ADR-014](docs/architecture/decisions/ADR-014-zero-cost.md)). Free
-services have limits, so the app uses free fallbacks (another router, another
-tile source, another weather service) and says so when a free limit is reached.
-The path to production: [docs/PRODUCTION_READINESS_PLAN.md](docs/PRODUCTION_READINESS_PLAN.md).
-
-**Update 2026-10-04 ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md)):** the target is
-Google-Maps-class scale. The owner pays for hosting only; every other part stays free — the same free, open-source
-engines the public services above run on (Valhalla, Photon, Open-Meteo, MOTIS, OpenStreetMap tiles) move onto our own
-servers, so no third-party limit or fee applies. Plan: [docs/FREE_STACK_PLAN.md](docs/FREE_STACK_PLAN.md).
+Hosting is Cloudflare **Workers** (not Pages); development and the test Worker cost nothing (Workers Free) until
+the first engine runs in Cloudflare Containers (Workers Paid). Everything also runs on `localhost`.
 
 ## Honest limits
 
@@ -209,8 +208,10 @@ unavailable).
 Start with **[Project requirements](docs/PROJECT_REQUIREMENTS.md)** (single
 source of truth) and [AGENTS.md](AGENTS.md) (how to work on the project).
 
-- **[Free stack and development plan](docs/FREE_STACK_PLAN.md)** (in Russian) — free self-hosted replacements for every service, the Google Maps features we lack and their free sources, and the plan to move the navigation onto them ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md), 2026-10-04: only hosting is paid; no paid services, no sponsors)
-- **[Production readiness plan](docs/PRODUCTION_READINESS_PLAN.md)** — the zero-cost path to production from 2026-10-03 (stage 1 still first; stage 2 replaced by the free stack plan)
+- **[Development plan](docs/DEVELOPMENT_PLAN.md)** (in Russian) — the single plan from start to finish: stages, tasks with localhost and Cloudflare Workers checks, release gates, risks, owner decisions ([ADR-015](docs/architecture/decisions/ADR-015-free-software-own-hosting.md), [ADR-016](docs/architecture/decisions/ADR-016-all-on-cloudflare-workers.md))
+- **[Free stack catalogue](docs/FREE_STACK_PLAN.md)** (in Russian) — free self-hosted replacements for every service, the Google Maps features we lack and their free sources, where each part runs on Cloudflare
+- [Documentation audit 2026-10-04](docs/AUDIT/2026-10-04-docs-audit.md) (in Russian) — status of every document, contradictions, remaining fixes
+- [Production readiness plan](docs/PRODUCTION_READINESS_PLAN.md) — history (2026-10-03), superseded by the development plan
 - [Master audit 2026-10-03](docs/AUDIT/MASTER_AUDIT.md) — status of every requirement, confirmed defects, cost, roadmap ([gap analysis](docs/AUDIT/FEATURE_GAP_ANALYSIS.md), [implementation roadmap](docs/AUDIT/IMPLEMENTATION_ROADMAP.md))
 - [Platform audit 2026-10-02](docs/AUDIT/2026-10-02-platform-audit.md) — findings, fixes, sources
 - [Architecture decisions](docs/architecture/decisions/README.md) · [Target architecture](docs/architecture/TARGET_ARCHITECTURE.md) · [Roadmap & MVP](docs/ROADMAP.md)

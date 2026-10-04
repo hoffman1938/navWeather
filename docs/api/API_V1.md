@@ -1,5 +1,10 @@
 # navWeather HTTP API — v1
 
+> **Planned additions (2026-10-04, ADR-015/016, [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md)):** `/places/*` (DP-4.3),
+> `/geocode` (DP-4.4), `/weather/*` cells from our own pipeline (DP-4.6 — replaces the paid-key `/weather/points`
+> below), `/route` → Valhalla in Cloudflare Containers (DP-5.2), `/transit` → MOTIS (DP-5.3), `/radar/*` (DP-5.4),
+> `/reports/query` corridor (DP-7.2). Each contract is written here when its task starts.
+
 Base path: **`/api/v1`** on the app's origin. The unversioned `/api/…` paths
 are aliases of v1 for clients from before versioning (ADR-009). Types are
 shared code: `src/api/v1.ts`, `src/share/protocol.ts`, `src/reports/protocol.ts`.

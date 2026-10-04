@@ -1,6 +1,7 @@
 # ADR-011 — Public transport via Transitous, switchable off
 
 **Status:** Accepted (terms pending owner action) · **Date:** 2026-10-02 · Facts verified 2026-10-02
+**Update 2026-10-04:** amended by [ADR-015](ADR-015-free-software-own-hosting.md)/[ADR-016](ADR-016-all-on-cloudflare-workers.md): our own MOTIS in Cloudflare Containers with open feeds only (DP-5.3, DP-6.7) replaces Transitous.
 
 ## Context
 Public transport needs timetables. There is no free worldwide timetable API

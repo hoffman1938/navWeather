@@ -1,5 +1,8 @@
 # Roadmap and MVP
 
+> 🕘 **Superseded by [DEVELOPMENT_PLAN](DEVELOPMENT_PLAN.md) (2026-10-04, ADR-015/016).** Kept as history; the
+> banner below refers to an intermediate plan that is superseded too.
+
 > ⚠️ **Superseded by [PRODUCTION_READINESS_PLAN](PRODUCTION_READINESS_PLAN.md)** (zero cost, [ADR-014](architecture/decisions/ADR-014-zero-cost.md),
 > 2026-10-03). Paid items below (Workers Paid, paid Open-Meteo key, custom domain, paid compute, store apps) are
 > removed; kept as history.

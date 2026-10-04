@@ -1,5 +1,8 @@
 # UX, driving safety, performance, SEO, analytics, i18n, monetisation, AI
 
+> **Docs audit 2026-10-04:** §9 "Monetisation" contradicts the binding constraint REQ-COST-006 / ADR-015
+> (non-commercial forever: no subscriptions, ads or paid features) and is void; it is removed in DP-0.7.
+
 Product plan and competitor feature study (Russian): [PLAN.md](../PLAN.md).
 This document sets the rules; PLAN.md tracks iterations.
 
@@ -89,6 +92,8 @@ Engine via `POST /api/v1/telemetry` for product counters.
 - Currencies: none needed until monetisation.
 
 ## 9. Monetisation (not in MVP)
+> ⚠️ **Void** — see the note at the top (REQ-COST-006, ADR-015: non-commercial forever).
+
 Options: free core + premium (multi-day trip planning, longer "when to leave"
 windows, saved route alerts, offline regions), B2B route-weather API, fleet
 dashboards, white-label. **Advertising is not recommended** (driver

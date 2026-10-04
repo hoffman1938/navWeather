@@ -1,5 +1,10 @@
 # Privacy architecture and compliance checklist
 
+> **Update 2026-10-04 (ADR-015/016):** after stage 6 of [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md) coordinates and
+> search text go only to our own Worker and engines on Cloudflare (no OSRM, Open-Meteo, Photon, Nominatim, Overpass or
+> Transitous). The inventory below describes the current code; it is updated in DP-6.9, traffic probes in DP-10.1, the
+> published policy in DP-12.3. Cloudflare becomes the processor for all of it (DPA).
+
 > **Not legal advice.** This is an engineering checklist. Items marked
 > **LEGAL REVIEW** need a qualified lawyer for each launch country before
 > public release.

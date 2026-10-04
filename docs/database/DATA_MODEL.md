@@ -1,5 +1,9 @@
 # Data model
 
+> **Update 2026-10-04 ([ADR-016](../architecture/decisions/ADR-016-all-on-cloudflare-workers.md)):** D1 is planned not only
+> for accounts but also for regional places and the FTS5 geocoder index (one database per region/country, ≤10 GB
+> each — REQ-CF-015, DP-4.2/DP-4.4); places tiles, weather cells and map tiles live in R2.
+
 Decision: [ADR-007](../architecture/decisions/ADR-007-data-storage.md).
 **Status: D1 is not in use.** The schema below is PROPOSED for Phase 3
 (optional accounts); the SQL lives in

@@ -1,5 +1,10 @@
 # Cost control and scalability model
 
+> ⚠️ **Superseded again (2026-10-04, ADR-015/016):** the only cost is Cloudflare hosting (Workers Paid, R2, D1,
+> Durable Objects, Queues, Containers) and a domain; no paid API keys or data. The figures below are history; the new
+> hosting cost model per 1,000 DAU comes from the capacity pilot DP-5.6 ([DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md),
+> [FREE_STACK_PLAN §6.1/§6a](../FREE_STACK_PLAN.md)).
+
 > ⚠️ **Superseded for all paid steps by [ADR-014](../architecture/decisions/ADR-014-zero-cost.md) (2026-10-03): the app is
 > free for users and costs $0 to run.** Paid plans, keys, compute and domains below are history, not plans. The
 > zero-cost capacity model, budgets and degradation ladder are in

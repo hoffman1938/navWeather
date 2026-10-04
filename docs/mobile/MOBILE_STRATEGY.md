@@ -1,5 +1,9 @@
 # Mobile, CarPlay and Android Auto strategy
 
+> **Update 2026-10-04:** the PWA row "Offline map regions — impractical" is being re-evaluated: DEVELOPMENT_PLAN DP-9.8
+> plans user-initiated region downloads (PMTiles + places) and starts with ADR-018, which may amend ADR-012. Store apps
+> stay blocked by fees (ADR-014/015).
+
 There are no native apps yet. This document prepares them so the backend and
 the core don't need a rewrite. Stack decision: [ADR-010](../architecture/decisions/ADR-010-mobile-stack.md)
 (Proposed — decided by a spike). Platform facts verified 2026-10-02 (Apple App

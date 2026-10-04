@@ -1,6 +1,7 @@
 # ADR-012 — Offline: honest shell-and-cache on web; regions and on-device routing native-only
 
 **Status:** Accepted · **Date:** 2026-10-02
+**Update 2026-10-04:** under review — DEVELOPMENT_PLAN DP-9.8 (user-initiated offline regions in the PWA) starts with ADR-018, which may amend this decision.
 
 ## Context
 Drivers lose signal in tunnels and mountains. The web app: service worker

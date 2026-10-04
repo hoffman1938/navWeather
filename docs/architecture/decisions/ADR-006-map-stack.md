@@ -1,6 +1,7 @@
 # ADR-006 — Map: MapLibre GL JS + OpenFreeMap vector tiles; PMTiles fallback
 
 **Status:** Accepted · **Date:** 2026-10-02 · Facts verified 2026-10-02
+**Update 2026-10-04:** amended by [ADR-015](ADR-015-free-software-own-hosting.md)/[ADR-016](ADR-016-all-on-cloudflare-workers.md): our own PMTiles in R2 become primary (DP-5.5), OpenFreeMap becomes the fallback.
 
 ## Context
 Rendering: MapLibre GL JS (BSD-3-Clause). Tiles and styles: OpenFreeMap

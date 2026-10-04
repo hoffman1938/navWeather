@@ -1,6 +1,7 @@
 # ADR-001 — Cloudflare-first, one Worker with static assets (not Pages)
 
 **Status:** Accepted · **Date:** 2026-10-02
+**Update 2026-10-04:** extended by [ADR-016](ADR-016-all-on-cloudflare-workers.md) — all hosting on this Worker project (static assets, R2, D1, Durable Objects, Queues, Cron, Containers); Workers Paid from the first container; every part also runs on localhost.
 
 ## Context
 The owner requires a Cloudflare-first architecture and described hosting as

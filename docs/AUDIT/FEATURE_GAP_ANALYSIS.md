@@ -1,5 +1,8 @@
 # FEATURE GAP ANALYSIS — navWeather
 
+> 🕘 **История (2026-10-04).** Платные шаги и «нет бесплатного источника» частично устарели: бесплатные источники для
+> недостающих функций — [FREE_STACK_PLAN §5](../FREE_STACK_PLAN.md), работы — [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md).
+
 > Дата: 2026-10-03 · Основа: [MASTER_AUDIT.md](MASTER_AUDIT.md) (ID требований и дефектов B-xx оттуда) ·
 > План работ: [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md).
 > Приоритеты: P0 критично · P1 высокий · P2 средний · P3 низкий.

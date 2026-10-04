@@ -1,6 +1,7 @@
 # ADR-007 — Storage: no server DB for MVP; D1 with accounts; Durable Objects for real time; KV narrowly
 
 **Status:** Accepted · **Date:** 2026-10-02 · Facts verified 2026-10-02
+**Update 2026-10-04:** amended by [ADR-016](ADR-016-all-on-cloudflare-workers.md): D1 also holds regional places and FTS5 geocoder indexes (one database per region/country); places tiles and weather cells in R2.
 
 ## Context
 Today the server stores only: live shares (one SQLite DO per link: latest

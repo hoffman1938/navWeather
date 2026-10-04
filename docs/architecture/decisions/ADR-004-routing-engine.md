@@ -1,6 +1,7 @@
 # ADR-004 — Routing: public OSRM now, self-hosted Valhalla before public beta
 
 **Status:** Accepted (migration planned) · **Date:** 2026-10-02 · Facts verified 2026-10-02
+**Update 2026-10-04:** amended by [ADR-015](ADR-015-free-software-own-hosting.md) (no public OSRM/FOSSGIS anywhere, not even in development) and [ADR-016](ADR-016-all-on-cloudflare-workers.md) (Valhalla in Cloudflare Containers, one instance group per region; external servers only if the capacity pilot DP-5.6 says so).
 
 ## Context
 Car routing uses the public OSRM demo server (`router.project-osrm.org`);

@@ -1,5 +1,8 @@
 # IMPLEMENTATION ROADMAP — navWeather (после аудита 2026-10-03)
 
+> 🕘 **Заменён [DEVELOPMENT_PLAN](../DEVELOPMENT_PLAN.md) (2026-10-04).** Баннер ниже ссылается на
+> PRODUCTION_READINESS_PLAN, который тоже заменён.
+
 > ⚠️ **Заменён** [PRODUCTION_READINESS_PLAN](../PRODUCTION_READINESS_PLAN.md) по решению владельца «ничего платного»
 > ([ADR-014](../architecture/decisions/ADR-014-zero-cost.md), 2026-10-03). Платные шаги ниже (Workers Paid, платный
 > ключ Open-Meteo, Containers/VM, свой домен, магазины приложений) **исключены**; порядок работ и задачи — в новом плане.

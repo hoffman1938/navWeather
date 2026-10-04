@@ -1,10 +1,13 @@
 # Licensing and terms matrix
 
-> **Update 2026-10-04 ([ADR-015](../architecture/decisions/ADR-015-free-software-own-hosting.md)):** production moves to
-> self-hosted free software on owner-paid hosting. The licences of the new engines and data sources (Valhalla,
-> Photon, Open-Meteo self-hosted, MOTIS, Planetiler, Overture Places, Foursquare OS Places, Open Charge Map, Copernicus,
-> Mangrove, Panoramax, LibreWXR, Kokoro and others) are listed in [FREE_STACK_PLAN §10](../FREE_STACK_PLAN.md#10-лицензии-и-обязательства);
-> rows are added here as each component is adopted (task FS-3.10).
+> **Update 2026-10-04 ([ADR-015](../architecture/decisions/ADR-015-free-software-own-hosting.md),
+> [ADR-016](../architecture/decisions/ADR-016-all-on-cloudflare-workers.md)):** production moves to self-hosted free software
+> and open data on owner-paid hosting — Cloudflare Workers, R2, D1, Durable Objects, Queues, Containers. Every
+> third-party component must be free forever (no limited free tiers, keys with quotas or public demo servers). The
+> licences of the new engines and data sources (Valhalla, Photon, Open-Meteo, MOTIS, Planetiler, Overture Places,
+> Foursquare OS Places, Open Charge Map, Copernicus, Mangrove, Panoramax, LibreWXR, Kokoro and others) are listed in
+> [FREE_STACK_PLAN §10](../FREE_STACK_PLAN.md#10-лицензии-и-обязательства); rows are added here as each component is
+> adopted (task DP-6.9).
 
 > Engineering summary of public terms, **not legal advice**. Since 2026-10-03 the app is free and
 > non-commercial with zero operating cost ([ADR-014](../architecture/decisions/ADR-014-zero-cost.md)); "commercial use"
@@ -64,7 +67,7 @@ commercial release — **PLANNED**.
 | Valhalla | MIT | recommended self-hosted router (ADR-004) |
 | GraphHopper | Apache-2.0 | alternative; hosted API free plan "for non-commercial use only", paid from €69/month |
 | OSRM | BSD-2-Clause | current integration |
-| MOTIS ([repo](https://github.com/motis-project/motis)) | MIT (verified 2026-10-04) | Transitous' engine: GTFS/NeTEx, GTFS-RT/SIRI, GBFS, OSM streets; self-hosting planned (FS-2.8) |
+| MOTIS ([repo](https://github.com/motis-project/motis)) | MIT (verified 2026-10-04) | Transitous' engine: GTFS/NeTEx, GTFS-RT/SIRI, GBFS, OSM streets; self-hosting planned (DP-5.3, Cloudflare Containers) |
 
 ## Attribution as shipped
 - Map (top-right control): OpenFreeMap © OpenMapTiles Data from OpenStreetMap.

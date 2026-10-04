@@ -1,5 +1,9 @@
 # Long Trip Mode — feature specification (source of truth)
 
+> **Update 2026-10-04 (ADR-015/016):** stop places and borders will no longer come from public Overpass through the
+> Worker (B-22): places → our Places API on D1/R2 (DP-6.5), borders → Natural Earth on the client (DP-4.5). On Workers
+> Paid the planner's CPU limit (B-23) no longer applies.
+
 Status: **IMPLEMENTED (core)** · Requirements: REQ-TRIP-001…015 in
 [PROJECT_REQUIREMENTS](../PROJECT_REQUIREMENTS.md) · Decision:
 [ADR-013](../architecture/decisions/ADR-013-trip-planner.md) · Last updated 2026-10-02.

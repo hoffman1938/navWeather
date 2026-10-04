@@ -1,6 +1,7 @@
 # ADR-005 — Weather: Open-Meteo; shared edge cache + commercial key before commercial use
 
 **Status:** Accepted · **Date:** 2026-10-02 · Facts verified 2026-10-02
+**Update 2026-10-04:** superseded by [ADR-015](ADR-015-free-software-own-hosting.md)/[ADR-016](ADR-016-all-on-cloudflare-workers.md): no paid key, no MET Norway, no client-direct Open-Meteo API — our own pipeline turns open model files (ECMWF/DWD/NOAA, CAMS) into forecast cells in R2 (DEVELOPMENT_PLAN DP-4.6).
 
 ## Context
 Forecasts, elevation and air quality come from Open-Meteo, called directly by

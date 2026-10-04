@@ -1,10 +1,10 @@
 # План вывода navWeather в production — полностью бесплатно ($0)
 
-> ⚠️ **Обновление 2026-10-04 ([ADR-015](architecture/decisions/ADR-015-free-software-own-hosting.md)):** владелец разрешил
-> оплачивать **хостинг**; платные сервисы и спонсоры по-прежнему запрещены; цель — масштаб уровня Google Maps.
-> **Этап 1 этого плана остаётся без изменений и выполняется первым; этап 2 заменён** этапами 2–4
-> [FREE_STACK_PLAN](FREE_STACK_PLAN.md) (свои Valhalla, Photon, база мест, Open-Meteo, MOTIS, тайлы и бэкенд реального
-> времени); этапы 3–7 продолжаются с уточнёнными воротами (FREE_STACK_PLAN §8). Ниже — исходный текст от 2026-10-03.
+> 🕘 **Заменён полностью [DEVELOPMENT_PLAN](DEVELOPMENT_PLAN.md) (2026-10-04,
+> [ADR-015](architecture/decisions/ADR-015-free-software-own-hosting.md), [ADR-016](architecture/decisions/ADR-016-all-on-cloudflare-workers.md)).**
+> Владелец разрешил оплачивать только хостинг (Cloudflare Workers); платные сервисы и спонсоры запрещены; цель —
+> масштаб уровня Google Maps; всё должно работать и на localhost. Задачи PR-x.y перенесены в DEVELOPMENT_PLAN (колонка
+> «Было»), ворота G1–G12 — в единый список DEVELOPMENT_PLAN §7. Ниже — исходный текст от 2026-10-03.
 
 > **Версия:** 1.0 · **Дата:** 2026-10-03 · **Статус:** утверждён к исполнению (решение владельца: «ничего не должно быть платным»)
 > **Решение:** [ADR-014 — Zero cost](architecture/decisions/ADR-014-zero-cost.md) ·

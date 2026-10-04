@@ -1,5 +1,10 @@
 # Security architecture
 
+> **Update 2026-10-04 ([ADR-016](../architecture/decisions/ADR-016-all-on-cloudflare-workers.md)):** provider calls move
+> behind our Worker (no client-direct third parties); WAF/zone rules become available with the custom domain (DP-12.1);
+> new surfaces to model — Cloudflare Containers (Valhalla, MOTIS, LibreWXR) and the moderation admin (DP-7.3); review
+> in DP-11.9.
+
 Scope: the web app, the Worker API, Durable Objects, provider calls, and the
 planned accounts. Requirements: PROJECT_REQUIREMENTS §13 (REQ-SEC-*).
 

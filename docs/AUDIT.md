@@ -1,6 +1,9 @@
 # Product audit, status and gap analysis
 
-> **Latest:** the master audit of 2026-10-03 — [AUDIT/MASTER_AUDIT.md](AUDIT/MASTER_AUDIT.md)
+> **Newest:** the documentation audit of 2026-10-04 — [AUDIT/2026-10-04-docs-audit.md](AUDIT/2026-10-04-docs-audit.md);
+> the single work plan — [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) (ADR-015/016).
+>
+> **Latest code audit:** the master audit of 2026-10-03 — [AUDIT/MASTER_AUDIT.md](AUDIT/MASTER_AUDIT.md)
 > (status of every requirement, confirmed defects, roadmap). Before it, the full platform audit of 2026-10-02 —
 > [AUDIT/2026-10-02-platform-audit.md](AUDIT/2026-10-02-platform-audit.md) —
 > supersedes the gap analysis below; requirements now live in

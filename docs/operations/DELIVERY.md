@@ -1,5 +1,11 @@
 # Delivery: environments, CI/CD, testing strategy, disaster recovery
 
+> **Update 2026-10-04 ([ADR-016](../architecture/decisions/ADR-016-all-on-cloudflare-workers.md)):** environments become
+> `dev` (localhost: Vite + Cloudflare Vite plugin with local Durable Objects/D1/R2 + Docker for engines), `preview`
+> (own Worker, Durable Objects, D1, R2 — never production data) and `production`; one E2E suite must pass on localhost
+> and on preview (REQ-DEV-001). Provider fallbacks below (MET Norway, a second public router) are replaced by our own
+> engines. See [DEVELOPMENT_PLAN §2](../DEVELOPMENT_PLAN.md), tasks DP-2.x and DP-3.x.
+
 ## 1. Environments
 
 | Env | How | Config | Data |

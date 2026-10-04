@@ -1,5 +1,10 @@
 # Maps, routing, navigation, voice and GIS
 
+> **Update 2026-10-04 (ADR-015/016):** the providers in §1 are the current code. The target replaces them with our own
+> engines on Cloudflare: Valhalla in Containers (car, walk, bike, truck, motorcycle), a D1 FTS5 geocoder (Photon if
+> needed), a Places API on D1/R2, own PMTiles in R2 (OpenFreeMap as fallback), own weather cells in R2, MOTIS in
+> Containers. MET Norway is not planned. See [FREE_STACK_PLAN §4, §6a](../FREE_STACK_PLAN.md).
+
 ## 1. Six separate systems
 
 | System | What it is | Current provider | Interface | Licence / terms (see matrix) | Failure mode |

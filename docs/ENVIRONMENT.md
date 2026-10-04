@@ -1,5 +1,10 @@
 # Environment
 
+> **Update 2026-10-04 (ADR-015/016):** the provider defaults below are the current code and **violate** the
+> "always free" rule (public services with usage limits, [FREE_STACK_PLAN §1.1](FREE_STACK_PLAN.md)); they are removed
+> in stage 6 (DP-6.1). Local development becomes one `npm run dev` (Vite + Cloudflare Vite plugin with local Durable
+> Objects/D1/R2, Docker for the engines) with `.env.development` / `.env.preview` / `.env.production` (DP-2.1…DP-2.3).
+
 Everything is optional. With no `.env` the app uses free public services and
 needs no API keys. Copy `.env.example` to `.env` to override values.
 
