@@ -33,9 +33,12 @@ weather. It is not "a map site" or "a weather site" — keep that direction.
 - **Only hosting is paid; free for users (ADR-015, owner, 2026-10-04 — supersedes the zero-cost part of ADR-014):**
   the owner pays for hosting (compute, storage, bandwidth, CDN, domain) and nothing else. Never add a paid API
   plan, key, per-request fee, paid data, store account or paid feature; no ads or subscriptions; no sponsors,
-  grants or credits. Every third-party component is free software or open data with its licence recorded. In
-  production no live public third-party API sits in the critical path (OpenFreeMap tiles as a fallback is the
-  exception). Target scale: Google-Maps-class. Work follows `docs/FREE_STACK_PLAN.md` (tasks `FS-x.y`); stage 1 of
+  grants or credits. Every third-party component is free software or open data with its licence recorded, and it
+  must be **free always, at any scale, in development too**: only our own instances of free software, open data
+  files downloaded on a fixed schedule, or services with no limit and no paid tier (OpenFreeMap fallback, browser
+  capabilities). Never add a free tier with a request limit, a key with a quota, a trial or a public demo server —
+  not even "for now" or "in development" (FREE_STACK_PLAN §1.1). Development runs the stack locally in Docker at $0.
+  Target scale: Google-Maps-class. Work follows `docs/FREE_STACK_PLAN.md` (tasks `FS-x.y`); stage 1 of
   `docs/PRODUCTION_READINESS_PLAN.md` (driver safety) goes first.
 - Only real data: no source → "not available"; simulations labelled; driver
   reports are "reported", never fact. Weather wording: forecast vs derived

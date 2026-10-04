@@ -42,7 +42,7 @@ or BLOCKED below with the reason and date (never deleted).
 | REQ-COST-009 | **Only hosting is paid:** the owner pays for compute, storage, bandwidth, CDN in front of our own servers and a domain — nothing else; no paid API plans, keys, per-request/per-user fees or paid data (ADR-015) | P0 | PLANNED (FREE_STACK_PLAN; today the app uses free public services) |
 | REQ-COST-010 | **No sponsors:** no sponsorship programmes, grants or credits in the plan or the critical path (ADR-015) | P0 | VERIFIED (none used) |
 | REQ-COST-011 | **Free software and open data only** for every third-party component; licence recorded in LICENSING_MATRIX before use; attribution shown; AGPL obligations met (ADR-015) | P0 | IN PROGRESS (FREE_STACK_PLAN §10; FS-3.10) |
-| REQ-COST-012 | **No live public third-party API in the production critical path**, except services whose terms explicitly allow unlimited use (today: OpenFreeMap as tile fallback); public demo servers only in development; checked by an E2E test of the production build (gate G3') | P0 | PLANNED (FS-3.1…FS-3.8) |
+| REQ-COST-012 | **Always free, at any scale, in development and in production:** only (A) our own instances of free software, (B) open data files downloaded on a fixed schedule (volume independent of users, no paid tier) and (C) services with no usage limit and no paid tier (OpenFreeMap as tile fallback, browser capabilities). No free tier with a limit, key with a quota, trial or public demo server anywhere — development runs the same stack locally at $0 (FREE_STACK_PLAN §1.1); checked by a bundle test and an E2E test of dev and prod builds (gates G2', G3') | P0 | PLANNED (FS-2.1, FS-3.1…FS-3.8) |
 
 ## 1. Product vision
 

@@ -48,9 +48,16 @@ Option 3:
    else is paid. No sponsorships, grants or credits are part of the plan.
 2. **Every third-party component is free software or free open data.** Licences are recorded in
    [LICENSING_MATRIX](../../legal/LICENSING_MATRIX.md) and FREE_STACK_PLAN §10 before use.
-3. **No live public third-party API in the production critical path**, except services whose terms explicitly
-   allow unlimited use (today: OpenFreeMap tiles, as a fallback to our own tiles). Public demo servers remain allowed
-   in development only.
+3. **Always free, at any scale, in development and in production** (owner clarification 2026-10-04: there is no money
+   for development and no sponsors). Only three classes of dependency are allowed (FREE_STACK_PLAN §1.1):
+   **A** our own instance of free software; **B** open data files our pipelines download on a fixed schedule (volume
+   does not grow with users; no paid tier exists); **C** services with no usage limit and no paid tier (today:
+   OpenFreeMap tiles as a fallback to our own tiles; browser capabilities such as Web Speech and Web Push).
+   Forbidden everywhere, including development: free tiers with a request limit, keys with quotas, trial periods,
+   public demo servers or any service that forbids production/app use (OSRM demo, FOSSGIS, Nominatim, Photon komoot,
+   Overpass, Open-Meteo API, Transitous, MET Norway, RainViewer, Mapillary API, Tankerkönig). Development runs the
+   same self-hosted stack locally (Docker, regional extracts) at $0; CI runs on GitHub Actions for a public
+   repository (no minute limit). Hosting is paid only from the launch for users.
 4. **Own engines** (all horizontally scalable, stateless behind load balancers, regional):
    routing **Valhalla** (car, truck, motorcycle, bicycle, pedestrian/wheelchair; avoid tolls/highways/ferries,
    matrix, optimised route, isochrones, map matching, live-traffic speeds); geocoding **Photon** (Pelias optional for
