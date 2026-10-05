@@ -59,6 +59,7 @@ Build-time only (pipelines; never bundled into the app or the Worker):
 | --- | --- | --- |
 | @openmeteo/file-reader | GPL-2.0 | reads `.om` files in `pipelines/weather/` (dev dependency); its output — our tiles — is data, not a derivative of the program |
 | wrangler | MIT OR Apache-2.0 | local Worker, local D1/R2 |
+| @playwright/test | Apache-2.0 | browser test (`e2e/`), drives the installed Chrome |
 
 Run `npx license-checker --production` (or equivalent) in CI before a
 commercial release — **PLANNED**.

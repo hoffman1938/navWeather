@@ -5,6 +5,7 @@ import {
   parseDateTimeLocal,
   timeZoneOffsetMinutes,
   toDateTimeLocalValue,
+  zonedParts,
   zonedWallTimeToUtc,
 } from './timezone';
 import { en } from '../i18n/en';
@@ -86,5 +87,28 @@ describe('unit defaults', () => {
     expect(defaultUnits('en-US', 'Asia/Tbilisi')).toEqual({ distance: 'metric', temperature: 'c', wind: 'kmh' });
     expect(defaultUnits('en-GB', 'Europe/London')).toEqual({ distance: 'imperial', temperature: 'c', wind: 'mph' });
     expect(defaultUnits('ka-GE', 'Asia/Tbilisi').distance).toBe('metric');
+  });
+});
+
+describe('zonedParts (offset cached per quarter hour)', () => {
+  const intl = (ms: number, tz: string) => {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms));
+    const g = (t: string) => Number(p.find((x) => x.type === t)!.value);
+    return { year: g('year'), month: g('month'), day: g('day'), hour: g('hour') % 24, minute: g('minute'), second: g('second') };
+  };
+
+  it('agrees with Intl everywhere, also across odd offsets and DST changes', () => {
+    // Kathmandu +5:45, Chatham +12:45/+13:45, Lord Howe's 30-minute DST, Tehran +3:30, Berlin and New York DST.
+    const zones = ['Asia/Kathmandu', 'Pacific/Chatham', 'Australia/Lord_Howe', 'Asia/Tehran', 'Europe/Berlin', 'America/New_York', 'Asia/Tbilisi', 'UTC'];
+    const starts = [Date.UTC(2026, 2, 28, 22), Date.UTC(2026, 3, 4, 13), Date.UTC(2026, 9, 3, 14), Date.UTC(2026, 9, 24, 22), Date.UTC(2026, 10, 1, 4)];
+    for (const tz of zones) {
+      for (const t0 of starts) {
+        for (let ms = t0; ms < t0 + 6 * 3600_000; ms += 7 * 60_000 + 13_000) expect(zonedParts(ms, tz), `${tz} ${new Date(ms).toISOString()}`).toEqual(intl(ms, tz));
+      }
+    }
+  });
+
+  it('an unknown zone reads as UTC', () => {
+    expect(zonedParts(Date.UTC(2026, 0, 1, 12, 30, 5), 'Mars/Olympus')).toEqual({ year: 2026, month: 1, day: 1, hour: 12, minute: 30, second: 5 });
   });
 });

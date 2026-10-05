@@ -81,8 +81,42 @@ export interface ZonedParts {
   second: number;
 }
 
+/**
+ * Wall-clock parts of an instant in a zone. Hot (trip schedules ask tens of thousands of times), so the zone's
+ * offset is computed once per zone and quarter hour and the parts come from arithmetic: offsets change only on
+ * 15-minute UTC boundaries (every offset in use is a multiple of 15 minutes, and so are the moments it changes).
+ */
 export function zonedParts(utcMs: number, timeZone: string): ZonedParts {
   const tz = isValidTimeZone(timeZone) ? timeZone : 'UTC';
+  const offsetMs = quarterOffsetMs(utcMs, tz);
+  const d = new Date(utcMs + offsetMs);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+    hour: d.getUTCHours(),
+    minute: d.getUTCMinutes(),
+    second: d.getUTCSeconds(),
+  };
+}
+
+const QUARTER_MS = 15 * 60_000;
+const offsetCache = new Map<string, number>();
+
+function quarterOffsetMs(utcMs: number, tz: string): number {
+  const start = Math.floor(utcMs / QUARTER_MS) * QUARTER_MS;
+  const key = `${tz}|${start}`;
+  let off = offsetCache.get(key);
+  if (off === undefined) {
+    const p = intlParts(start, tz);
+    off = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - start;
+    if (offsetCache.size >= 20_000) offsetCache.clear();
+    offsetCache.set(key, off);
+  }
+  return off;
+}
+
+function intlParts(utcMs: number, tz: string): ZonedParts {
   const parts = formatter(
     tz,
     {

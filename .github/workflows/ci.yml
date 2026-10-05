@@ -49,3 +49,42 @@ jobs:
           npm run test:weather
           API=/api npm run test:share
           API=/api npm run test:reports
+
+  # The app in a real browser (DEVELOPMENT_PLAN DP-2.6, gate G4): our data, our router and our forecast on the
+  # runner, then search → road with weather → simulated drive → live share → driver report, and nothing sent to
+  # the public services with usage limits (E2E_STRICT). Chrome is preinstalled on the runner; no browser download.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Our data (Georgia places and search index), a forecast for the Caucasus, Valhalla
+        run: |
+          npm run seed:local
+          npm run data:weather -- --bbox 39,40,47,44
+          npm run engines:up
+      - run: npm run build
+      - name: Browser smoke test against the local Worker
+        run: |
+          npx wrangler dev --port 8787 --ip 127.0.0.1 > wrangler.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8787/api/v1/health && break
+            sleep 1
+          done
+          BASE_URL=http://127.0.0.1:8787 E2E_STRICT=1 npm run e2e || (tail -50 wrangler.log; exit 1)
+      - name: Trace of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-trace
+          path: test-results/
+          retention-days: 7

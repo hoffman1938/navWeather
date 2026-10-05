@@ -34,16 +34,28 @@ export interface FetchJsonOptions {
   init?: RequestInit;
 }
 
+/** A timeout that fires this much later than due was held up by a busy page. */
+const LATE_TIMER_MS = 1000;
+const GRACE_MS = 2000;
+
 /** fetch + JSON with timeout, abort propagation and normalized errors. */
 export async function fetchJson<T>(url: string, opts: FetchJsonOptions): Promise<T> {
   const { provider, signal, timeoutMs = 15000, init } = opts;
   if (signal?.aborted) throw new ProviderError('Request aborted', 'aborted', provider);
   const controller = new AbortController();
   let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
+  // A timer that fires late means the page was busy (a long task on a slow phone), not that the network was
+  // slow: the answer may already be waiting behind it. Give it a moment before giving up — a few times at most.
+  let timer: ReturnType<typeof setTimeout>;
+  const arm = (ms: number, graces: number) => {
+    const due = Date.now() + ms;
+    timer = setTimeout(() => {
+      if (graces > 0 && Date.now() - due > LATE_TIMER_MS) return arm(GRACE_MS, graces - 1);
+      timedOut = true;
+      controller.abort();
+    }, ms);
+  };
+  arm(timeoutMs, 3);
   const onAbort = () => controller.abort();
   signal?.addEventListener('abort', onAbort, { once: true });
   try {
@@ -80,7 +92,7 @@ export async function fetchJson<T>(url: string, opts: FetchJsonOptions): Promise
       throw new ProviderError(`${provider} returned invalid JSON`, 'invalid-response', provider);
     }
   } finally {
-    clearTimeout(timer);
+    clearTimeout(timer!);
     signal?.removeEventListener('abort', onAbort);
   }
 }

@@ -15,3 +15,7 @@ data/raw/
 data/build/
 # Places tiles built from OSM by `npm run data:osm` (ODbL, rebuilt from the extract)
 public/data/places/
+
+# Browser tests (Playwright)
+test-results/
+playwright-report/

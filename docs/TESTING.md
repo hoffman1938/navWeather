@@ -13,7 +13,17 @@ npm run test:trips    # Long Trip planner, places and borders on the Worker
 npm run test:geocode  # our geocoder on the Worker (skips the search checks when the index isn't loaded)
 npm run test:route    # our routing engine through the Worker (skips without an engine: npm run engines:up)
 npm run test:weather  # our forecast through the Worker (skips the forecast checks without tiles: npm run data:weather)
+npm run e2e           # the app in Chrome: search → road with weather → simulated drive → live share → driver report
 ```
+
+**Browser test** (`e2e/smoke.spec.ts`, Playwright, DP-2.6): drives the installed Google Chrome headless (`channel:
+'chrome'` — nothing to download). `BASE_URL` picks the target: `http://localhost:5173` (`npm run dev`, the default),
+`http://127.0.0.1:8787` (`npm run build` + `npm run dev:api` — what CI uses), or the preview Worker (never
+production: the test shares and reports). `E2E_STRICT=1` — with our data, forecast and router running — also fails
+on any request to the public services with usage limits (OSRM, FOSSGIS, Photon, Nominatim, Overpass, the Open-Meteo
+forecast API). The basemap is skipped (`E2E_MAP=1` keeps it): in headless Chrome every map frame waits on a GPU
+process without a display and the page stalls for a minute. The CI job `e2e` builds Georgia's data, a Caucasus
+forecast and Valhalla on the runner and runs it strictly.
 
 ## What is covered
 

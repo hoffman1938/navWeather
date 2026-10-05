@@ -62,7 +62,7 @@ rolled back (protocols are versioned and additive for that reason).
 | Scenario / integration (store end-to-end with fake providers, Tbilisi → Batumi fixtures) | vitest + harness | yes | more international/timezone fixtures |
 | API (Worker) | `scripts/*-smoke.mjs` against wrangler dev | share 7 checks, reports 5 checks, both prefixes | add to CI (done) |
 | Live providers | `npm run test:live` (opt-in) | partial | run weekly in CI with a budget |
-| E2E browser | — | none | Playwright: search → route → simulate → arrive; transit plan; offline |
+| E2E browser | Playwright + installed Chrome (`e2e/`, `npm run e2e`) | search → road with weather → simulated drive → live share and viewer → driver report; strict: no limited public service (CI job `e2e`, 2026-10-05) | arrive, transit plan, offline; run against preview after each deploy |
 | Accessibility | axe-core (manual run 2026-10-02) | 0 violations | automate in Playwright (DP-11.4) |
 | Performance | — | none | Lighthouse CI on preview |
 | Security | review rounds (code audits) | yes | dependency audit in CI (DP-11.6); security review DP-11.9; WAF on the domain (DP-12.1) |
