@@ -8,10 +8,13 @@ import { tripBorders, tripPlaces, tripPlan, type TripEnv } from './trips';
 import { geocode, type GeocodeEnv } from './geocode';
 import { route, routeMatrix, type RouteEnv } from './route';
 import { weatherForecast, weatherMeta, type WeatherEnv } from './weather';
+import { elevation } from './elevation';
+import { air, type AirEnv } from './air';
+import { transitPlan, type TransitEnv } from './transit';
 
 export { LiveShare, Reports };
 
-export interface Env extends TripEnv, GeocodeEnv, RouteEnv, WeatherEnv {
+export interface Env extends TripEnv, GeocodeEnv, RouteEnv, WeatherEnv, AirEnv, TransitEnv {
   ASSETS: Fetcher;
   LIVE_SHARE: DurableObjectNamespace<LiveShare>;
   /** Workers rate-limiting binding (wrangler.toml [[ratelimits]]); optional so the relay still runs without it. */
@@ -58,6 +61,9 @@ async function allowed(limiter: { limit(opts: { key: string }): Promise<{ succes
  *   POST   /api/route/matrix       travel times between points (detours)
  *   GET    /api/weather/forecast?latitude=…&longitude=…   our forecast anywhere (Open-Meteo-compatible; worker/weather.ts)
  *   GET    /api/weather/meta       which model runs the forecast is built from
+ *   GET    /api/elevation?latitude=…&longitude=…  ground heights from our DEM tiles (worker/elevation.ts)
+ *   GET    /api/air?latitude=…&longitude=…        European Air Quality Index now (CAMS tiles; worker/air.ts)
+ *   GET    /api/transit/plan?fromPlace=…&toPlace=… public transport from our MOTIS (worker/transit.ts)
  *
  *   POST   /api/trips/plan         long-trip plan for a route (stateless; worker/trips.ts)
  *   POST   /api/trips/places       places around one planned stop (Overpass, edge-cached)
@@ -83,6 +89,9 @@ export default {
     if (path === '/api/route/matrix') return routeMatrix(request, env);
     if (path === '/api/weather/forecast') return weatherForecast(request, url, env, ctx);
     if (path === '/api/weather/meta') return weatherMeta(request, env);
+    if (path === '/api/elevation') return elevation(request, url, env);
+    if (path === '/api/air') return air(request, url, env);
+    if (path === '/api/transit/plan') return transitPlan(request, url, env);
 
     if (path === '/api/trips/plan') return tripPlan(request, env);
     if (path === '/api/trips/places') return tripPlaces(request, env);

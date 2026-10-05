@@ -54,13 +54,19 @@ export const config = {
     places: str('VITE_PLACES_PROVIDER', 'tiles'),
     /** Outside the region our tiles cover: `overpass` (until that region is built) or `none`. */
     placesFallback: str('VITE_PLACES_FALLBACK', 'overpass'),
-    elevation: str('VITE_ELEVATION_PROVIDER', 'open-meteo'),
+    /** Ground heights: our DEM (`/api/v1/elevation`, DP-6.6); `open-meteo` = the public API only. */
+    elevation: str('VITE_ELEVATION_PROVIDER', 'api'),
+    /** Where our DEM tiles don't reach (or the Worker can't answer): `open-meteo` (public API) or `none`. */
+    elevationFallback: str('VITE_ELEVATION_FALLBACK', 'open-meteo'),
     map: str('VITE_MAP_PROVIDER', 'openfreemap'),
     poi: str('VITE_POI_PROVIDER', 'tiles'),
     speedLimits: str('VITE_SPEED_LIMIT_PROVIDER', 'tiles'),
     traffic: str('VITE_TRAFFIC_PROVIDER', 'none'),
     incidents: str('VITE_INCIDENT_PROVIDER', 'reports'),
-    airQuality: str('VITE_AIR_QUALITY_PROVIDER', 'open-meteo'),
+    /** Air quality: ours, worldwide (`/api/v1/air`, CAMS tiles, DP-4.6); `open-meteo` = the public API only. */
+    airQuality: str('VITE_AIR_QUALITY_PROVIDER', 'api'),
+    /** When our tiles can't answer (not built here, too old): `open-meteo` (public API) or `none`. */
+    airQualityFallback: str('VITE_AIR_QUALITY_FALLBACK', 'open-meteo'),
     speech: str('VITE_SPEECH_PROVIDER', 'browser'),
   },
   endpoints: {
@@ -70,10 +76,17 @@ export const config = {
     /** OpenStreetMap community routing instances for walking and cycling (the demo server above only does cars). */
     osrmFoot: str('VITE_OSRM_FOOT_URL', 'https://routing.openstreetmap.de/routed-foot'),
     osrmBike: str('VITE_OSRM_BIKE_URL', 'https://routing.openstreetmap.de/routed-bike'),
-    /** Public transport: Transitous (MOTIS) over operators' open timetables. Empty turns public transport off. */
-    transit: env.VITE_TRANSIT_URL === '' ? '' : str('VITE_TRANSIT_URL', 'https://api.transitous.org'),
+    /** Public transport: our MOTIS behind the Worker (DP-6.7). Empty turns public transport off. */
+    transit: env.VITE_TRANSIT_URL === '' ? '' : str('VITE_TRANSIT_URL', api('/transit')),
+    /** Where our timetables don't reach (or our engine isn't running): Transitous (MOTIS, open source and
+     * non-commercial use only). Empty = no fallback. */
+    transitFallback: env.VITE_TRANSIT_FALLBACK_URL === '' ? '' : str('VITE_TRANSIT_FALLBACK_URL', 'https://api.transitous.org'),
     /** Our forecast (the Worker's `/api/v1/weather`, same origin). */
     weather: str('VITE_WEATHER_URL', api('/weather')),
+    /** Our ground heights (the Worker's `/api/v1/elevation`, same origin). */
+    elevation: str('VITE_ELEVATION_URL', api('/elevation')),
+    /** Our air quality (the Worker's `/api/v1/air`, same origin). */
+    air: str('VITE_AIR_URL', api('/air')),
     openMeteo: str('VITE_OPEN_METEO_BASE_URL', 'https://api.open-meteo.com'),
     openMeteoAir: str('VITE_OPEN_METEO_AIR_URL', 'https://air-quality-api.open-meteo.com'),
     nominatim: str('VITE_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),

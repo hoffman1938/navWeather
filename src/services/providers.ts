@@ -1,5 +1,6 @@
 import { config, type AppConfig } from '../config';
 import type { ElevationProvider } from './elevation/ElevationProvider';
+import { ApiElevationProvider } from './elevation/ApiElevationProvider';
 import { OpenMeteoElevationProvider } from './elevation/OpenMeteoElevationProvider';
 import type { AutocompleteProvider, GeocodingProvider } from './geocoding/GeocodingProvider';
 import { NominatimProvider } from './geocoding/NominatimProvider';
@@ -26,9 +27,9 @@ import type { TravelMode } from '../types/travel';
 import { FlightEstimateProvider } from './routing/FlightEstimateProvider';
 import { OSRMProvider } from './routing/OSRMProvider';
 import { ValhallaProvider } from './routing/ValhallaProvider';
-import { TransitousProvider } from './routing/TransitousProvider';
+import { ApiTransitProvider, TransitousProvider } from './routing/TransitousProvider';
 import type { RoutingProvider } from './routing/RoutingProvider';
-import { OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
+import { ApiAirQualityProvider, OpenMeteoAirQualityProvider, type AirQualityProvider } from './air/AirQualityProvider';
 import { NoIncidentProvider, type IncidentProvider } from './traffic/IncidentProvider';
 import { ReportsIncidentProvider } from './traffic/ReportsIncidentProvider';
 import { NoTrafficProvider, type TrafficProvider } from './traffic/TrafficProvider';
@@ -100,8 +101,12 @@ export function createProviders(cfg: AppConfig = config): Providers {
           flight: new FlightEstimateProvider(),
         }
       : { walk: onFoot(e.osrmFoot), bike: onFoot(e.osrmBike), flight: new FlightEstimateProvider() };
-  // Public transport: timetables operators publish, through Transitous (no key). Off when the URL is set empty.
-  if (e.transit) routingByMode.transit = new TransitousProvider(e.transit, cfg.geocoding.language);
+  // Public transport: our MOTIS over the region's open timetables; Transitous only outside them or without our
+  // engine (VITE_TRANSIT_FALLBACK_URL). Off when VITE_TRANSIT_URL is set empty.
+  if (e.transit) {
+    const transitous = e.transitFallback ? new TransitousProvider(e.transitFallback, cfg.geocoding.language) : null;
+    routingByMode.transit = /^https?:\/\//.test(e.transit) && /transitous/.test(e.transit) ? new TransitousProvider(e.transit, cfg.geocoding.language) : new ApiTransitProvider(e.transit, transitous, cfg.geocoding.language);
+  }
 
   // Our tiles (places, settlements) and our geocoder first; public servers only where our data has nothing.
   const tiles = new PlacesTiles(e.placesTiles);
@@ -143,12 +148,17 @@ export function createProviders(cfg: AppConfig = config): Providers {
           ? null
           : unknown('places', p.places);
 
+  // The public Open-Meteo Elevation API only where our DEM tiles don't reach, while VITE_ELEVATION_FALLBACK allows it.
+  const elevationFallback =
+    p.elevationFallback === 'open-meteo' ? new OpenMeteoElevationProvider(e.openMeteo) : p.elevationFallback === 'none' ? null : unknown('elevation fallback', p.elevationFallback);
   const elevation: ElevationProvider | null =
-    p.elevation === 'open-meteo'
-      ? new OpenMeteoElevationProvider(e.openMeteo)
-      : p.elevation === 'none'
-        ? null
-        : unknown('elevation', p.elevation);
+    p.elevation === 'api'
+      ? new ApiElevationProvider(e.elevation, elevationFallback)
+      : p.elevation === 'open-meteo'
+        ? new OpenMeteoElevationProvider(e.openMeteo)
+        : p.elevation === 'none'
+          ? null
+          : unknown('elevation', p.elevation);
 
   const map: MapProvider =
     p.map === 'openfreemap' || p.map === 'style-url'
@@ -180,8 +190,17 @@ export function createProviders(cfg: AppConfig = config): Providers {
       : p.incidents === 'none'
         ? new NoIncidentProvider()
         : unknown('incident', p.incidents);
+  // The public Open-Meteo Air Quality API only when our tiles can't answer, while VITE_AIR_QUALITY_FALLBACK allows it.
+  const airFallback =
+    p.airQualityFallback === 'open-meteo' ? new OpenMeteoAirQualityProvider(e.openMeteoAir) : p.airQualityFallback === 'none' ? null : unknown('air quality fallback', p.airQualityFallback);
   const air: AirQualityProvider | null =
-    p.airQuality === 'open-meteo' ? new OpenMeteoAirQualityProvider(e.openMeteoAir) : p.airQuality === 'none' ? null : unknown('air quality', p.airQuality);
+    p.airQuality === 'api'
+      ? new ApiAirQualityProvider(e.air, airFallback)
+      : p.airQuality === 'open-meteo'
+        ? new OpenMeteoAirQualityProvider(e.openMeteoAir)
+        : p.airQuality === 'none'
+          ? null
+          : unknown('air quality', p.airQuality);
   if (p.speech !== 'browser') unknown('speech', p.speech);
 
   return {

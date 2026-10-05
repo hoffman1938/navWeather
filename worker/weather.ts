@@ -14,6 +14,7 @@ import {
   type WeatherIndex,
 } from '../src/api/weather';
 import { timeZoneOffsetMinutes } from '../src/utils/timezone';
+import { elevations, type ElevationEnv } from './elevation';
 import { json } from './http';
 
 /**
@@ -25,7 +26,7 @@ import { json } from './http';
  * uses its fallback.
  */
 
-export interface WeatherEnv {
+export interface WeatherEnv extends ElevationEnv {
   WEATHER?: R2Bucket;
   WEATHER_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
@@ -118,11 +119,15 @@ export async function weatherForecast(request: Request, url: URL, env: WeatherEn
   if (!fresh(c)) return json({ error: 'unavailable', reason: 'stale' }, 503);
 
   const started = Date.now();
-  const cells = q.points.map((p) => gridCell(p.lat, p.lon));
+  // A point's own height from our DEM when the app sent none (map centre, a place card): the temperature is then
+  // for the point, not for its 25-km grid cell — as Open-Meteo does with its DEM.
+  const asked = q.points.some((p) => p.elevation === undefined) ? await elevations(env, q.points).catch(() => q.points.map(() => null)) : [];
+  const points = q.points.map((p, n) => (p.elevation === undefined && asked[n] != null ? { ...p, elevation: asked[n]! } : p));
+  const cells = points.map((p) => gridCell(p.lat, p.lon));
   const recs = await records(env, ctx, c, cells);
   const plan = planHours(c.index, hoursFor(c.index, started / 1000, q.pastHours, q.forecastHours));
   const units = { time: 'unixtime', ...Object.fromEntries(q.hourly.map((h) => [h, h === 'wind_speed_10m' || h === 'wind_gusts_10m' ? (q.windUnit === 'ms' ? 'm/s' : 'km/h') : HOURLY_UNITS[h]])) };
-  const answer = q.points.map((p, n) => {
+  const answer = points.map((p, n) => {
     const cell = cells[n];
     const timezone = zoneOf(p.lat, p.lon);
     const head = { latitude: cell.lat, longitude: cell.lon, timezone, utc_offset_seconds: timeZoneOffsetMinutes(started, timezone) * 60 };

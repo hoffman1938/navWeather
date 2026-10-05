@@ -25,6 +25,8 @@
     "../src/api/geocode.ts",
     "../src/api/route.ts",
     "../src/api/weather.ts",
+    "../src/api/elevation.ts",
+    "../src/api/air.ts",
     "../src/utils/timezone.ts"
   ]
 }

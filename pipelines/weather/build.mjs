@@ -8,6 +8,7 @@
  *   npm run data:weather -- --bbox 39,40,47,44            # only tiles touching this box (w,s,e,n): a quick local run
  *   npm run data:weather -- --out data/build/weather      # write the objects as files instead of R2
  *   npm run data:weather -- --force                       # rebuild even when these runs are already there
+ *   npm run data:weather -- --max-mb 400                  # download ceiling for one run (default 350 MB)
  *   npm run data:weather -- --env production              # into that environment's bucket on Cloudflare (needs
  *                                                         # `wrangler login` or CLOUDFLARE_API_TOKEN; the schedule
  *                                                         # in .github/workflows/weather.yml does this)
@@ -21,22 +22,20 @@
  * the globe, ~250 MB downloaded per run. Two builds stay in R2 (the newest and the one before, for requests in
  * flight); older ones are deleted.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { GRID, LATEST_KEY, MISSING, recordValues, runPrefix, TILE, tileKey, VARS } from '../../src/api/weather.ts';
 import { countryAt, decodeCountries } from '../../src/trip/countries.ts';
-import { getJson, OmVariable, stats } from './om.mjs';
+import { option, openStore, writer } from '../lib/store.mjs';
+import { getJson, OmVariable, setDownloadLimit, stats } from './om.mjs';
 
 const args = process.argv.slice(2);
-const opt = (name) => {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
-};
+const opt = (name) => option(args, name);
 const OUT = opt('out');
 const BBOX = opt('bbox')?.split(',').map(Number);
 const FORCE = args.includes('--force');
 const ENV = opt('env');
-if (ENV && ENV !== 'preview' && ENV !== 'production') throw new Error('--env is preview or production');
+// ~270 MB for the world (land and coasts); the run stops before going over this.
+setDownloadLimit(Number(opt('max-mb') ?? 350));
 
 const IFS = 'ecmwf_ifs025';
 const GFS = 'ncep_gfs025';
@@ -102,67 +101,7 @@ console.log(`IFS ${iso(newest.ref)}${older ? ` (continued by ${iso(older.ref)})`
 
 // ---- where we write ----
 
-async function openStore() {
-  if (OUT) {
-    return {
-      kind: `files in ${OUT}`,
-      put: async (key, bytes) => {
-        mkdirSync(dirname(join(OUT, key)), { recursive: true });
-        writeFileSync(join(OUT, key), bytes);
-      },
-      getText: async (key) => {
-        try {
-          return readFileSync(join(OUT, key), 'utf8');
-        } catch {
-          return null;
-        }
-      },
-      has: async (key) => existsSync(join(OUT, key)),
-      runs: async () => [],
-      deleteRun: async () => {},
-      close: async () => {},
-    };
-  }
-  const { getPlatformProxy, unstable_readConfig } = await import('wrangler');
-  let proxy;
-  if (ENV) {
-    // The environment's real bucket, through a one-binding config of our own (the Worker's config stays local).
-    const cfg = unstable_readConfig({ config: 'wrangler.toml', env: ENV }, { hideWarnings: true });
-    const bucket = cfg.r2_buckets.find((b) => b.binding === 'WEATHER')?.bucket_name;
-    const configPath = 'data/build/weather-remote.wrangler.json';
-    mkdirSync(dirname(configPath), { recursive: true });
-    writeFileSync(configPath, JSON.stringify({ name: 'navweather-weather-pipeline', compatibility_date: '2026-09-01', r2_buckets: [{ binding: 'WEATHER', bucket_name: bucket, remote: true }] }));
-    proxy = await getPlatformProxy({ configPath, persist: false });
-  } else {
-    // The same local state `wrangler dev` uses (.wrangler/state), so the dev Worker sees what we write.
-    proxy = await getPlatformProxy({ persist: true });
-  }
-  const bucket = proxy.env.WEATHER;
-  if (!bucket) throw new Error('wrangler.toml has no R2 binding WEATHER');
-  const keys = async (prefix) => {
-    const out = [];
-    let cursor;
-    do {
-      const page = await bucket.list({ prefix, cursor });
-      out.push(...page.objects.map((o) => o.key));
-      cursor = page.truncated ? page.cursor : undefined;
-    } while (cursor);
-    return out;
-  };
-  return {
-    kind: ENV ? `R2 of ${ENV} on Cloudflare` : 'local R2 (bucket of `npm run dev`)',
-    put: (key, bytes) => bucket.put(key, bytes),
-    getText: async (key) => (await bucket.get(key))?.text() ?? null,
-    has: async (key) => (await bucket.head(key)) !== null,
-    runs: async () => (await bucket.list({ prefix: 'weather/runs/', delimiter: '/' })).delimitedPrefixes.map((p) => p.split('/')[2]),
-    deleteRun: async (r) => {
-      const all = await keys(runPrefix(r));
-      for (let i = 0; i < all.length; i += 1000) await bucket.delete(all.slice(i, i + 1000));
-    },
-    close: () => proxy.dispose(),
-  };
-}
-const store = await openStore();
+const store = await openStore({ binding: 'WEATHER', env: ENV, out: OUT });
 const previous = JSON.parse((await store.getText(LATEST_KEY)) ?? 'null');
 if (previous?.run === run && !FORCE) {
   console.log(`${run} is already the latest (--force to rebuild).`);
@@ -226,14 +165,7 @@ const RV = recordValues({ vars: VARS, times });
 const odd = new Map();
 const ptypes = new Map();
 let written = 0;
-let storedBytes = 0;
-const pending = new Set();
-async function put(key, bytes) {
-  while (pending.size >= 8) await Promise.race(pending);
-  const p = store.put(key, bytes).finally(() => pending.delete(p));
-  pending.add(p);
-  storedBytes += bytes.byteLength;
-}
+const out = writer(store);
 
 for (let ty = 0; ty < tileRows; ty++) {
   if (!land[ty].length) continue;
@@ -285,7 +217,7 @@ for (let ty = 0; ty < tileRows; ty++) {
           });
         }
       }
-      await put(tileKey(run, ty, tx), new Uint8Array(rec.buffer));
+      await out.put(tileKey(run, ty, tx), new Uint8Array(rec.buffer));
       written++;
     }
   }
@@ -293,7 +225,7 @@ for (let ty = 0; ty < tileRows; ty++) {
     `  tiles ${written}/${tileCount} · downloaded ${(stats.bytes / 1e6).toFixed(0)} MB in ${stats.requests} requests · ${Math.round((Date.now() - t0) / 1000)} s`,
   );
 }
-await Promise.all(pending);
+await out.flush();
 const values = written * TILE * TILE * S * sources.length;
 for (const [key, n] of odd) {
   console.warn(`  ${key}: ${n} values outside the plausible range were left out`);
@@ -321,14 +253,15 @@ const indexJson = JSON.stringify(index);
 await store.put(`${runPrefix(run)}index.json`, indexJson);
 await store.put(LATEST_KEY, indexJson);
 const keep = new Set([run, previous?.run]);
-for (const r of await store.runs()) {
+for (const prefix of await store.prefixes('weather/runs/')) {
+  const r = prefix.split('/')[2];
   if (keep.has(r)) continue;
-  await store.deleteRun(r);
+  await store.deletePrefix(prefix);
   console.log(`  deleted the old build ${r}`);
 }
 for (const s of sources) s.file.dispose();
 hsurf.dispose();
 await store.close();
 console.log(
-  `${run}: ${written} tiles, ${(storedBytes / 1e6).toFixed(0)} MB → ${store.kind}; downloaded ${(stats.bytes / 1e6).toFixed(0)} MB; ${Math.round((Date.now() - t0) / 1000)} s`,
+  `${run}: ${written} tiles, ${(out.bytes / 1e6).toFixed(0)} MB → ${store.kind}; downloaded ${(stats.bytes / 1e6).toFixed(0)} MB; ${Math.round((Date.now() - t0) / 1000)} s`,
 );

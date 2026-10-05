@@ -107,6 +107,22 @@ name = "SHARE_LIMITER"
 namespace_id = "1009"
 simple = { limit = 240, period = 60 }
 
+# Heights for route profiles (one request per road), air quality for the map chip and place cards, public transport.
+[[ratelimits]]
+name = "ELEVATION_LIMITER"
+namespace_id = "1010"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "AIR_LIMITER"
+namespace_id = "1011"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "TRANSIT_LIMITER"
+namespace_id = "1012"
+simple = { limit = 30, period = 60 }
+
 # Our geocoder index (DEVELOPMENT_PLAN DP-4.4): the region's places, streets and addresses with FTS5.
 # Locally `npm run seed:local` loads it (no account needed).
 [[d1_databases]]
@@ -119,11 +135,17 @@ database_name = "navweather-geo"
 binding = "WEATHER"
 bucket_name = "navweather-weather"
 
+# Static open data built by our pipelines: heights (DP-4.7, `npm run data:elevation`), later map tiles (DP-5.5).
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "navweather-data"
+
 # Long-trip planner: Overpass endpoints and the User-Agent sent to them (name a contact before production —
 # Overpass asks apps to identify themselves; DP-0.6).
 [vars]
 OVERPASS_URLS = "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter"
 TRIP_USER_AGENT = "navWeather/0.1 (trip planner; Cloudflare Worker)"
+TRANSIT_BBOX = "39.9,41.0,46.8,43.6"
 
 # ---------------------------------------------------------------------------------------------------------------
 # preview: its own Worker and data. The first deploy creates the D1 database and the R2 bucket; load the geocoder
@@ -185,6 +207,21 @@ name = "SHARE_LIMITER"
 namespace_id = "2009"
 simple = { limit = 240, period = 60 }
 
+[[env.preview.ratelimits]]
+name = "ELEVATION_LIMITER"
+namespace_id = "2010"
+simple = { limit = 60, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "AIR_LIMITER"
+namespace_id = "2011"
+simple = { limit = 60, period = 60 }
+
+[[env.preview.ratelimits]]
+name = "TRANSIT_LIMITER"
+namespace_id = "2012"
+simple = { limit = 30, period = 60 }
+
 [[env.preview.d1_databases]]
 binding = "GEO"
 database_name = "navweather-geo-preview"
@@ -193,9 +230,14 @@ database_name = "navweather-geo-preview"
 binding = "WEATHER"
 bucket_name = "navweather-weather-preview"
 
+[[env.preview.r2_buckets]]
+binding = "DATA"
+bucket_name = "navweather-data-preview"
+
 [env.preview.vars]
 OVERPASS_URLS = "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter"
 TRIP_USER_AGENT = "navWeather/0.1 preview (trip planner; Cloudflare Worker)"
+TRANSIT_BBOX = "39.9,41.0,46.8,43.6"
 
 # ---------------------------------------------------------------------------------------------------------------
 # production: real users. The first deploy creates the D1 database and the R2 bucket; `npm run seed:production`
@@ -257,6 +299,21 @@ name = "SHARE_LIMITER"
 namespace_id = "3009"
 simple = { limit = 240, period = 60 }
 
+[[env.production.ratelimits]]
+name = "ELEVATION_LIMITER"
+namespace_id = "3010"
+simple = { limit = 60, period = 60 }
+
+[[env.production.ratelimits]]
+name = "AIR_LIMITER"
+namespace_id = "3011"
+simple = { limit = 60, period = 60 }
+
+[[env.production.ratelimits]]
+name = "TRANSIT_LIMITER"
+namespace_id = "3012"
+simple = { limit = 30, period = 60 }
+
 [[env.production.d1_databases]]
 binding = "GEO"
 database_name = "navweather-geo-production"
@@ -265,6 +322,11 @@ database_name = "navweather-geo-production"
 binding = "WEATHER"
 bucket_name = "navweather-weather-production"
 
+[[env.production.r2_buckets]]
+binding = "DATA"
+bucket_name = "navweather-data-production"
+
 [env.production.vars]
 OVERPASS_URLS = "https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter"
 TRIP_USER_AGENT = "navWeather/0.1 (trip planner; Cloudflare Worker)"
+TRANSIT_BBOX = "39.9,41.0,46.8,43.6"

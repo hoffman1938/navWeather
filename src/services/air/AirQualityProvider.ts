@@ -1,5 +1,5 @@
 import type { LngLat } from '../../types/geo';
-import { fetchJson } from '../http';
+import { fetchJson, isAbortError } from '../http';
 
 export interface AirQuality {
   /** European AQI (0 good … 100+ extremely poor). */
@@ -31,6 +31,43 @@ export class OpenMeteoAirQualityProvider implements AirQualityProvider {
     });
     const aqi = data.current?.european_aqi;
     const value = typeof aqi === 'number' && Number.isFinite(aqi) ? { europeanAqi: Math.round(aqi), observedAt: (data.current?.time ?? Date.now() / 1000) * 1000 } : null;
+    this.cache.set(key, { at: Date.now(), value });
+    return value;
+  }
+}
+
+/**
+ * Air quality from OUR CAMS tiles (`/api/v1/air`, DEVELOPMENT_PLAN DP-4.6): the European AQI now, anywhere on land.
+ * The `fallback` (the public Open-Meteo Air Quality API, while VITE_AIR_QUALITY_FALLBACK allows it) answers only when
+ * our Worker can't (no tiles here, too old). Cached ~30 min per ~5 km cell, like the fallback.
+ */
+export class ApiAirQualityProvider implements AirQualityProvider {
+  readonly name = 'navweather-air';
+  private cache = new Map<string, { at: number; value: AirQuality | null }>();
+
+  constructor(
+    private url: string,
+    private fallback: AirQualityProvider | null,
+  ) {}
+
+  async current([lon, lat]: LngLat, signal?: AbortSignal): Promise<AirQuality | null> {
+    const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const hit = this.cache.get(key);
+    if (hit && Date.now() - hit.at < 30 * 60_000) return hit.value;
+    let value: AirQuality | null;
+    try {
+      const params = new URLSearchParams({ latitude: lat.toFixed(2), longitude: lon.toFixed(2) });
+      const data = await fetchJson<{ current?: { time?: number; european_aqi?: number | null } }>(`${this.url}?${params}`, {
+        provider: 'Air quality service',
+        signal,
+        timeoutMs: 8000,
+      });
+      const aqi = data.current?.european_aqi;
+      value = typeof aqi === 'number' && Number.isFinite(aqi) ? { europeanAqi: Math.round(aqi), observedAt: (data.current?.time ?? Date.now() / 1000) * 1000 } : null;
+    } catch (e) {
+      if (!this.fallback || isAbortError(e)) throw e;
+      return this.fallback.current([lon, lat], signal);
+    }
     this.cache.set(key, { at: Date.now(), value });
     return value;
   }
